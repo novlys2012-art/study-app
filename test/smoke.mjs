@@ -1,6 +1,6 @@
-// Opens every screen of the built app in Chromium and fails on any page error.
-// Usage: npm run build && npm run smoke [-- reference-url]
-// With a reference URL (e.g. the old kviz-final page), each screen's text must match it.
+// Opens the built app in Chromium, checks the empty start screen, then plays one quiz round
+// on a made-up test subject. Fails on any page error.
+// Usage: npm run build && npm run smoke
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -18,40 +18,42 @@ const server = createServer(async (req, res) => {
   }
 }).listen(0);
 const base = `http://localhost:${server.address().port}/`;
-const reference = process.argv[2];
-const SCREENS = ["", "fu", "zauctuj", "ucty", "es", "mat", "mat-vypocty"];
+
+const SUBJECT = {
+  id: "test", code: "TST", name: "Testovací predmet", term: "",
+  topics: { a: "Téma A", b: "Téma B" },
+  questions: [
+    { t: "a", q: "Koľko je 2 + 2?", o: ["3", "4", "5", "6"], a: 1, e: "Dva a dva sú štyri.", x: "", s: "test" },
+    { t: "a", q: "Ktoré čísla sú párne?", o: ["1", "2", "3", "4"], a: [1, 3], e: "Párne sú 2 a 4.", x: "", s: "test" },
+    { t: "b", q: "Aká farba je obloha cez deň?", o: ["modrá", "zelená", "červená", "čierna"], a: 0, e: "", x: "", s: "" },
+  ],
+};
 
 const browser = await chromium.launch();
-let failed = 0;
+const page = await browser.newPage();
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && errors.push(m.text()));
+const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("✓ " + msg); };
 
-async function visit(url, hash) {
-  const page = await browser.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && !/goatcounter|gc\.zgo|fonts\./.test(m.text()) && errors.push(m.text()));
-  // Same random order on both pages, so screens with shuffled items compare equal.
-  await page.addInitScript(() => { let x = 42; Math.random = () => ((x = (x * 16807) % 2147483647) - 1) / 2147483646; });
-  await page.goto(url + (hash ? "#" + hash : ""));
-  await page.waitForLoadState("networkidle").catch(() => {});
-  const text = await page.locator("main").innerText();
-  return { page, errors, text };
-}
+await page.goto(base);
+check(await page.locator("#home").isVisible(), "start screen shows");
+check((await page.locator(".subj").count()) === 1, "no subjects, only the empty-state card");
 
-for (const hash of SCREENS) {
-  const { page, errors, text } = await visit(base, hash);
-  if (hash === "fu" || hash === "mat") {
-    await page.click("#go");
-    await page.locator("#opts button, #opts .opt").first().click();
-  }
-  if (errors.length) { failed++; console.log(`✗ #${hash}: ${errors.join(" | ")}`); }
-  else console.log(`✓ #${hash || "home"}`);
-  if (reference) {
-    const ref = await visit(reference, hash);
-    if (ref.text !== text) { failed++; console.log(`✗ #${hash}: text differs from reference`); }
-    await ref.page.close();
-  }
-  await page.close();
+await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.stringify([s])), SUBJECT);
+await page.goto(base + "#test");
+check(await page.locator("#setup").isVisible(), "subject opens on the round setup");
+await page.click('#counts [data-n="all"]');
+await page.click("#go");
+for (let n = 0; n < SUBJECT.questions.length; n++) {
+  await page.locator("#opts .opt").first().click();
+  if (await page.locator("#check").isVisible()) await page.click("#check");
+  await page.click("#next");
 }
+check(await page.locator("#end").isVisible(), "a full round ends on the result screen");
+await page.click("#crumb");
+check((await page.locator(".subj").count()) === 2, "home lists the subject and the add card");
+
 await browser.close();
 server.close();
-process.exit(failed ? 1 : 0);
+if (errors.length) { console.log("✗ " + errors.join("\n✗ ")); process.exit(1); }

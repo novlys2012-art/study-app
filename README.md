@@ -1,6 +1,6 @@
 # Study App
 
-Turns your own course files and past exams into summaries, quizzes and an exam plan, in Slovak and Czech. Built on the [kviz-final](https://github.com/novlys2012-art/kviz-final) quiz site.
+Turns your own course files and past exams into summaries, quizzes and an exam plan, in Slovak and Czech. Uses the design of the [kviz-final](https://github.com/novlys2012-art/kviz-final) quiz site, without its content.
 
 **Try it in the browser:** https://novlys2012-art.github.io/study-app/ (updated on every merge to `main`).
 

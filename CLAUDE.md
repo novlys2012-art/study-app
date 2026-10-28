@@ -1,6 +1,6 @@
 # Study App
 
-A study app for Slovak and Czech university students. A student uploads their own course files and past exams and gets clean summaries, quizzes, topics and a day-by-day plan up to the exam date. It grows out of the quiz site in `novlys2012-art/kviz-final` (Finančné účtovníctvo, Španielčina, Matematika I), and must keep its look and its study modes.
+A study app for Slovak and Czech university students. A student uploads their own course files and past exams and gets clean summaries, quizzes, topics and a day-by-day plan up to the exam date. It is a new app that reuses only the design and the quiz mechanics of the quiz site in `novlys2012-art/kviz-final`. **None of that site's content (subjects, questions, notes, accounts, Spanish or math material) belongs in this app**; every subject and question comes from the student's own uploads.
 
 - Development roadmap (phases, tasks, "done when" checks): https://claude.ai/artifact/Vh6sBwyMTvcZtmDTckrzoQ
 - Business case (pricing, costs, competitors, large-file costs, store rules): https://claude.ai/code/artifact/c7447c49-2241-49f3-bc99-49509500556d
@@ -15,7 +15,7 @@ The five core features, in build order (roadmap phases 3 to 6):
 4. **Exam countdown plan**: exam dates in, a daily plan and local reminders out (spaced repetition with ts-fsrs).
 5. **Slovak and Czech first**: the whole UI and every AI answer in the student's language.
 
-The existing study modes carry over: multiple-choice quiz, mistake review, "Zaúčtuj to", account list, math calculation practice with lenient answer checking, the Spanish workbook, flashcards and click-to-translate.
+From the quiz site only the multiple-choice quiz engine carries over: topics, round size, unseen questions, mistake review, explanations and the six looks. Its subject-specific modes (booking exercises, account list, math and Spanish practice) are not part of this app.
 
 **Not in version 1** (see the roadmap's "After version 1" list): streaks, XP, daily goals and leagues (Duolingo-style features), class sharing and the teacher plan, push notifications, a public library, a chat tutor, school licences, and all marketing.
 
@@ -37,7 +37,7 @@ The existing study modes carry over: multiple-choice quiz, mistake review, "Zaú
 - **Cost targets.** A 200-page PDF should cost under €0.10 to process; a heavy paying user under about €0.75 a month in AI. Extract text locally, strip repeated headers and footers, split into sections of about 8–10k tokens, hash files and sections so a shared file is processed once, and use Batch (half price) for anything not needed right away. Limits are counted in pages, not uploads.
 - **Generated questions use the quiz site's format** (`q`, `o`, `a`, `e`, `x`, `s`), so the existing quiz mode can show them unchanged. Every question keeps a source quote.
 - **UI strings go through `src/i18n/`.** Static markup uses `data-i18n="section.key"`; code uses `t("key")`. `sk.json` is the source, `cs.json` is filled in phase 7, missing keys fall back to Slovak.
-- **Keep the look.** The styles in `src/styles/legacy.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. New screens reuse its classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`) and colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
+- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. New screens reuse its classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`) and colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
 - **Privacy.** 16+ only unless parental consent is added. Original uploads are deleted once text extraction succeeds. An AI consent screen naming the provider is shown before the first upload (an App Store requirement).
 
 ## Pricing (planned)
@@ -48,15 +48,14 @@ Free tier with a small monthly page limit. Plus at €3.99 a month or €29.99 a
 
 ```
 index.html            page shell, markup tagged with data-i18n
-src/main.js           entry: styles, i18n, then the legacy app
-src/legacy/app.js     study modes carried over from kviz-final; split further as features are rebuilt
-src/data/             question banks: fu.js, mat.js, es.js (to move into Supabase later)
+src/main.js           entry: styles, i18n, then the app
+src/app/app.js        home screen and the multiple-choice quiz
+src/app/subjects.js   subjects and questions on the device (localStorage until Supabase in phase 2)
 src/i18n/             sk.json, cs.json, t() and applyI18n()
-src/styles/           legacy.css (all looks)
+src/styles/           app.css (all looks)
 ai/                   provider layer (index.js, providers/, prices.js) and prompts (tasks.js)
 scripts/ai-trial.mjs  phase 0 trial: run generation on real files and log tokens and cost
 android/, ios/        Capacitor native projects
-tools/                one-time migration scripts from kviz-final (already run; rerunning overwrites edits)
 test/                 unit tests (npm test) and the browser smoke test (npm run smoke)
 ```
 
@@ -66,7 +65,7 @@ test/                 unit tests (npm test) and the browser smoke test (npm run 
 npm install
 npm run dev            # local dev server
 npm test               # unit tests
-npm run build && npm run smoke   # opens every screen in Chromium and fails on any page error
+npm run build && npm run smoke   # opens the app in Chromium, plays a round on a made-up subject, fails on any page error
 npm run cap:sync       # build and copy into android/ and ios/
 npm run trial -- --dry-run files...   # phase 0: extract and count tokens without AI calls
 npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or another provider) in .env

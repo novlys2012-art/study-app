@@ -1,3 +1,3 @@
-import "./styles/legacy.css";
+import "./styles/app.css";
 import "./i18n/boot.js";
-import "./legacy/app.js";
+import "./app/app.js";
