@@ -12,7 +12,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap">
 </head>
-</head>
 <body>
 <main>
   <header>
@@ -35,6 +34,15 @@
   </section>
 
   <section class="sheet" id="setup" hidden>
+    <div class="group" id="filesWrap" hidden>
+      <p class="label" data-i18n="study.files">Zhrnutia</p>
+      <div class="cards" id="files"></div>
+      <p class="hint" id="checked" hidden></p>
+    </div>
+    <div class="group" id="tinfoWrap" hidden>
+      <p class="label" data-i18n="study.topics">Témy a slabé miesta</p>
+      <div class="cards" id="tinfo"></div>
+    </div>
     <div class="group" id="progWrap">
       <p class="label" data-i18n="setup.progress">Tvoj postup na tomto zariadení</p>
       <div class="progress" id="prog"></div>
@@ -66,6 +74,8 @@
     <p class="avail" id="avail"></p>
     <button class="btn" id="go" type="button" data-i18n="setup.go">Začať kolo</button>
     <p class="hint"><span data-i18n="setup.keys">Odpovedaj myšou alebo klávesmi 1–4, na ďalšiu otázku Enter.</span></p>
+    <div><button class="link" id="delSubj" type="button" data-i18n="setup.delete">Odstrániť predmet</button></div>
+    <div class="confirm" id="delConfirm" hidden><span data-i18n="setup.deleteConfirm">Odstrániť predmet aj s otázkami a postupom?</span><button class="tiny danger" id="delYes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="delNo" type="button" data-i18n="setup.no">Zrušiť</button></div>
   </section>
 
   <section class="sheet" id="quiz" hidden>
@@ -99,6 +109,49 @@
       <button class="btn" id="retry" type="button" data-i18n="end.retry">Zopakovať chyby</button>
       <button class="btn ghost" id="again" type="button" data-i18n="end.again">Nové kolo</button>
     </div>
+  </section>
+
+  <section class="sheet" id="upload" hidden>
+    <div class="group" id="upOff" hidden>
+      <p class="label" data-i18n="upload.offLabel">Online spracovanie</p>
+      <p class="hint" data-i18n="upload.off">Táto verzia ešte nie je pripojená na server, ktorý spracúva súbory.</p>
+    </div>
+    <div class="group" id="upLogin" hidden>
+      <p class="label" data-i18n="upload.loginLabel">Prihlásenie</p>
+      <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s odkazom na prihlásenie. Otvor ho v tomto prehliadači.</p>
+      <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" data-i18n-placeholder="upload.emailPlaceholder">
+      <button class="btn" id="upSend" type="button" data-i18n="upload.send">Poslať odkaz</button>
+      <p class="tipbox" id="upSent" hidden></p>
+    </div>
+    <div class="group" id="upConsent" hidden>
+      <p class="label" data-i18n="upload.consentLabel">Spracovanie umelou inteligenciou</p>
+      <p data-i18n="upload.consent1">Text tvojich súborov pošleme na spracovanie službe Claude od spoločnosti Anthropic. Z neho vzniknú zhrnutia, otázky a témy.</p>
+      <p class="hint" data-i18n="upload.consent2">Samotný súbor zostáva v tvojom zariadení. Posiela sa iba jeho text a obrázky strán, na ktorých text nie je. Anthropic tieto údaje nepoužíva na trénovanie modelov.</p>
+      <button class="btn" id="upAgree" type="button" data-i18n="upload.agree">Súhlasím a pokračovať</button>
+    </div>
+    <div class="group" id="upForm" hidden>
+      <div class="group">
+        <label class="label" for="upName" data-i18n="upload.nameLabel">Názov predmetu</label>
+        <input class="search" id="upName" type="text" maxlength="80" data-i18n-placeholder="upload.namePlaceholder">
+      </div>
+      <div class="group">
+        <p class="label" data-i18n="upload.filesLabel">Súbory</p>
+        <p class="hint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</p>
+        <label class="btn ghost" for="upFiles" data-i18n="upload.pick">Vybrať súbory</label>
+        <input id="upFiles" class="visually-hidden" type="file" multiple>
+        <ul class="miss" id="upList" hidden></ul>
+      </div>
+      <button class="btn" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
+      <p class="hint" id="upUsage"></p>
+      <p class="hint"><span id="upWho"></span> <button class="link" id="upOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button></p>
+    </div>
+    <div class="group" id="upWork" hidden>
+      <p class="label" data-i18n="upload.workLabel">Spracúvam</p>
+      <div class="bar"><i id="upBar"></i></div>
+      <p class="avail" id="upStep"></p>
+      <p class="hint" data-i18n="upload.workHint">Väčší súbor trvá pár minút. Nechaj túto stránku otvorenú.</p>
+    </div>
+    <p class="err" id="upErr" role="alert" hidden></p>
   </section>
 
   <footer id="foot"></footer>

@@ -7,3 +7,7 @@ android/app/build/
 android/.gradle/
 ios/App/Pods/
 trial-output/
+supabase/functions/_shared/
+supabase/.temp/
+dist-e2e/
+e2e-failure.png

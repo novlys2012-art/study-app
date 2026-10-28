@@ -17,4 +17,6 @@ Turns your own course files and past exams into summaries, quizzes and an exam p
 
 4. Open the address it prints (usually http://localhost:5173).
 
+To make uploads work on the live site, follow [docs/live-setup.md](docs/live-setup.md) (Supabase project, Claude key, GitHub settings).
+
 See [CLAUDE.md](CLAUDE.md) for goals, scope, stack and all commands.

@@ -33,4 +33,5 @@ export function t(key, vars) {
 export function applyI18n(root) {
   document.documentElement.lang = lang;
   root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
 }
