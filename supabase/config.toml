@@ -5,3 +5,13 @@ project_id = "study-app"
 [functions.generate]
 # The function checks the signed-in user itself, so it also works with the new publishable keys.
 verify_jwt = false
+
+# The sign-in email, in Slovak with the code at the top. Used by a local `supabase start`;
+# on the live project paste the same subject and file into the dashboard (docs/live-setup.md, step 3).
+[auth.email.template.magic_link]
+subject = "Kód na prihlásenie: {{ .Token }}"
+content_path = "./supabase/templates/sign-in.html"
+
+[auth.email.template.confirmation]
+subject = "Kód na prihlásenie: {{ .Token }}"
+content_path = "./supabase/templates/sign-in.html"

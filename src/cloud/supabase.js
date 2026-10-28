@@ -25,9 +25,19 @@ export async function session() {
   return data.session;
 }
 
+// Sends the sign-in email: a code to type on any device, plus a link that works in this browser.
 export async function signIn(email) {
   const { error } = await client().auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-  if (error) throw new CloudError(error.status === 429 ? "rate" : "signIn", error.message);
+  if (!error) return;
+  // 429 is either the project's hourly email cap or the one-minute wait between codes for one address.
+  if (error.status === 429) throw new CloudError(/seconds/i.test(error.message) ? "wait" : "rate", error.message);
+  throw new CloudError("signIn", error.message);
+}
+
+export async function verifyCode(email, code) {
+  const { data, error } = await client().auth.verifyOtp({ email, token: code, type: "email" });
+  if (error) throw new CloudError(error.status === 429 ? "rate" : "code", error.message);
+  return data.session;
 }
 
 export const signOut = () => client().auth.signOut();

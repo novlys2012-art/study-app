@@ -118,10 +118,18 @@
     </div>
     <div class="group" id="upLogin" hidden>
       <p class="label" data-i18n="upload.loginLabel">Prihlásenie</p>
-      <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s odkazom na prihlásenie. Otvor ho v tomto prehliadači.</p>
-      <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" data-i18n-placeholder="upload.emailPlaceholder">
-      <button class="btn" id="upSend" type="button" data-i18n="upload.send">Poslať odkaz</button>
-      <p class="tipbox" id="upSent" hidden></p>
+      <div class="group" id="upAsk">
+        <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s kódom na prihlásenie. Môžeš ho otvoriť aj v mobile.</p>
+        <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" data-i18n-placeholder="upload.emailPlaceholder">
+        <button class="btn" id="upSend" type="button" data-i18n="upload.send">Poslať kód</button>
+      </div>
+      <div class="group" id="upCodeBox" hidden>
+        <p class="tipbox" id="upSent"></p>
+        <label class="label" for="upCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
+        <input class="search code-input" id="upCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+        <button class="btn" id="upVerify" type="button" data-i18n="upload.verify">Prihlásiť sa</button>
+        <div><button class="link" id="upAgain" type="button" data-i18n="upload.again">Poslať nový kód alebo zmeniť e-mail</button></div>
+      </div>
     </div>
     <div class="group" id="upConsent" hidden>
       <p class="label" data-i18n="upload.consentLabel">Spracovanie umelou inteligenciou</p>

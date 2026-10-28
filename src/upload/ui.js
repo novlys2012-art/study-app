@@ -99,14 +99,25 @@ let wired = false;
 function wire() {
   if (wired) return; wired = true;
   $("upFiles").accept = TYPES.join(",");
+  const askCode = (on) => { $("upAsk").hidden = on; $("upCodeBox").hidden = !on; if (on) $("upCode").focus(); };
   $("upSend").onclick = async () => {
     const email = $("upEmail").value.trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { error(t("upload.err.email")); return; }
     error(""); $("upSend").disabled = true;
-    try { await cloud.signIn(email); $("upSent").textContent = t("upload.sent", { email }); $("upSent").hidden = false; }
+    try { await cloud.signIn(email); $("upSent").textContent = t("upload.sent", { email }); $("upCode").value = ""; askCode(true); }
     catch (e) { error(message(e)); }
     finally { $("upSend").disabled = false; }
   };
+  $("upVerify").onclick = async () => {
+    const code = $("upCode").value.replace(/\s/g, "");
+    if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat")); return; }
+    error(""); $("upVerify").disabled = true;
+    try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await refresh(); }
+    catch (e) { error(message(e)); }
+    finally { $("upVerify").disabled = false; }
+  };
+  $("upCode").onkeydown = (e) => { if (e.key === "Enter") $("upVerify").click(); };
+  $("upAgain").onclick = () => { error(""); askCode(false); };
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
     error("");
