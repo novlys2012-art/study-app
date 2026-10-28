@@ -57,7 +57,8 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 
 ## 6. Deploy and try it
 
-1. Open https://github.com/novlys2012-art/study-app/actions, run **Deploy server** (creates the usage table and the function), then run **Deploy web preview** (rebuilds the site with the Supabase address). Both run by themselves on later merges.
+1. Merge the pull request that added this file. The merge runs **Deploy server** (creates the usage table and the function) and **Deploy web preview** (rebuilds the site with the Supabase address) by themselves; watch them at https://github.com/novlys2012-art/study-app/actions. Both also run on every later merge.
+   If you add the GitHub settings after the merge, run them by hand: on the Actions page pick **Deploy server** in the left list, then **Run workflow** on the right; then the same for **Deploy web preview**. These buttons only exist once the workflows are on `main`.
 2. Open the site, choose **Pridať predmet**, enter your email, open the link from the email **in the same browser**, agree to the AI screen, pick a file and start.
 
 ## What it costs
