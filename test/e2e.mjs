@@ -139,6 +139,15 @@ async function makePptx() {
 // ----- The run.
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// Behave like a browser a year or two old (Safari on older iPhones): hide the newest built-ins
+// that pdf.js's modern build relies on, so a build that needs them fails here too.
+await page.addInitScript(() => {
+  delete Map.prototype.getOrInsertComputed; delete Map.prototype.getOrInsert;
+  delete WeakMap.prototype.getOrInsertComputed; delete WeakMap.prototype.getOrInsert;
+  delete Math.sumPrecise; delete Promise.try; delete Uint8Array.fromBase64; delete Uint8Array.prototype.toBase64;
+  // Safari cannot loop over a stream with for await; pdf.js reads page text that way.
+  delete ReadableStream.prototype[Symbol.asyncIterator]; delete ReadableStream.prototype.values;
+});
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 let refusing = false; // the wrong-code step expects the browser to log one 403

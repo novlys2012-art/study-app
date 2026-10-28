@@ -1,6 +1,7 @@
 // Text extraction on the device: PDF (pdf.js), PPTX (JSZip), DOCX (mammoth), TXT and MD.
 // The original file never leaves the device; only its text, and pictures of pages that have no text, are sent.
 import { stripRepeated, splitPages } from "./text.js";
+import { addStreamIteration } from "./polyfills.js";
 
 export const MIN_TEXT = 150;        // characters; a PDF page with less is read as a picture
 export const MAX_PAGES = 300;       // per file, for the free test
@@ -18,8 +19,11 @@ const words = (s) => s.replace(/\s+/g, " ").trim();
 let pdfjs;
 async function loadPdf() {
   if (!pdfjs) {
-    pdfjs = await import("pdfjs-dist");
-    pdfjs.GlobalWorkerOptions.workerSrc = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+    addStreamIteration();
+    // The legacy build carries its own polyfills; the modern one needs built-ins that Safari
+    // and older phones lack (Map.getOrInsertComputed, Math.sumPrecise, Promise.try).
+    pdfjs = await import("pdfjs-dist/legacy/build/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
   }
   return pdfjs;
 }
