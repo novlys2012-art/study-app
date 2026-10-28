@@ -59,6 +59,13 @@ const api = createServer(async (req, res) => {
   const path = req.url.split("?")[0];
   if (path === "/auth/v1/otp") return send(200, {});
   if (path === "/auth/v1/user") return send(200, USER);
+  // The 6-digit code from the email: 123456 is right, anything else is wrong or expired.
+  if (path === "/auth/v1/verify") {
+    const { token, email, type } = JSON.parse(raw || "{}");
+    if (token !== "123456" || email !== USER.email || type !== "email") return send(403, { code: "otp_expired", error_code: "otp_expired", msg: "Token has expired or is invalid" });
+    const now = Math.floor(Date.now() / 1000);
+    return send(200, { access_token: "fake-token", token_type: "bearer", expires_in: 3600, expires_at: now + 3600, refresh_token: "r", user: USER });
+  }
   if (path === "/functions/v1/generate") {
     bodyBytes += raw;
     const token = (req.headers.authorization || "").replace(/^Bearer /, "");
@@ -132,9 +139,19 @@ async function makePptx() {
 // ----- The run.
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// Behave like a browser a year or two old (Safari on older iPhones): hide the newest built-ins
+// that pdf.js's modern build relies on, so a build that needs them fails here too.
+await page.addInitScript(() => {
+  delete Map.prototype.getOrInsertComputed; delete Map.prototype.getOrInsert;
+  delete WeakMap.prototype.getOrInsertComputed; delete WeakMap.prototype.getOrInsert;
+  delete Math.sumPrecise; delete Promise.try; delete Uint8Array.fromBase64; delete Uint8Array.prototype.toBase64;
+  // Safari cannot loop over a stream with for await; pdf.js reads page text that way.
+  delete ReadableStream.prototype[Symbol.asyncIterator]; delete ReadableStream.prototype.values;
+});
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && errors.push(m.text()));
+let refusing = false; // the wrong-code step expects the browser to log one 403
+page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && !(refusing && /status of 403/.test(m.text())) && errors.push(m.text()));
 const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("✓ " + msg); };
 
 try {
@@ -145,15 +162,20 @@ try {
   await page.fill("#upEmail", USER.email);
   await page.click("#upSend");
   await page.locator("#upSent").waitFor();
-  check((await page.textContent("#upSent")).includes(USER.email), "sign-in link requested");
-
-  // What the sign-in link would leave behind: a session in local storage.
-  const now = Math.floor(Date.now() / 1000);
-  await page.evaluate((s) => localStorage.setItem("sb-localhost-auth-token", JSON.stringify(s)), {
-    access_token: "fake-token", token_type: "bearer", expires_in: 3600, expires_at: now + 3600, refresh_token: "r", user: USER,
-  });
+  check((await page.textContent("#upSent")).includes(USER.email), "sign-in code requested");
+  await page.fill("#upCode", "654321");
+  refusing = true;
+  await page.click("#upVerify");
+  await page.locator("#upErr").waitFor();
+  refusing = false;
+  check((await page.textContent("#upErr")).includes("Kód nesedí"), "a wrong code is refused");
+  await page.fill("#upCode", "123 456");
+  await page.press("#upCode", "Enter");
+  await page.locator("#upConsent").waitFor();
+  check(await page.locator("#upErr").isHidden(), "the right code signs in");
   await page.reload();
   await page.locator("#upConsent").waitFor();
+  check(true, "the session survives a reload");
   check((await page.textContent("#upConsent")).includes("Anthropic"), "consent screen names the AI provider");
   await page.click("#upAgree");
   await page.locator("#upForm").waitFor();

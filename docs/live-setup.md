@@ -24,14 +24,26 @@ Keep the key open in that tab for step 4.
    - **Project ref**: Project Settings → General → Project ID (20 lowercase letters).
    - **Publishable key**: Project Settings → API Keys → `sb_publishable_...` (the legacy `anon` key works too).
 
-## 3. Sign-in links
+## 3. Sign-in
 
-Authentication → URL Configuration:
+Students sign in with a 6-digit code from an email, so they can read the email on their phone and type the code on the computer. The link in the same email also works, but only in the browser that asked for it.
+
+**URLs.** Authentication → URL Configuration:
 
 - **Site URL:** `https://novlys2012-art.github.io/study-app/`
 - **Redirect URLs:** add `https://novlys2012-art.github.io/study-app/` and `http://localhost:5173/`
 
-Supabase's built-in email sender only delivers to members of your Supabase organisation and a few emails an hour. That is enough for you to test; other testers need your own email sender (Authentication → Emails → SMTP settings, for example with Resend's free plan).
+**The email.** Authentication → Emails → Templates. Do this for both **Magic link** and **Confirm signup**, because a first sign-in uses the second one:
+
+- **Subject:** `Kód na prihlásenie: {{ .Token }}`
+- **Body:** switch the editor to source and paste the whole of [`supabase/templates/sign-in.html`](../supabase/templates/sign-in.html) (open it on GitHub, press the copy button).
+
+**Your own mail sender.** Supabase's built-in sender only sends about 2 emails an hour for the whole project, and only to members of your Supabase organisation. Connect your own sender to lift both limits. Authentication → Emails → SMTP Settings → enable custom SMTP:
+
+- **Without your own domain: Gmail.** Turn on 2-Step Verification for your Google account, then create an app password at https://myaccount.google.com/apppasswords (name it `study-app`). Fill in host `smtp.gmail.com`, port `465`, username = your Gmail address, password = the 16-letter app password, sender email = your Gmail address, sender name `Study App`. Gmail allows about 500 emails a day, plenty for testing.
+- **With your own domain (later): Resend.** Sign up at https://resend.com, add and verify your domain, create an API key, then fill in host `smtp.resend.com`, port `465`, username `resend`, password = the API key, sender email `prihlasenie@<your domain>`. The free plan sends 100 emails a day. Without a verified domain Resend only delivers to your own address.
+
+After that, raise the cap under Authentication → Rate Limits → "Rate limit for sending emails" (for example 30 an hour). Type the password or key only into the Supabase page, never into a chat.
 
 ## 4. Secrets for the server function
 
@@ -59,7 +71,7 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 
 1. Merge the pull request that added this file. The merge runs **Deploy server** (creates the usage table and the function) and **Deploy web preview** (rebuilds the site with the Supabase address) by themselves; watch them at https://github.com/novlys2012-art/study-app/actions. Both also run on every later merge.
    If you add the GitHub settings after the merge, run them by hand: on the Actions page pick **Deploy server** in the left list, then **Run workflow** on the right; then the same for **Deploy web preview**. These buttons only exist once the workflows are on `main`.
-2. Open the site, choose **Pridať predmet**, enter your email, open the link from the email **in the same browser**, agree to the AI screen, pick a file and start.
+2. Open the site, choose **Pridať predmet**, enter your email, type the code from the email (you can read it on your phone), agree to the AI screen, pick a file and start.
 
 ## What it costs
 
