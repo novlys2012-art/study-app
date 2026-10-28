@@ -86,3 +86,32 @@ npm run trial -- --mode exam exams... # phase 0: tag old exam questions with top
 - When to register a živnosť (before phase 7), or sell through Paddle instead.
 - Age limit: 16+ only (recommended), or parental consent for younger students.
 - Whether the repo stays public once it holds paid features.
+
+## Status: where we left off (28 Oct 2026)
+
+Read this first when picking the work up again. Keep it current at the end of each working day.
+
+**Decisions made**
+- This is a new app, separate from `kviz-final`. It reuses only that site's design (six looks) and its quiz engine, and none of its content.
+- AI is Claude only: Haiku 5.5 for summaries, questions and topics, and Sonnet 5.5 for reading picture pages and scanned exams and for checking questions. The provider switch in `ai/` stays, but there are no plans to test other providers.
+- Version 1 is the five core features above. Duolingo-style features (streaks, XP, leagues) come after version 1.
+- Hosting: GitHub Pages for now (https://novlys2012-art.github.io/study-app/). Move to Cloudflare Pages or Vercel later, once a custom domain or headers are needed.
+- Key names: in cloud coding sessions the Claude key is saved as `STUDY_APP_ANTHROPIC_KEY`, because `ANTHROPIC_API_KEY` is reserved there. On the live site the key is the Supabase function secret `ANTHROPIC_API_KEY`.
+
+**Phase 0 AI trial** (full report in the project files, `ai-trial-2026-10-28/report.md`)
+- Past exam mode on 5 real math exams cost $0.21 in total. Reading an exam costs $0.02 to $0.04, including one made only of screenshots. Topic ranking was sensible, and Sonnet rated 19 of 20 practice questions correct.
+- Two finance lecture PDFs (11 and 19 pages) became summaries of 2.3 and 2.9 pages plus 10 questions each, for $0.16 including the Sonnet check and topics. The Sonnet check costs about 4× the Haiku generation, so it is the first place to save (check a sample, or use Batch).
+- Haiku's questions lean towards calculations, so the quiz prompt now asks for theory in the source's own wording as well.
+
+**What is live**
+- The site has an upload screen. You sign in with an email code, accept the AI consent screen (it names Anthropic), and pick PDF, PPTX, DOCX or TXT files. Files are read in the browser. Sonnet reads picture pages, Haiku writes a summary and questions for each section, Sonnet checks the questions, and Haiku sorts everything into topics with weak spots. The result opens as a subject with the summaries, topics and quiz. Subjects are saved only in that browser.
+- Supabase project (Frankfurt) with the `ai_usage` table and the `generate` function. Each account can spend at most $1 a month and the whole app $5 a day, and `ALLOWED_EMAILS` can limit who may use it. Both deploy from `main` through GitHub Actions.
+- Merged pull requests: #3 (live uploads) and #5 (sign-in by code, and the Safari fix for reading PDFs).
+
+**Open to-dos for Simon** (`docs/live-setup.md`, step 3)
+1. Supabase → Authentication → Emails → Templates: paste `supabase/templates/sign-in.html` into **Magic link** and **Confirm signup**, with the subject `Kód na prihlásenie: {{ .Token }}`.
+2. Connect your own mail sender (Gmail with an app password) and raise the email rate limit. The built-in sender only sends about 2 emails an hour.
+3. Retry the PDF that failed (`4_CP A PODIELY_2026.pdf`) on the iPhone and on a PC. This will be the first real end-to-end run, so check the cost line and the `ai_usage` table.
+
+**Next step**
+After the first real upload works, build past exam mode in the app, which is feature 3 and the main paid feature. Students upload old exams, `pastExamSystem` / `rankTopics` from `ai/tasks.js` link the questions to the subject's topics and rank them, and the quiz practises the topics in that order. After that come keeping subjects in Supabase so they appear on every device, and the exam countdown plan (feature 4).
