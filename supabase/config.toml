@@ -1,0 +1,7 @@
+# Supabase settings for this repo. The project itself is created in the dashboard (Frankfurt);
+# see docs/live-setup.md.
+project_id = "study-app"
+
+[functions.generate]
+# The function checks the signed-in user itself, so it also works with the new publishable keys.
+verify_jwt = false

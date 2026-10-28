@@ -4,10 +4,10 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import JSZip from "jszip";
-import { parseSummaryQuiz } from "../ai/tasks.js";
+import { parseSummaryQuiz, parsePastExam, rankTopics } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 import { costUsd } from "../ai/prices.js";
-import { extract, stripRepeated, toSections } from "../scripts/lib/extract.mjs";
+import { extract, extractImages, stripRepeated, toSections } from "../scripts/lib/extract.mjs";
 
 test("parseSummaryQuiz keeps valid questions and counts the rest", () => {
   const reply = 'Here:\n{"summary":"- a","questions":[{"q":"Q1","o":["x","y"],"a":1},{"q":"bad","o":["x"],"a":3}]}';
@@ -48,4 +48,29 @@ test("extract reads slide text and speaker notes from a PPTX", async () => {
   const path = join(await mkdtemp(join(tmpdir(), "pptx-")), "t.pptx");
   await writeFile(path, await zip.generateAsync({ type: "nodebuffer" }));
   assert.deepEqual(await extract(path), ["Prvý slajd\n[Poznámky] Poznámka", "Druhý"]);
+});
+
+test("parsePastExam keeps questions with a topic", () => {
+  const out = parsePastExam('{"questions":[{"n":1,"text":"Derivuj x^2","topic":"Derivácie","points":3},{"n":2,"text":"?","topic":""}],"unreadable":""}');
+  assert.deepEqual(out.questions, [{ n: "1", text: "Derivuj x^2", topic: "Derivácie", points: 3 }]);
+});
+
+test("rankTopics orders by how many exams a topic appears in", () => {
+  const q = (topic, points = 0) => ({ topic, points });
+  const ranking = rankTopics([
+    { questions: [q("Integrály", 5), q("Limity", 2), q("Integrály", 3)] },
+    { questions: [q("integrály", 4)] },
+  ]);
+  assert.deepEqual(ranking.map((r) => [r.topic, r.exams, r.questions, r.points]), [["Integrály", 2, 3, 12], ["Limity", 1, 1, 2]]);
+});
+
+test("extractImages returns DOCX pictures in document order and skips icons", async () => {
+  const zip = new JSZip();
+  const big = Buffer.alloc(6000, 1), icon = Buffer.alloc(100, 1);
+  zip.file("word/_rels/document.xml.rels", '<Relationships><Relationship Id="r1" Target="media/b.png"/><Relationship Id="r2" Target="media/a.png"/><Relationship Id="r3" Target="media/i.png"/></Relationships>');
+  zip.file("word/document.xml", '<w:document><a:blip r:embed="r1"/><a:blip r:embed="r3"/><a:blip r:embed="r2"/></w:document>');
+  zip.file("word/media/a.png", big); zip.file("word/media/b.png", big); zip.file("word/media/i.png", icon);
+  const path = join(await mkdtemp(join(tmpdir(), "docx-")), "t.docx");
+  await writeFile(path, await zip.generateAsync({ type: "nodebuffer" }));
+  assert.deepEqual((await extractImages(path)).map((x) => [x.name, x.mediaType]), [["word/media/b.png", "image/png"], ["word/media/a.png", "image/png"]]);
 });

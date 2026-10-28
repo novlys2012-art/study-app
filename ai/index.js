@@ -1,4 +1,5 @@
-// One entry point for every AI call, so the provider can be swapped with an env variable:
+// One entry point for every AI call. Claude is the chosen provider (28 Oct); the switch stays so
+// another provider can be added without touching callers:
 //   AI_PROVIDER=anthropic|google   AI_MODEL_FAST=...   AI_MODEL_STRONG=...
 // To add a provider, add a file in providers/ that exports DEFAULT_MODELS and complete().
 import * as anthropic from "./providers/anthropic.js";
@@ -19,10 +20,10 @@ export function getProvider(env = process.env) {
     if (!m) throw new Error(`Set AI_MODEL_${tier.toUpperCase()} for provider "${name}".`);
   }
 
-  // tier "fast" for summaries, quizzes and topics; "strong" for past exam analysis.
-  async function complete({ tier = "fast", system, prompt, maxTokens = 16000 }) {
+  // tier "fast" for summaries, quizzes and topics; "strong" for checks and scanned past exams.
+  async function complete({ tier = "fast", system, prompt, images, effort, maxTokens = 16000 }) {
     const model = models[tier];
-    const out = await impl.complete({ model, system, prompt, maxTokens });
+    const out = await impl.complete({ model, system, prompt, images, effort, maxTokens, env });
     return { ...out, provider: name, model, costUsd: costUsd(name, model, out.usage) };
   }
   return { name, models, complete };

@@ -1,0 +1,32 @@
+name: Deploy server
+
+# Updates the Supabase database tables and the "generate" server function on every push to main
+# that touches them. Skipped until the Supabase project is connected (see docs/live-setup.md).
+# The Claude key is NOT here: it is a secret in the Supabase dashboard, read only by the function.
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/**", "ai/**", "server/**", ".github/workflows/server.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.SUPABASE_PROJECT_REF != ''
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: npm run fn:prepare
+      - run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
+      - run: supabase functions deploy generate --project-ref "$PROJECT_REF" --use-api --no-verify-jwt

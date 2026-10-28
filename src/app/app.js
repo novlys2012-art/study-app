@@ -1,6 +1,7 @@
 // Home screen and the multiple-choice quiz: topics, round size, unseen questions, mistake review.
 import { t } from "../i18n/index.js";
-import { loadSubjects, progressKey } from "./subjects.js";
+import { loadSubjects, saveSubjects, progressKey } from "./subjects.js";
+import { renderMarkdown } from "./md.js";
 
 // Link to a form for reporting a wrong question; {id} and {q} are filled in.
 // Empty: the button copies the report text to the clipboard instead.
@@ -27,7 +28,7 @@ function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { co
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function show(id) {
-  ["home", "setup", "quiz", "end"].forEach((s) => ($(s).hidden = s !== id));
+  ["home", "setup", "quiz", "end", "upload"].forEach((s) => ($(s).hidden = s !== id));
   $("crumb").hidden = id === "home";
   window.scrollTo({ top: 0 });
 }
@@ -60,8 +61,57 @@ function setupProgress() {
   });
   $("progWrap").hidden = !seen; $("confirm").hidden = true; $("reset").hidden = false;
 }
+// Summaries per file and topics with their weak spots, for subjects made from uploads.
+function details(title, meta) {
+  const d = el("details", "card"); const sm = el("summary");
+  sm.append(el("span", null, title)); if (meta) sm.append(el("span", "n", meta));
+  d.appendChild(sm); return d;
+}
+function studyMaterial() {
+  const files = CUR.files || [], info = CUR.topicInfo || {};
+  const fb = $("files"); fb.innerHTML = "";
+  files.forEach((f) => {
+    const d = details(f.title || f.name, t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") }));
+    const body = el("div", "card-body");
+    if (f.title && f.title !== f.name) body.appendChild(el("p", "qid", f.name));
+    if (f.picturePages) body.appendChild(el("p", "hint", t("study.pictures", { n: f.picturePages })));
+    if (f.skippedPictures) body.appendChild(el("p", "hint", t("study.skipped", { n: f.skippedPictures })));
+    body.appendChild(renderMarkdown(f.summary));
+    if (f.keyTerms && f.keyTerms.length) {
+      body.appendChild(el("p", "label", t("study.terms")));
+      const dl = el("dl", "terms");
+      f.keyTerms.forEach((k) => dl.append(el("dt", null, k.term), el("dd", null, k.meaning)));
+      body.appendChild(dl);
+    }
+    d.appendChild(body); fb.appendChild(d);
+  });
+  $("checked").textContent = CUR.checkedOut ? t("study.checked", { n: CUR.checkedOut }) : "";
+  $("checked").hidden = !CUR.checkedOut;
+  $("filesWrap").hidden = !files.length;
+
+  const tb = $("tinfo"); tb.innerHTML = "";
+  Object.keys(TOPICS).forEach((k) => {
+    const n = QUESTIONS.filter((x) => x.t === k).length, it = info[k];
+    if (!it || (!it.summary && !(it.weakSpots || []).length && !n)) return;
+    const d = details(TOPICS[k], n ? n + " " + t("home.questions") : "");
+    const body = el("div", "card-body");
+    if (it.summary) body.appendChild(el("p", null, it.summary));
+    if ((it.weakSpots || []).length) {
+      body.appendChild(el("p", "label", t("study.weak")));
+      const ul = el("ul"); it.weakSpots.forEach((w) => ul.appendChild(el("li", null, w))); body.appendChild(ul);
+    }
+    if (n) {
+      const b = el("button", "btn ghost", t("study.practise")); b.type = "button";
+      b.onclick = () => { topic = k; mode = "all"; start(shuffle(pool()).slice(0, count === "all" ? undefined : +count)); };
+      body.appendChild(b);
+    }
+    d.appendChild(body); tb.appendChild(d);
+  });
+  $("tinfoWrap").hidden = !tb.childNodes.length;
+}
 function setup() {
-  setupProgress();
+  setupProgress(); studyMaterial();
+  $("delConfirm").hidden = true; $("delSubj").hidden = false;
   const box = $("topics"); box.innerHTML = "";
   const rows = [["all", t("setup.allTopics"), QUESTIONS.length]]
     .concat(Object.keys(TOPICS).map((k) => [k, TOPICS[k], QUESTIONS.filter((x) => x.t === k).length]).filter((r) => r[2]));
@@ -77,6 +127,13 @@ function setup() {
 $("reset").onclick = () => { $("confirm").hidden = false; $("reset").hidden = true; };
 $("no").onclick = () => { $("confirm").hidden = true; $("reset").hidden = false; };
 $("yes").onclick = () => { P = {}; save(); setup(); };
+$("delSubj").onclick = () => { $("delConfirm").hidden = false; $("delSubj").hidden = true; };
+$("delNo").onclick = () => { $("delConfirm").hidden = true; $("delSubj").hidden = false; };
+$("delYes").onclick = () => {
+  saveSubjects(loadSubjects().filter((x) => x.id !== CUR.id));
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  goHome();
+};
 $("modes").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
   mode = b.dataset.m; [...$("modes").children].forEach((x) => x.setAttribute("aria-pressed", x === b)); updAvail();
@@ -234,8 +291,8 @@ function subjectCard(sj, last) {
   return b;
 }
 
-function placeholderCard(title, text) {
-  const d = el("div", "sheet subj soon");
+function addCard(title, text) {
+  const d = el("button", "sheet subj add"); d.type = "button"; d.onclick = openUpload;
   const top = el("div", "subj-top"); top.append(el("span", "code", "+"));
   d.append(top, el("p", "subj-name", title), el("div", "subj-topics", text));
   return d;
@@ -245,7 +302,7 @@ function renderHome() {
   let last = ""; try { last = localStorage.getItem(LAST_KEY) || ""; } catch (e) {}
   const box = $("subjects"); box.innerHTML = "";
   SUBJECTS.forEach((sj) => box.appendChild(subjectCard(sj, sj.id === last && SUBJECTS.length > 1)));
-  box.appendChild(SUBJECTS.length ? placeholderCard(t("home.add.title"), t("home.add.text")) : placeholderCard(t("home.empty.title"), t("home.empty.text")));
+  box.appendChild(SUBJECTS.length ? addCard(t("home.add.title"), t("home.add.text")) : addCard(t("home.empty.title"), t("home.empty.text")));
 }
 
 function goHome() {
@@ -262,11 +319,21 @@ function openSubject(id) {
   setup(); setHash(sj.id);
 }
 
+// The upload screen loads its code (pdf.js, Supabase) only when opened.
+function openUpload() {
+  CUR = null;
+  head(t("upload.eyebrow"), t("upload.title"), t("upload.lede"), t("upload.foot"));
+  show("upload"); setHash("upload");
+  import("../upload/ui.js").then((m) => m.open({ opened: (id) => { SUBJECTS = loadSubjects(); openSubject(id); } }));
+}
+
 $("crumb").onclick = goHome;
 function route() {
   SUBJECTS = loadSubjects();
   const h = decodeURIComponent(location.hash.slice(1));
-  if (SUBJECTS.some((x) => x.id === h)) openSubject(h); else goHome();
+  // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
+  if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
+  else if (SUBJECTS.some((x) => x.id === h)) openSubject(h); else goHome();
 }
 route();
 window.addEventListener("hashchange", route);
