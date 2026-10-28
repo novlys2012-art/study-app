@@ -4,8 +4,8 @@ export const DEFAULT_MODELS = { fast: null, strong: null };
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models/";
 
-export async function complete({ model, system, prompt, images = [], maxTokens }) {
-  const key = process.env.GEMINI_API_KEY;
+export async function complete({ model, system, prompt, images = [], maxTokens, env }) {
+  const key = env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
   const res = await fetch(`${API}${encodeURIComponent(model)}:generateContent`, {
     method: "POST",

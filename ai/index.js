@@ -21,9 +21,9 @@ export function getProvider(env = process.env) {
   }
 
   // tier "fast" for summaries, quizzes and topics; "strong" for checks and scanned past exams.
-  async function complete({ tier = "fast", system, prompt, images, maxTokens = 16000 }) {
+  async function complete({ tier = "fast", system, prompt, images, effort, maxTokens = 16000 }) {
     const model = models[tier];
-    const out = await impl.complete({ model, system, prompt, images, maxTokens });
+    const out = await impl.complete({ model, system, prompt, images, effort, maxTokens, env });
     return { ...out, provider: name, model, costUsd: costUsd(name, model, out.usage) };
   }
   return { name, models, complete };
