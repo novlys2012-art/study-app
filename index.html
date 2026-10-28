@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Kvízy na precvičenie ZS 2026: finančné účtovníctvo, španielčina A1–A2 a matematika I, s vysvetleniami, cvičeniami a kartičkami.">
+<meta name="theme-color" content="#1f6b58">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6b58'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+<title>Kvízy na precvičenie ZS 2026</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap">
+</head>
+<body>
+<main>
+  <header>
+    <button class="crumb" id="crumb" type="button" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>Všetky predmety</button>
+    <div class="eyebrow" id="eyebrow">Finančné účtovníctvo · ZS 2026</div>
+    <h1 id="h1">Testové otázky na precvičenie</h1>
+    <p class="lede" id="lede"></p>
+    <div class="looks" id="looks"><span class="eyebrow" data-i18n="header.vzhlad">Vzhľad</span>
+      <button type="button" data-l="kocky" aria-pressed="true" data-i18n="header.kocky">Kocky</button>
+      <button type="button" data-l="riso" aria-pressed="false" data-i18n="header.riso">Riso</button>
+      <button type="button" data-l="" aria-pressed="false" data-i18n="header.default">Účtovná kniha</button>
+      <button type="button" data-l="zosit" aria-pressed="false" data-i18n="header.zosit">Zošit</button>
+      <button type="button" data-l="tabula" aria-pressed="false" data-i18n="header.tabula">Tabuľa</button>
+      <button type="button" data-l="cisty" aria-pressed="false" data-i18n="header.cisty">Čistý</button>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Časti stránky">
+      <button type="button" data-v="quiz" aria-current="page" data-i18n="header.quiz">Kvíz</button>
+      <button type="button" data-v="book" data-i18n="header.book">Zaúčtuj to</button>
+      <button type="button" data-v="acc" data-i18n="header.acc">Účty</button>
+      <button type="button" data-v="calc" data-i18n="header.calc">Príklady na výpočet</button>
+    </nav>
+  </header>
+
+  <section id="home" hidden>
+    <div class="subjects" id="subjects"></div>
+  </section>
+
+  <section id="es" hidden></section>
+
+  <section class="sheet" id="setup">
+    <div class="group" id="progWrap">
+      <p class="label" data-i18n="setup.tvoj_postup_na_tomto_zar">Tvoj postup na tomto zariadení</p>
+      <div class="progress" id="prog"></div>
+      <div><button class="link" id="reset" type="button" data-i18n="setup.reset">Vymazať postup</button></div>
+      <div class="confirm" id="confirm" hidden><span data-i18n="setup.naozaj_vymazat_cely_post">Naozaj vymazať celý postup?</span><button class="tiny danger" id="yes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="no" type="button" data-i18n="setup.no">Zrušiť</button></div>
+    </div>
+    <div class="group">
+      <p class="label" data-i18n="setup.tema">Téma</p>
+      <div class="topics" id="topics"></div>
+    </div>
+    <div class="group">
+      <p class="label" data-i18n="setup.pocet_otazok">Počet otázok</p>
+      <div class="seg" id="counts">
+        <button type="button" data-n="10" aria-pressed="false">10</button>
+        <button type="button" data-n="20" aria-pressed="true">20</button>
+        <button type="button" data-n="50" aria-pressed="false">50</button>
+        <button type="button" data-n="all" aria-pressed="false" data-i18n="setup.all">Všetky</button>
+        <label class="custom" for="customN"><span data-i18n="setup.vlastny">Vlastný:</span><input id="customN" type="number" inputmode="numeric" min="1" step="1" placeholder="napr. 35"></label>
+      </div>
+    </div>
+    <div class="group">
+      <p class="label" data-i18n="setup.ktore_otazky">Ktoré otázky</p>
+      <div class="seg" id="modes">
+        <button type="button" data-m="all" aria-pressed="true" data-i18n="setup.all">Všetky</button>
+        <button type="button" data-m="new" aria-pressed="false" data-i18n="setup.new">Ešte nevidené</button>
+        <button type="button" data-m="wrong" aria-pressed="false" data-i18n="setup.wrong">Moje chyby</button>
+      </div>
+    </div>
+    <p class="avail" id="avail"></p>
+    <button class="btn" id="go" type="button" data-i18n="setup.go">Začať kolo</button>
+    <p class="hint">Odpovedaj myšou alebo klávesmi <kbd>1</kbd>–<kbd>4</kbd>, na ďalšiu otázku <kbd>Enter</kbd>.</p>
+  </section>
+
+  <section class="sheet" id="quiz" hidden>
+    <div class="meta"><span class="eyebrow" id="qtopic"></span><span class="count" id="pos"></span></div>
+    <div class="bar"><i id="pg"></i></div>
+    <p class="q" id="q"></p>
+    <div class="fig" id="qfig" hidden></div>
+    <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
+    <div class="opts" id="opts"></div>
+    <div class="fb" id="fb" hidden>
+      <p class="verdict" id="verdict"></p>
+      <button class="link" id="toggle" type="button" data-i18n="quiz.toggle">Zobraziť vysvetlenie</button>
+      <div class="more" id="more" hidden></div>
+      <div class="foot"><span class="qid" id="qid"></span><span><button class="link" id="report" type="button" data-i18n="quiz.report">Nahlásiť chybu v otázke</button> <span class="toast" id="toast" hidden></span></span></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
+      <button class="btn" id="next" type="button" hidden data-i18n="quiz.next">Ďalšia otázka</button>
+      <button class="link" id="quit" type="button" data-i18n="quiz.quit">Ukončiť kolo</button>
+    </div>
+  </section>
+
+  <section class="sheet" id="end" hidden>
+    <p class="label" data-i18n="end.vysledok_kola">Výsledok kola</p>
+    <div class="score" id="final"></div>
+    <p class="lede" id="note"></p>
+    <div class="group" id="missWrap">
+      <p class="label" data-i18n="end.na_zopakovanie">Na zopakovanie</p>
+      <ul class="miss" id="miss"></ul>
+    </div>
+    <div class="row">
+      <button class="btn" id="retry" type="button" data-i18n="end.retry">Zopakovať chyby</button>
+      <button class="btn ghost" id="again" type="button" data-i18n="end.again">Nové kolo</button>
+    </div>
+  </section>
+
+  <section class="sheet" id="book" hidden>
+    <div class="group">
+      <p class="hint" data-i18n="book.precitaj_si_uctovny_prip">Prečítaj si účtovný prípad a napíš čísla účtov na strane MD a D. Pod políčkom uvidíš názov účtu, ktorý si napísal.</p>
+      <div class="chips" id="bTopics"></div>
+    </div>
+    <div class="meta"><span class="eyebrow" id="bTopic"></span><span class="count" id="bPos"></span></div>
+    <p class="q" id="bQ"></p>
+    <form class="fields" id="bForm" autocomplete="off">
+      <div class="field"><label for="bMd" data-i18n="book.ma_dat_md">Má dať (MD)</label><input id="bMd" inputmode="numeric" maxlength="3" placeholder="účet" list="acctlist"><div class="nmh" id="bMdN"></div></div>
+      <div class="field"><label for="bD" data-i18n="book.dal_d">Dal (D)</label><input id="bD" inputmode="numeric" maxlength="3" placeholder="účet" list="acctlist"><div class="nmh" id="bDN"></div></div>
+    </form>
+    <div class="row" id="bActions">
+      <button class="btn" id="bCheck" type="button" data-i18n="book.bCheck">Skontrolovať</button>
+      <button class="btn ghost" id="bTipBtn" type="button" data-i18n="book.bTipBtn">Tip</button>
+      <button class="link" id="bShow" type="button" data-i18n="book.bShow">Ukázať riešenie</button>
+    </div>
+    <div class="tipbox" id="bTip" hidden></div>
+    <div class="fb" id="bFb" hidden>
+      <p class="verdict" id="bVerdict"></p>
+      <div class="sol" id="bSol"></div>
+      <div class="more" id="bMore"></div>
+    </div>
+    <div class="row"><button class="btn" id="bNext" type="button" hidden data-i18n="book.bNext">Ďalší prípad</button></div>
+  </section>
+
+  <section class="sheet" id="acc" hidden>
+    <div class="group">
+      <p class="hint" data-i18n="acc.ramcova_uctova_osnova_pr">Rámcová účtová osnova pre podnikateľov, triedy 0 až 7. Ťukni na číslo účtu kdekoľvek na stránke a zobrazí sa jeho názov.</p>
+      <input class="search" id="aSearch" type="search" placeholder="Hľadaj číslo alebo názov účtu">
+      <div class="chips" id="aMode"><button type="button" data-m="all" aria-pressed="true" data-i18n="acc.all">Celá účtová osnova</button><button type="button" data-m="used" aria-pressed="false" data-i18n="acc.used">Len účty z otázok a cvičení</button></div>
+    </div>
+    <div class="alist" id="aList"></div>
+  </section>
+
+  <section class="sheet" id="calc" hidden>
+    <div class="group">
+      <p class="hint" data-i18n="calc.vypocitaj_priklad_na_pap">Vypočítaj príklad na papier a výsledok napíš do políčka. Netreba presné matematické znaky: x2 alebo x^2 je x², ex je eˣ, inf je ∞, a 0,5 je to isté ako 1/2. Pod políčkom uvidíš, ako odpoveď chápem.</p>
+      <div class="chips" id="cTopics"></div>
+    </div>
+    <div class="meta"><span class="eyebrow" id="cTopic"></span><span class="count" id="cPos"></span></div>
+    <div class="q cq" id="cQ"></div>
+    <div class="fig" id="cFig" hidden></div>
+    <form class="cfields" id="cForm" autocomplete="off"></form>
+    <p class="hint" id="cHelp"></p>
+    <div class="row" id="cActions">
+      <button class="btn" id="cCheck" type="button" data-i18n="calc.cCheck">Skontrolovať</button>
+      <button class="btn ghost" id="cTipBtn" type="button" data-i18n="calc.cTipBtn">Nápoveda</button>
+      <button class="link" id="cShow" type="button" data-i18n="calc.cShow">Ukázať riešenie</button>
+    </div>
+    <div class="tipbox" id="cTip" hidden></div>
+    <div class="fb" id="cFb" hidden><p class="verdict" id="cVerdict"></p></div>
+    <div class="group csol" id="cSolWrap" hidden>
+      <p class="label" data-i18n="calc.postup">Postup</p>
+      <ol class="csteps" id="cSol"></ol>
+    </div>
+    <div class="row">
+      <button class="btn" id="cNext" type="button" hidden data-i18n="calc.cNext">Ďalší príklad</button>
+      <button class="link" id="cPrev" type="button" hidden data-i18n="calc.cPrev">Predchádzajúci príklad</button>
+    </div>
+  </section>
+
+  <div class="pop" id="pop" role="dialog" aria-label="Účet" hidden></div>
+  <datalist id="acctlist"></datalist>
+  <div class="es-keys" id="esKeys" aria-label="Španielske písmená" hidden></div>
+  <div class="es-keys m-keys" id="mKeys" aria-label="Matematické znaky" hidden></div>
+
+  <footer id="foot">Otázky pripravili študenti, zdroje odkazujú na prezentácie Ing. Martiny Mateášovej, PhD. Ak nájdeš chybu v otázke, napíš autorovi kvízu. Stránka anonymne počíta návštevy, bez cookies a osobných údajov.</footer>
+</main>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
