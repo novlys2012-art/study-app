@@ -5,7 +5,8 @@ export const DEFAULT_MODELS = { fast: "claude-haiku-5-5", strong: "claude-sonnet
 let client;
 
 export async function complete({ model, system, prompt, maxTokens }) {
-  client ??= new Anthropic(); // reads ANTHROPIC_API_KEY
+  // Cloud sessions reserve ANTHROPIC_API_KEY, so the key can also be saved there as STUDY_APP_ANTHROPIC_KEY.
+  client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || process.env.STUDY_APP_ANTHROPIC_KEY });
   const res = await client.messages.create({
     model,
     max_tokens: maxTokens,

@@ -68,7 +68,7 @@ npm test               # unit tests
 npm run build && npm run smoke   # opens the app in Chromium, plays a round on a made-up subject, fails on any page error
 npm run cap:sync       # build and copy into android/ and ios/
 npm run trial -- --dry-run files...   # phase 0: extract and count tokens without AI calls
-npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or another provider) in .env
+npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or STUDY_APP_ANTHROPIC_KEY in a cloud environment, or another provider) in .env
 ```
 
 ## Open decisions
