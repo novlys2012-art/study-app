@@ -26,14 +26,14 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 | App | Plain JavaScript modules, built with Vite, wrapped for Android and iOS with Capacitor |
 | Text extraction | pdf.js, mammoth.js, JSZip, on the device; AI vision only for pages with no text |
 | Accounts, database, storage, server function | Supabase, Frankfurt region (from phase 2) |
-| AI | Behind `ai/index.js`, swappable by env variable. Default Claude Haiku 5.5 (`claude-haiku-5-5`) for summaries, quizzes and topics, Claude Sonnet 5.5 (`claude-sonnet-5-5`) for past exams. Google Gemini is wired in and being compared on cost. |
+| AI | **Claude** (decided 28 Oct, no multi-provider test). Claude Haiku 5.5 (`claude-haiku-5-5`) for summaries, quizzes and topics; Claude Sonnet 5.5 (`claude-sonnet-5-5`) for checking questions and reading scanned past exams. Calls go through `ai/index.js`, which keeps a provider switch (a Gemini adapter exists but is unused). |
 | Payments | RevenueCat (stores) and Stripe (web), phase 7 |
 | iPhone builds | Codemagic free tier |
 
 ## Rules
 
 - **AI keys never ship in the app.** Only `scripts/` and the Supabase server function (phase 3) call `ai/`. The server function checks the page quota and `file_cache` before every AI call.
-- **Keep the provider swappable.** All AI calls go through `getProvider().complete({ tier, system, prompt })`. Prompts live in `ai/tasks.js` and must stay provider-neutral (plain text in, JSON out). A new provider is one file in `ai/providers/` plus its prices in `ai/prices.js`.
+- **Keep the provider switch.** All AI calls go through `getProvider().complete({ tier, system, prompt, images })`. Prompts live in `ai/tasks.js` and must stay provider-neutral (plain text in, JSON out). A new provider is one file in `ai/providers/` plus its prices in `ai/prices.js`.
 - **Cost targets.** A 200-page PDF should cost under €0.10 to process; a heavy paying user under about €0.75 a month in AI. Extract text locally, strip repeated headers and footers, split into sections of about 8–10k tokens, hash files and sections so a shared file is processed once, and use Batch (half price) for anything not needed right away. Limits are counted in pages, not uploads.
 - **Generated questions use the quiz site's format** (`q`, `o`, `a`, `e`, `x`, `s`), so the existing quiz mode can show them unchanged. Every question keeps a source quote.
 - **UI strings go through `src/i18n/`.** Static markup uses `data-i18n="section.key"`; code uses `t("key")`. `sk.json` is the source, `cs.json` is filled in phase 7, missing keys fall back to Slovak.
@@ -68,7 +68,8 @@ npm test               # unit tests
 npm run build && npm run smoke   # opens the app in Chromium, plays a round on a made-up subject, fails on any page error
 npm run cap:sync       # build and copy into android/ and ios/
 npm run trial -- --dry-run files...   # phase 0: extract and count tokens without AI calls
-npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or another provider) in .env
+npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY in .env
+npm run trial -- --mode exam exams... # phase 0: tag old exam questions with topics and rank them (Sonnet, reads scans)
 ```
 
 ## Open decisions
@@ -76,4 +77,3 @@ npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or ano
 - When to register a živnosť (before phase 7), or sell through Paddle instead.
 - Age limit: 16+ only (recommended), or parental consent for younger students.
 - Whether the repo stays public once it holds paid features.
-- Which AI provider and models to use, after the cost comparison.

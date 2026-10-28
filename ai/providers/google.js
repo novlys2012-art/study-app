@@ -1,10 +1,10 @@
-// Gemini through its REST API. Pick the model with AI_MODEL_FAST / AI_MODEL_STRONG
-// once the provider comparison has chosen one; there is no default on purpose.
+// Gemini through its REST API. Not in use (Claude was chosen on 28 Oct); kept so the switch
+// in ai/index.js stays real. Needs AI_MODEL_FAST / AI_MODEL_STRONG, there is no default.
 export const DEFAULT_MODELS = { fast: null, strong: null };
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models/";
 
-export async function complete({ model, system, prompt, maxTokens }) {
+export async function complete({ model, system, prompt, images = [], maxTokens }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set.");
   const res = await fetch(`${API}${encodeURIComponent(model)}:generateContent`, {
@@ -12,7 +12,7 @@ export async function complete({ model, system, prompt, maxTokens }) {
     headers: { "content-type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts: [...images.map((im) => ({ inline_data: { mime_type: im.mediaType, data: im.data } })), { text: prompt }] }],
       generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" },
     }),
   });

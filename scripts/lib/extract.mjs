@@ -66,3 +66,34 @@ export function toSections(pages, maxTokens = 9000) {
   if (cur.trim()) out.push({ from, to: pages.length, text: cur });
   return out;
 }
+
+const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+const MIN_IMAGE_BYTES = 5000;      // smaller ones are icons and bullets
+const MAX_IMAGE_BYTES = 5_000_000; // the API's limit per image
+
+// Page images for scanned material: a photo file itself, or the pictures inside a DOCX in document order.
+// Image-only PDF pages need rendering, which the app does on the device in phase 3; here they are skipped.
+export async function extractImages(path) {
+  const ext = extname(path).toLowerCase();
+  const keep = (name, buf) => {
+    const mediaType = IMAGE_TYPES[extname(name).toLowerCase()];
+    if (!mediaType || buf.length < MIN_IMAGE_BYTES) return null;
+    if (buf.length > MAX_IMAGE_BYTES) { console.warn(`Skipping ${name}: over 5 MB`); return null; }
+    return { name, mediaType, data: buf.toString("base64") };
+  };
+  if (IMAGE_TYPES[ext]) return [keep(path, await readFile(path))].filter(Boolean);
+  if (ext !== ".docx") return [];
+  const zip = await JSZip.loadAsync(await readFile(path));
+  const rels = await zip.file("word/_rels/document.xml.rels")?.async("string") || "";
+  const target = new Map([...rels.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)].map((m) => [m[1], "word/" + m[2]]));
+  const doc = await zip.file("word/document.xml")?.async("string") || "";
+  const order = [...new Set([...doc.matchAll(/r:embed="([^"]+)"/g)].map((m) => target.get(m[1])).filter(Boolean))];
+  const out = [];
+  for (const name of order) {
+    const f = zip.file(name);
+    if (!f) continue;
+    const im = keep(name, await f.async("nodebuffer"));
+    if (im) out.push(im);
+  }
+  return out;
+}
