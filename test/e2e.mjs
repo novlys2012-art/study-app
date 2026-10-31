@@ -210,8 +210,26 @@ try {
   await page.locator("#opts .opt").first().click();
   await page.click("#toggle");
   check((await page.textContent("#more")).includes("prednaska1"), "the source quote names the file");
+  check(await page.locator("#upPct").textContent() === "100 %", "the upload bar ends at 100 %");
   await page.click("#crumb");
   check((await page.locator(".subj").count()) === 2, "home lists the new subject");
+
+  await page.locator(".subj").first().click();
+  await page.click("#addFiles");
+  await page.locator("#upForm").waitFor();
+  check(await page.locator("#upNameBox").isHidden() && (await page.textContent("#upInto")).includes("Mikroekonómia"), "adding files names the subject");
+  check(await page.locator("#upLimit").isVisible(), "the monthly limit shows as a bar");
+  await page.click('#upMake [data-k="summary"]');
+  await page.setInputFiles("#upFiles", [{ name: "doplnok.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: await makeDocx() }]);
+  if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "add-files.png"), fullPage: true });
+  const before = tasks.length;
+  await page.click("#upGo");
+  await page.locator("#setup").waitFor({ timeout: 30000 });
+  check(!tasks.slice(before).includes("summary"), "summaries can be left out");
+  check(await page.locator("#progWrap").isVisible(), "the subject keeps its progress after adding files");
+  check((await page.locator("#files .card").count()) === 3, "a file without a summary adds only questions");
+  await page.click("#crumb");
+  check((await page.locator(".subj").count()) === 2, "adding files does not make a second subject");
   check(ledger.length === tasks.filter((x) => x !== "usage").length, "every AI call is recorded for the limit");
 } catch (e) {
   errors.push(e.message);

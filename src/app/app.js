@@ -3,9 +3,6 @@ import { t } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, progressKey } from "./subjects.js";
 import { renderMarkdown } from "./md.js";
 
-// Link to a form for reporting a wrong question; {id} and {q} are filled in.
-// Empty: the button copies the report text to the clipboard instead.
-const REPORT_URL = "";
 const LOOK_KEY = "studyapp-look";
 const LAST_KEY = "studyapp-last-subject";
 const L = "ABCD";
@@ -62,53 +59,134 @@ function setupProgress() {
   $("progWrap").hidden = !seen; $("confirm").hidden = true; $("reset").hidden = false;
 }
 // Summaries per file and topics with their weak spots, for subjects made from uploads.
-function details(title, meta) {
-  const d = el("details", "card"); const sm = el("summary");
+// Both lists fold away, can be sorted, and get a search box once there are many cards.
+const FOLD_KEY = "studyapp-folds";
+const SEARCH_FROM = 6; // cards in both lists together before the search box shows
+let sortBy = "order", query = "";
+const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+function details(title, meta, cls = "card") {
+  const d = el("details", cls); const sm = el("summary");
   sm.append(el("span", null, title)); if (meta) sm.append(el("span", "n", meta));
   d.appendChild(sm); return d;
 }
+function fileCard(f) {
+  const d = details(f.title || f.name, t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") }));
+  const body = el("div", "card-body");
+  if (f.title && f.title !== f.name) body.appendChild(el("p", "qid", f.name));
+  if (f.picturePages) body.appendChild(el("p", "hint", t("study.pictures", { n: f.picturePages })));
+  if (f.skippedPictures) body.appendChild(el("p", "hint", t("study.skipped", { n: f.skippedPictures })));
+  body.appendChild(renderMarkdown(f.summary));
+  const terms = f.keyTerms || [];
+  if (terms.length) {
+    const sub = details(t("study.terms"), String(terms.length), "card-sub");
+    const dl = el("dl", "terms");
+    terms.forEach((k) => dl.append(el("dt", null, k.term), el("dd", null, k.meaning)));
+    sub.appendChild(dl); body.appendChild(sub);
+  }
+  d.appendChild(body);
+  d.dataset.text = norm([f.title, f.name, f.summary, ...terms.map((k) => k.term + " " + k.meaning)].join(" "));
+  return d;
+}
+function topicCard(k, it, n) {
+  const d = details(TOPICS[k], n ? n + " " + t("home.questions") : "");
+  const body = el("div", "card-body");
+  if (it.summary) body.appendChild(el("p", null, it.summary));
+  const weak = it.weakSpots || [];
+  if (weak.length) {
+    const sub = details(t("study.weak"), String(weak.length), "card-sub");
+    sub.open = true;
+    const ul = el("ul"); weak.forEach((w) => ul.appendChild(el("li", null, w))); sub.appendChild(ul);
+    body.appendChild(sub);
+  }
+  if (n) {
+    const b = el("button", "btn ghost", t("study.practise")); b.type = "button";
+    b.onclick = () => { topic = k; mode = "all"; start(shuffle(pool()).slice(0, count === "all" ? undefined : +count)); };
+    body.appendChild(b);
+  }
+  d.appendChild(body);
+  d.dataset.text = norm([TOPICS[k], it.summary, ...weak].join(" "));
+  return d;
+}
+function sorted(rows) {
+  // rows: [{ card, name, size }] in upload order
+  if (sortBy === "az") return rows.slice().sort((x, y) => x.name.localeCompare(y.name, "sk"));
+  if (sortBy === "long") return rows.slice().sort((x, y) => y.size - x.size);
+  return rows;
+}
 function studyMaterial() {
-  const files = CUR.files || [], info = CUR.topicInfo || {};
-  const fb = $("files"); fb.innerHTML = "";
-  files.forEach((f) => {
-    const d = details(f.title || f.name, t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") }));
-    const body = el("div", "card-body");
-    if (f.title && f.title !== f.name) body.appendChild(el("p", "qid", f.name));
-    if (f.picturePages) body.appendChild(el("p", "hint", t("study.pictures", { n: f.picturePages })));
-    if (f.skippedPictures) body.appendChild(el("p", "hint", t("study.skipped", { n: f.skippedPictures })));
-    body.appendChild(renderMarkdown(f.summary));
-    if (f.keyTerms && f.keyTerms.length) {
-      body.appendChild(el("p", "label", t("study.terms")));
-      const dl = el("dl", "terms");
-      f.keyTerms.forEach((k) => dl.append(el("dt", null, k.term), el("dd", null, k.meaning)));
-      body.appendChild(dl);
-    }
-    d.appendChild(body); fb.appendChild(d);
-  });
+  const files = (CUR.files || []).filter((f) => f.summary), info = CUR.topicInfo || {};
+  const fileRows = files.map((f) => ({ card: fileCard(f), name: f.title || f.name, size: +f.pagesBefore || 0 }));
+  const topicRows = Object.keys(TOPICS).map((k) => {
+    const n = QUESTIONS.filter((x) => x.t === k).length, it = info[k];
+    if (!it || (!it.summary && !(it.weakSpots || []).length && !n)) return null;
+    return { card: topicCard(k, it, n), name: TOPICS[k], size: n };
+  }).filter(Boolean);
+  $("files").replaceChildren(...sorted(fileRows).map((r) => r.card));
+  $("tinfo").replaceChildren(...sorted(topicRows).map((r) => r.card));
+  $("filesN").textContent = files.length; $("tinfoN").textContent = topicRows.length;
   $("checked").textContent = CUR.checkedOut ? t("study.checked", { n: CUR.checkedOut }) : "";
   $("checked").hidden = !CUR.checkedOut;
   $("filesWrap").hidden = !files.length;
-
-  const tb = $("tinfo"); tb.innerHTML = "";
-  Object.keys(TOPICS).forEach((k) => {
-    const n = QUESTIONS.filter((x) => x.t === k).length, it = info[k];
-    if (!it || (!it.summary && !(it.weakSpots || []).length && !n)) return;
-    const d = details(TOPICS[k], n ? n + " " + t("home.questions") : "");
-    const body = el("div", "card-body");
-    if (it.summary) body.appendChild(el("p", null, it.summary));
-    if ((it.weakSpots || []).length) {
-      body.appendChild(el("p", "label", t("study.weak")));
-      const ul = el("ul"); it.weakSpots.forEach((w) => ul.appendChild(el("li", null, w))); body.appendChild(ul);
-    }
-    if (n) {
-      const b = el("button", "btn ghost", t("study.practise")); b.type = "button";
-      b.onclick = () => { topic = k; mode = "all"; start(shuffle(pool()).slice(0, count === "all" ? undefined : +count)); };
-      body.appendChild(b);
-    }
-    d.appendChild(body); tb.appendChild(d);
-  });
-  $("tinfoWrap").hidden = !tb.childNodes.length;
+  $("tinfoWrap").hidden = !topicRows.length;
+  const many = fileRows.length + topicRows.length;
+  $("studyTools").hidden = fileRows.length < 2 && topicRows.length < 2;
+  $("studySearch").hidden = many < SEARCH_FROM;
+  if (many < SEARCH_FROM) query = "";
+  $("studySearch").value = query;
+  [...$("studySort").children].forEach((b) => b.setAttribute("aria-pressed", b.dataset.s === sortBy));
+  let folds = {}; try { folds = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; } catch (e) {}
+  document.querySelectorAll("details.fold").forEach((d) => { d.open = folds[d.dataset.fold] !== false; });
+  filterStudy();
 }
+// Hides cards that do not contain the search text and opens the ones that do.
+function filterStudy() {
+  const q = norm(query.trim());
+  let shown = 0;
+  ["files", "tinfo"].forEach((id) => {
+    let here = 0;
+    $(id).querySelectorAll(":scope > .card").forEach((d) => {
+      const hit = !q || d.dataset.text.includes(q);
+      d.hidden = !hit; if (hit) here++;
+      if (q && hit) { d.open = true; d.dataset.found = "1"; }
+      else if (!q && d.dataset.found) { d.open = false; delete d.dataset.found; }
+    });
+    if (q && here) $(id).closest("details").open = true;
+    $(id).closest("details").classList.toggle("none", !here);
+    shown += here;
+  });
+  $("studyNone").hidden = !q || !!shown;
+  foldLabels();
+}
+function foldLabels() {
+  document.querySelectorAll(".fold-all").forEach((b) => {
+    const cards = [...$(b.dataset.target).querySelectorAll(":scope > .card:not([hidden])")];
+    b.hidden = cards.length < 2;
+    b.textContent = t(cards.every((d) => d.open) ? "study.closeAll" : "study.openAll");
+  });
+}
+$("studySearch").oninput = () => { query = $("studySearch").value; filterStudy(); };
+$("studySort").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  sortBy = b.dataset.s; studyMaterial();
+};
+document.querySelectorAll(".fold-all").forEach((b) => {
+  b.onclick = () => {
+    const cards = [...$(b.dataset.target).querySelectorAll(":scope > .card:not([hidden])")];
+    const open = !cards.every((d) => d.open);
+    cards.forEach((d) => { d.open = open; });
+    foldLabels();
+  };
+});
+document.querySelectorAll("details.fold").forEach((d) => {
+  d.addEventListener("toggle", () => {
+    let folds = {}; try { folds = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; } catch (e) {}
+    folds[d.dataset.fold] = d.open;
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(folds)); } catch (e) {}
+  });
+});
+// A card opened or closed by hand updates the "open all" link.
+["files", "tinfo"].forEach((id) => $(id).addEventListener("toggle", foldLabels, true));
 function setup() {
   setupProgress(); studyMaterial();
   $("delConfirm").hidden = true; $("delSubj").hidden = false;
@@ -201,7 +279,6 @@ function grade(sel) {
     else if (sel.has(n)) b.classList.add("no"); else b.classList.add("dim");
   });
   $("check").hidden = true;
-  $("qid").textContent = t("quiz.qid", { id: x.id }); $("toast").hidden = true;
   const fb = $("fb"); fb.className = "fb " + (ok ? "good" : "bad");
   const cl = [...C].sort().map((n) => L[n]);
   $("verdict").textContent = ok ? t("quiz.correct")
@@ -215,18 +292,6 @@ function grade(sel) {
   $("next").textContent = t(i === list.length - 1 ? "quiz.toResult" : "quiz.next"); $("next").hidden = false; $("next").focus({ preventScroll: true });
 }
 $("toggle").onclick = () => { const m = $("more"); m.hidden = !m.hidden; $("toggle").textContent = t(m.hidden ? "quiz.show" : "quiz.hide"); };
-$("report").onclick = () => {
-  const x = list[i];
-  if (REPORT_URL) {
-    const a = document.createElement("a");
-    a.href = REPORT_URL.replace("{id}", encodeURIComponent(x.id)).replace("{q}", encodeURIComponent(x.q));
-    a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); return;
-  }
-  const txt = t("quiz.reportText", { id: x.id, q: x.q, a: corr(x).map((a) => x.o[a]).join(" | ") });
-  const done = (msg) => { $("toast").textContent = msg; $("toast").hidden = false; };
-  try { navigator.clipboard.writeText(txt).then(() => done(t("quiz.copied")), () => done(t("quiz.qid", { id: x.id }))); }
-  catch (e) { done(t("quiz.qid", { id: x.id })); }
-};
 $("check").onclick = () => { if (!answered && picked.size) grade(new Set(picked)); };
 $("next").onclick = () => { i++; i < list.length ? render() : finish(); };
 $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.length ? finish() : setup(); };
@@ -313,26 +378,31 @@ function goHome() {
 
 function openSubject(id) {
   const sj = SUBJECTS.find((x) => x.id === id); if (!sj) { goHome(); return; }
-  if (CUR !== sj) { CUR = sj; QUESTIONS = sj.questions; TOPICS = sj.topics; loadProgress(); topic = "all"; mode = "all"; list = []; }
+  if (CUR !== sj) { CUR = sj; QUESTIONS = sj.questions; TOPICS = sj.topics; loadProgress(); topic = "all"; mode = "all"; list = []; query = ""; }
   try { localStorage.setItem(LAST_KEY, sj.id); } catch (e) {}
   head(sj.name + (sj.term ? " · " + sj.term : ""), t("subject.title"), t("subject.lede", { n: sj.questions.length }), t("home.foot"));
   setup(); setHash(sj.id);
 }
 
 // The upload screen loads its code (pdf.js, Supabase) only when opened.
-function openUpload() {
+// With a subject id it adds files to that subject instead of making a new one.
+function openUpload(target) {
+  const into = typeof target === "string" ? SUBJECTS.find((x) => x.id === target) : null;
   CUR = null;
-  head(t("upload.eyebrow"), t("upload.title"), t("upload.lede"), t("upload.foot"));
-  show("upload"); setHash("upload");
-  import("../upload/ui.js").then((m) => m.open({ opened: (id) => { SUBJECTS = loadSubjects(); openSubject(id); } }));
+  if (into) head(into.name, t("upload.addTitle"), t("upload.addLede"), t("upload.foot"));
+  else head(t("upload.eyebrow"), t("upload.title"), t("upload.lede"), t("upload.foot"));
+  show("upload"); setHash(into ? "upload/" + into.id : "upload");
+  import("../upload/ui.js").then((m) => m.open({ target: into ? into.id : null, opened: (id) => { SUBJECTS = loadSubjects(); CUR = null; openSubject(id); } }));
 }
 
 $("crumb").onclick = goHome;
+$("addFiles").onclick = () => openUpload(CUR.id);
 function route() {
   SUBJECTS = loadSubjects();
   const h = decodeURIComponent(location.hash.slice(1));
   // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
-  if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
+  if (h.startsWith("upload/")) openUpload(h.slice(7));
+  else if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
   else if (SUBJECTS.some((x) => x.id === h)) openSubject(h); else goHome();
 }
 route();
