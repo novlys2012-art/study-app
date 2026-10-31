@@ -506,3 +506,16 @@ input[type="file"]:focus-visible + .btn,.btn:focus-visible{outline:2px solid var
 .card-sub>dl,.card-sub>ul{padding:0 12px 12px}
 .card-sub>ul{padding-left:calc(12px + 1.2em)}
 @media (prefers-reduced-motion:reduce){.fold>summary::before,.card-sub>summary::before{transition:none}}
+/* Upload: what to make, progress per file, the monthly limit */
+#upAmount{align-items:center}
+#upAmount[hidden]{display:none}
+.up-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.up-pct{font:700 22px var(--f-display);font-variant-numeric:tabular-nums}
+.up-steps{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:15px}
+.up-steps li{display:flex;gap:10px;align-items:baseline;min-width:0}
+.up-steps li span:last-child{min-width:0;overflow-wrap:anywhere}
+.up-steps .st{flex:0 0 7.5em;font:600 12px var(--f-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.up-steps li[data-state="ai"] .st,.up-steps li[data-state="reading"] .st{color:var(--ledger)}
+.up-steps li[data-state="done"] .st{color:var(--ok)}
+.up-steps li[data-state="failed"] .st{color:var(--no)}
+.limit.warn .bar i{background:var(--warn)}

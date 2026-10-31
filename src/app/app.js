@@ -115,7 +115,7 @@ function sorted(rows) {
   return rows;
 }
 function studyMaterial() {
-  const files = CUR.files || [], info = CUR.topicInfo || {};
+  const files = (CUR.files || []).filter((f) => f.summary), info = CUR.topicInfo || {};
   const fileRows = files.map((f) => ({ card: fileCard(f), name: f.title || f.name, size: +f.pagesBefore || 0 }));
   const topicRows = Object.keys(TOPICS).map((k) => {
     const n = QUESTIONS.filter((x) => x.t === k).length, it = info[k];
@@ -385,19 +385,24 @@ function openSubject(id) {
 }
 
 // The upload screen loads its code (pdf.js, Supabase) only when opened.
-function openUpload() {
+// With a subject id it adds files to that subject instead of making a new one.
+function openUpload(target) {
+  const into = typeof target === "string" ? SUBJECTS.find((x) => x.id === target) : null;
   CUR = null;
-  head(t("upload.eyebrow"), t("upload.title"), t("upload.lede"), t("upload.foot"));
-  show("upload"); setHash("upload");
-  import("../upload/ui.js").then((m) => m.open({ opened: (id) => { SUBJECTS = loadSubjects(); openSubject(id); } }));
+  if (into) head(into.name, t("upload.addTitle"), t("upload.addLede"), t("upload.foot"));
+  else head(t("upload.eyebrow"), t("upload.title"), t("upload.lede"), t("upload.foot"));
+  show("upload"); setHash(into ? "upload/" + into.id : "upload");
+  import("../upload/ui.js").then((m) => m.open({ target: into ? into.id : null, opened: (id) => { SUBJECTS = loadSubjects(); CUR = null; openSubject(id); } }));
 }
 
 $("crumb").onclick = goHome;
+$("addFiles").onclick = () => openUpload(CUR.id);
 function route() {
   SUBJECTS = loadSubjects();
   const h = decodeURIComponent(location.hash.slice(1));
   // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
-  if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
+  if (h.startsWith("upload/")) openUpload(h.slice(7));
+  else if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
   else if (SUBJECTS.some((x) => x.id === h)) openSubject(h); else goHome();
 }
 route();

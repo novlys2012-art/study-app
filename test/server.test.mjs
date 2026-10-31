@@ -111,3 +111,46 @@ test("pipeline: builds a subject in the quiz format from one file", async () => 
   assert.equal(sj.files[0].picturePages, 1);
   assert.deepEqual(sj.topicInfo.t1.weakSpots, ["posun vs. pohyb"]);
 });
+
+test("pipeline: makes only what was chosen", async () => {
+  const docs = [{ name: "L1", pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }];
+  const { call, log } = fakeCall();
+  const make = { summary: false, quiz: true, topics: false };
+  const steps = [];
+  const sj = await buildSubject({ name: "M", docs, call, make, onStep: (d, n) => steps.push([d, n]) });
+  assert.deepEqual(log, ["quiz", "check"]);
+  assert.equal(stepsFor(docs, make), 2);
+  assert.deepEqual(steps.at(-1), [2, 2]);
+  assert.equal(sj.files[0].summary, "");
+  assert.deepEqual(Object.values(sj.topics), ["L1"]);
+});
+
+test("pipeline: adds files to a subject, sorts topics again and renames moved questions", async () => {
+  const { call } = fakeCall();
+  const docs = [{ name: "L1", pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }];
+  const first = await buildSubject({ name: "Mikro", docs, call });
+  const oldId = first.questions[0].id;
+  const log = [];
+  let sent;
+  const call2 = async (task, input) => {
+    log.push(task);
+    if (task === "topics") {
+      sent = input;
+      return { topics: [{ name: "Ponuka", questions: ["n1#1"], files: [], summary: "", weakSpots: [] }, { name: "Dopyt", questions: ["p1"], files: [], summary: "", weakSpots: [] }] };
+    }
+    if (task === "quiz") return { questions: [{ q: "Čo robí ponuka, keď cena stúpne?", o: ["rastie", "klesá"], a: 0, e: "", x: "", s: "rastie", page: 1 }] };
+    if (task === "check") return [{ i: 0, verdict: "ok" }];
+    return call(task, input);
+  };
+  const sj = await buildSubject({ name: "", docs: [{ name: "L2", pages: ["Ponuka rastie s cenou. ".repeat(20)], images: [] }], call: call2, existing: first });
+  assert.equal(sj.id, first.id);
+  assert.equal(sj.name, "Mikro");
+  assert.deepEqual(sent.files.map((f) => f.name), ["L1", "L2"]);
+  assert.deepEqual(sent.questions.map((x) => x.id), ["p1", "n1#1"]);
+  assert.deepEqual(sj.topics, { t1: "Ponuka", t2: "Dopyt" });
+  assert.equal(sj.questions.length, 2);
+  const moved = sj.questions.find((x) => x.q === first.questions[0].q);
+  assert.equal(moved.t, "t2");
+  assert.equal(sj.renamed[oldId], moved.id);
+  assert.equal(sj.checkedOut, first.checkedOut);
+});
