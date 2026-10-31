@@ -56,10 +56,6 @@
   "quiz.hide": "Skryť vysvetlenie",
   "quiz.example": "Príklad: ",
   "quiz.source": "Zdroj: ",
-  "quiz.qid": "Otázka #{id}",
-  "quiz.report": "Nahlásiť chybu v otázke",
-  "quiz.reportText": "Chyba v otázke #{id}: {q}\nOznačená odpoveď: {a}\nČo je zle: ",
-  "quiz.copied": "Skopírované, pošli to autorovi otázok.",
   "quiz.check": "Skontrolovať",
   "quiz.next": "Ďalšia otázka",
   "quiz.toResult": "Zobraziť výsledok",
@@ -135,5 +131,12 @@
   "upload.again": "Poslať nový kód alebo zmeniť e-mail",
   "upload.err.wait": "Nový kód môžeš poslať o chvíľu, počkaj minútu.",
   "upload.err.code": "Kód nesedí alebo už vypršal. Skontroluj ho, alebo si pošli nový.",
-  "upload.err.codeFormat": "Zadaj kód z e-mailu (6 číslic)."
+  "upload.err.codeFormat": "Zadaj kód z e-mailu (6 číslic).",
+  "study.search": "Hľadať v zhrnutiach a témach",
+  "study.sortOrder": "Ako boli nahraté",
+  "study.sortAz": "Podľa názvu",
+  "study.sortLong": "Najdlhšie",
+  "study.none": "Nič sa nenašlo.",
+  "study.openAll": "Rozbaliť všetky",
+  "study.closeAll": "Zbaliť všetky"
 }

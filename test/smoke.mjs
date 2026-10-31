@@ -22,6 +22,10 @@ const base = `http://localhost:${server.address().port}/`;
 const SUBJECT = {
   id: "test", code: "TST", name: "Testovací predmet", term: "",
   topics: { a: "Téma A", b: "Téma B" },
+  topicInfo: { a: { summary: "Sčítanie.", weakSpots: ["Párne a nepárne čísla"] }, b: { summary: "Farby.", weakSpots: [] } },
+  files: ["Zlomky", "Algebra", "Ťažké príklady", "Bežné príklady"].map((title, k) => ({
+    name: "subor" + k + ".pdf", title, pagesBefore: 10 - k, pagesAfter: 1.5, summary: "- **" + title + "** v skratke", keyTerms: [],
+  })),
   questions: [
     { t: "a", q: "Koľko je 2 + 2?", o: ["3", "4", "5", "6"], a: 1, e: "Dva a dva sú štyri.", x: "", s: "test" },
     { t: "a", q: "Ktoré čísla sú párne?", o: ["1", "2", "3", "4"], a: [1, 3], e: "Párne sú 2 a 4.", x: "", s: "test" },
@@ -43,6 +47,12 @@ check((await page.locator(".subj").count()) === 1, "no subjects, only the empty-
 await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.stringify([s])), SUBJECT);
 await page.goto(base + "#test");
 check(await page.locator("#setup").isVisible(), "subject opens on the round setup");
+check((await page.locator("#files .card").count()) === 4 && (await page.locator("#tinfo .card").count()) === 2, "summaries and topics show");
+await page.fill("#studySearch", "tazke");
+check((await page.locator("#files .card:not([hidden])").count()) === 1 && await page.locator("#tinfoWrap").isHidden(), "search finds a summary without diacritics");
+await page.fill("#studySearch", "");
+await page.click('#studySort [data-s="az"]');
+check((await page.locator("#files .card summary span").first().textContent()) === "Algebra", "summaries sort by name");
 await page.click('#counts [data-n="all"]');
 await page.click("#go");
 for (let n = 0; n < SUBJECT.questions.length; n++) {

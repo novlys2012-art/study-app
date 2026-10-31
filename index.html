@@ -10,7 +10,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap">
 </head>
 <body>
 <main>
@@ -34,15 +34,30 @@
   </section>
 
   <section class="sheet" id="setup" hidden>
-    <div class="group" id="filesWrap" hidden>
-      <p class="label" data-i18n="study.files">Zhrnutia</p>
-      <div class="cards" id="files"></div>
-      <p class="hint" id="checked" hidden></p>
+    <div class="group study-tools" id="studyTools" hidden>
+      <input class="search" id="studySearch" type="search" autocomplete="off" data-i18n-placeholder="study.search">
+      <div class="seg" id="studySort">
+        <button type="button" data-s="order" aria-pressed="true" data-i18n="study.sortOrder">Ako boli nahraté</button>
+        <button type="button" data-s="az" aria-pressed="false" data-i18n="study.sortAz">Podľa názvu</button>
+        <button type="button" data-s="long" aria-pressed="false" data-i18n="study.sortLong">Najdlhšie</button>
+      </div>
+      <p class="hint" id="studyNone" hidden data-i18n="study.none">Nič sa nenašlo.</p>
     </div>
-    <div class="group" id="tinfoWrap" hidden>
-      <p class="label" data-i18n="study.topics">Témy a slabé miesta</p>
-      <div class="cards" id="tinfo"></div>
-    </div>
+    <details class="fold" id="filesWrap" data-fold="files" open hidden>
+      <summary><span class="label" data-i18n="study.files">Zhrnutia</span><span class="n" id="filesN"></span></summary>
+      <div class="group">
+        <button class="link fold-all" type="button" data-target="files"></button>
+        <div class="cards" id="files"></div>
+        <p class="hint" id="checked" hidden></p>
+      </div>
+    </details>
+    <details class="fold" id="tinfoWrap" data-fold="topics" open hidden>
+      <summary><span class="label" data-i18n="study.topics">Témy a slabé miesta</span><span class="n" id="tinfoN"></span></summary>
+      <div class="group">
+        <button class="link fold-all" type="button" data-target="tinfo"></button>
+        <div class="cards" id="tinfo"></div>
+      </div>
+    </details>
     <div class="group" id="progWrap">
       <p class="label" data-i18n="setup.progress">Tvoj postup na tomto zariadení</p>
       <div class="progress" id="prog"></div>
@@ -88,7 +103,6 @@
       <p class="verdict" id="verdict"></p>
       <button class="link" id="toggle" type="button"></button>
       <div class="more" id="more" hidden></div>
-      <div class="foot"><span class="qid" id="qid"></span><span><button class="link" id="report" type="button" data-i18n="quiz.report">Nahlásiť chybu v otázke</button> <span class="toast" id="toast" hidden></span></span></div>
     </div>
     <div class="row">
       <button class="btn" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
