@@ -25,7 +25,7 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 |---|---|
 | App | Plain JavaScript modules, built with Vite, wrapped for Android and iOS with Capacitor |
 | Text extraction | pdf.js, mammoth.js, JSZip, on the device; AI vision only for pages with no text |
-| Accounts, database, storage, server function | Supabase, Frankfurt region: email-link sign-in, `ai_usage` table, Edge Function `generate`. Deployed by `.github/workflows/server.yml`; the site gets `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` at build time |
+| Accounts, database, storage, server function | Supabase, Frankfurt region: email-link sign-in, `ai_usage`, `subjects` and `progress` tables, Edge Function `generate`. Deployed by `.github/workflows/server.yml`; the site gets `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` at build time |
 | AI | **Claude** (decided 28 Oct, no multi-provider test). Claude Haiku 5.5 (`claude-haiku-5-5`) for summaries, quizzes and topics; Claude Sonnet 5.5 (`claude-sonnet-5-5`) for checking questions and reading scanned past exams. Calls go through `ai/index.js`, which keeps a provider switch (a Gemini adapter exists but is unused). |
 | Payments | RevenueCat (stores) and Stripe (web), phase 7 |
 | iPhone builds | Codemagic free tier |
@@ -33,6 +33,7 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 ## Rules
 
 - **AI keys never ship in the app.** Only `scripts/` and the Supabase server function call `ai/`. The function (`supabase/functions/generate`, logic in `server/generate.js`) checks the signed-in user, the optional `ALLOWED_EMAILS` test list and the spending caps (`USER_MONTHLY_LIMIT_USD`, default 1; `DAILY_LIMIT_USD`, default 5) before every AI call, and records each call's cost in `ai_usage`. The page quota and `file_cache` come with paid plans. Setup steps: `docs/live-setup.md`.
+- **Subjects live on the device and in the account.** The app reads and writes localStorage only through `src/app/subjects.js`, which marks each change; `src/cloud/sync.js` copies changes to and from the `subjects` and `progress` tables (row level security: own rows only). When both sides changed, the newer subject wins and progress is merged per question. A signed-out student stays device-only.
 - **Files stay on the device.** The browser extracts text (`src/upload/extract.js`) and renders text-less PDF pages to JPEG; only text and those pictures are sent.
 - **Keep the provider switch.** All AI calls go through `getProvider().complete({ tier, system, prompt, images })`. Prompts live in `ai/tasks.js` and must stay provider-neutral (plain text in, JSON out). A new provider is one file in `ai/providers/` plus its prices in `ai/prices.js`.
 - **Cost targets.** A 200-page PDF should cost under €0.10 to process; a heavy paying user under about €0.75 a month in AI. Extract text locally, strip repeated headers and footers, split into sections of about 8–10k tokens, hash files and sections so a shared file is processed once, and use Batch (half price) for anything not needed right away. Limits are counted in pages, not uploads.
@@ -51,15 +52,16 @@ Free tier with a small monthly page limit. Plus at €3.99 a month or €29.99 a
 index.html            page shell, markup tagged with data-i18n
 src/main.js           entry: styles, i18n, then the app
 src/app/app.js        screens: Today, Subjects, one subject (tabs), summary reader, quiz, Profile, and the bottom tab bar
-src/app/subjects.js   subjects and questions on the device (localStorage until sync arrives)
+src/app/subjects.js   subjects, questions and progress on the device (localStorage), with marks of what changed
+src/app/autosync.js   when to sync with the account (start, after a change, back in front, after sign-in)
 src/app/md.js         safe renderer for the summaries' Markdown
 src/upload/           upload screen (ui.js), extraction on the device (extract.js, text.js), pipeline (pipeline.js)
-src/cloud/            Supabase sign-in and calls to the server function
+src/cloud/            Supabase sign-in, calls to the server function, and sync of subjects and progress (sync.js)
 src/i18n/             sk.json, cs.json, t() and applyI18n()
 src/styles/           app.css (all looks)
 ai/                   provider layer (index.js, providers/, prices.js) and prompts (tasks.js)
 server/generate.js    server task runner: auth, caps, one AI task, cost record (runs in the Edge Function and in tests)
-supabase/             config, migrations (ai_usage), functions/generate (Deno entry; shared code copied in by fn:prepare)
+supabase/             config, migrations (ai_usage, subjects and progress), functions/generate (Deno entry; shared code copied in by fn:prepare)
 docs/live-setup.md    connecting the live site: Supabase, keys, GitHub settings
 scripts/ai-trial.mjs  phase 0 trial: run generation on real files and log tokens and cost
 android/, ios/        Capacitor native projects

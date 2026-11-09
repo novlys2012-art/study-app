@@ -50,9 +50,10 @@ const fakeAi = {
 // ----- Fake Supabase: sign-in link request and the generate function.
 const USER = { id: "11111111-1111-1111-1111-111111111111", email: "student@example.com", aud: "authenticated", role: "authenticated" };
 const ledger = [], tasks = [];
+const db = { subjects: new Map(), progress: new Map() };
 let bodyBytes = "";
 const api = createServer(async (req, res) => {
-  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-version", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
+  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-version, prefer, accept-profile, content-profile", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS" };
   const send = (status, body) => { res.writeHead(status, { ...cors, "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
   if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
   let raw = ""; for await (const c of req) raw += c;
@@ -82,6 +83,20 @@ const api = createServer(async (req, res) => {
     } catch (e) {
       return e instanceof HttpError ? send(e.status, { error: e.code, message: e.message }) : send(500, { error: "server", message: e.message });
     }
+  }
+  // The account's tables, as PostgREST serves them: list (optionally "in" some ids), upsert, delete.
+  const table = (path.match(/^\/rest\/v1\/(subjects|progress)$/) || [])[1];
+  if (table) {
+    if (req.headers.authorization !== "Bearer fake-token") return send(401, { message: "no session" });
+    const q = new URL(req.url, API).searchParams, key = table === "progress" ? "subject_id" : "id";
+    const only = q.get(key) && q.get(key).replace(/^in\.\(|\)$/g, "").split(",").map((x) => x.replace(/^"|"$/g, ""));
+    if (req.method === "GET") {
+      const cols = q.get("select").split(",");
+      return send(200, [...db[table].values()].filter((r) => !only || only.includes(r[key])).map((r) => Object.fromEntries(cols.map((c) => [c, r[c]]))));
+    }
+    if (req.method === "POST") JSON.parse(raw).forEach((r) => db[table].set(r[key], { ...db[table].get(r[key]), ...r }));
+    else if (req.method === "DELETE") only.forEach((id) => db[table].delete(id));
+    res.writeHead(req.method === "POST" ? 201 : 204, cors); res.end(); return;
   }
   send(404, { error: "not found" });
 }).listen(API_PORT);
@@ -244,6 +259,41 @@ try {
   await page.click('#tabbar [data-go="home"]');
   check((await page.locator("#subjects .sj").count()) === 2, "adding files does not make a second subject");
   check(ledger.length === tasks.filter((x) => x !== "usage").length, "every AI call is recorded for the limit");
+
+  // ----- The account keeps a copy: it survives a cleared browser, and a delete reaches the account.
+  const until = async (fn, msg) => { for (let k = 0; k < 50 && !fn(); k++) await page.waitForTimeout(100); check(fn(), msg); };
+  const row = () => [...db.subjects.values()][0];
+  await until(() => db.subjects.size === 1 && row().data.files.length === 4 && row().data.name === "Mikroekonómia", "the subject is saved to the account");
+  await until(() => db.progress.size === 1 && Object.keys([...db.progress.values()][0].data).length === 1, "the quiz progress is saved to the account");
+  const other = await (await browser.newContext()).newPage();
+  other.on("pageerror", (e) => errors.push("second device: " + e.message));
+  await other.goto(base + "#upload");
+  await other.fill("#upEmail", USER.email);
+  await other.click("#upSend");
+  await other.fill("#upCode", "123456");
+  await other.click("#upVerify");
+  await other.locator("#upConsent").waitFor();
+  await other.click("#upClose");
+  await other.click('#tabbar [data-go="home"]');
+  check((await other.locator("#subjects .sj:not(.add)").count()) === 1, "signing in on a second device brings the subject");
+  await other.locator("#subjects .sj").first().click();
+  await other.click("#learn");
+  await other.locator("#opts .opt").first().click();
+  await until(() => Object.keys([...db.progress.values()][0].data).length === 2, "answers from the second device reach the account");
+  await other.close();
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("studyapp-") && k !== "studyapp-ai-consent").forEach((k) => localStorage.removeItem(k)));
+  await page.reload();
+  await page.locator("#subjects .sj:not(.add)").waitFor();
+  check(true, "after the browser lost its storage, the subject comes back from the account");
+  await page.locator("#subjects .sj").first().click();
+  await page.click("#sMore");
+  check(await page.locator("#progWrap").isVisible(), "the progress comes back too");
+  await page.click("#delSubj");
+  await page.click("#delYes");
+  await until(() => row().deleted === true && row().data === null && db.progress.size === 0, "deleting a subject removes it from the account");
+  await page.reload();
+  await page.waitForTimeout(800);
+  check((await page.locator("#subjects .sj").count()) === 1, "a deleted subject does not come back");
 } catch (e) {
   errors.push(e.message);
   const shown = await page.locator("#upErr").textContent().catch(() => "");
