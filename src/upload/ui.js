@@ -18,7 +18,16 @@ try { make = { ...make, ...JSON.parse(localStorage.getItem(MAKE_KEY)) }; } catch
 // The subject the files go into, when adding to one that exists.
 const target = () => (ctx && ctx.target ? loadSubjects().find((x) => x.id === ctx.target) : null);
 
-function panel(id) { PANELS.forEach((p) => ($(p).hidden = p !== id)); }
+// The three dots at the top: 1 pick files, 2 choose what to make, 3 processing.
+function dots(n) {
+  $("upDots").hidden = !n;
+  [...$("upDots").children].forEach((d, k) => d.classList.toggle("on", k < n));
+}
+function panel(id) {
+  PANELS.forEach((p) => ($(p).hidden = p !== id));
+  dots(id === "upWork" ? 3 : id === "upForm" ? ($("upStep2").hidden ? 1 : 2) : 0);
+}
+function step(n) { $("upStep1").hidden = n !== 1; $("upStep2").hidden = n !== 2; dots(n); }
 function error(msg) { $("upErr").textContent = msg || ""; $("upErr").hidden = !msg; }
 function usd(n) { return "$" + (Math.round(n * 100) / 100).toFixed(2); }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -59,12 +68,20 @@ async function refresh() {
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}
   if (!agreed) { panel("upConsent"); return; }
   $("upWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
-  const into = target();
-  $("upNameBox").hidden = !!into; $("upInto").hidden = !into;
-  if (into) $("upInto").textContent = t("upload.into", { name: into.name });
-  $("upGo").textContent = t(into ? "upload.goAdd" : "upload.go");
+  renderSubjects(); step(1);
   panel("upForm"); renderMake(); renderPicked();
   try { showUsage((await cloud.call("usage", {}, getLang())).usage); } catch (e) { error(message(e)); }
+}
+
+// The subject the files go into: one that exists, or a new one with a name.
+function renderSubjects() {
+  const all = loadSubjects(), sel = $("upSubject");
+  if (ctx.target && !all.some((x) => x.id === ctx.target)) ctx.target = null;
+  sel.replaceChildren(...all.map((x) => new Option(x.name, x.id)), new Option(t("upload.newSubject"), ""));
+  sel.value = ctx.target || "";
+  $("upSubjectBox").hidden = !all.length;
+  $("upNameBox").hidden = !!ctx.target;
+  $("upGo").textContent = t(ctx.target ? "upload.goAdd" : "upload.go");
 }
 
 function renderPicked() {
@@ -77,7 +94,9 @@ function renderPicked() {
     ul.appendChild(li);
   });
   ul.hidden = !picked.length;
-  const ok = picked.length && (ctx.target || $("upName").value.trim()) && (make.summary || make.quiz);
+  const ready = picked.length && (ctx.target || $("upName").value.trim());
+  const ok = ready && (make.summary || make.quiz);
+  $("upNext").disabled = !ready; $("upNext").style.opacity = ready ? 1 : 0.5;
   $("upGo").disabled = !ok; $("upGo").style.opacity = ok ? 1 : 0.5;
 }
 
@@ -146,7 +165,7 @@ async function run() {
     picked = []; $("upName").value = ""; $("upFiles").value = "";
     ctx.opened(saved.id);
   } catch (e) {
-    panel("upForm"); renderPicked();
+    step(2); panel("upForm"); renderPicked();
     error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) ? e.message : message(e));
   } finally {
     busy = false;
@@ -195,6 +214,9 @@ function wire() {
     renderPicked();
   };
   $("upName").oninput = renderPicked;
+  $("upSubject").onchange = () => { ctx.target = $("upSubject").value || null; renderSubjects(); renderPicked(); };
+  $("upNext").onclick = () => { error(""); step(2); };
+  $("upPrev").onclick = () => { error(""); step(1); };
   $("upMake").onclick = (e) => {
     const b = e.target.closest("button"); if (!b) return;
     make[b.dataset.k] = !make[b.dataset.k]; renderMake(); renderPicked();

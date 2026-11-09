@@ -1,5 +1,5 @@
-// Opens the built app in Chromium, checks the empty start screen, then plays one quiz round
-// on a made-up test subject. Fails on any page error.
+// Opens the built app in Chromium at phone size, checks the empty start screen, then walks a made-up
+// test subject: tabs, a summary, one quiz round, an exam date, Today and Profile. Fails on any page error.
 // Usage: npm run build && npm run smoke
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -40,29 +40,55 @@ page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && errors.push(m.text()));
 const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("✓ " + msg); };
 
+await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base);
-check(await page.locator("#home").isVisible(), "start screen shows");
-check((await page.locator(".subj").count()) === 1, "no subjects, only the empty-state card");
+check(await page.locator("#today").isVisible() && await page.locator("#tabbar").isVisible(), "start screen shows with the tab bar");
+check((await page.locator(".sj").count()) === 1, "no subjects, only the empty-state card");
 
 await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.stringify([s])), SUBJECT);
 await page.goto(base + "#test");
-check(await page.locator("#setup").isVisible(), "subject opens on the round setup");
-check((await page.locator("#files .card").count()) === 4 && (await page.locator("#tinfo .card").count()) === 2, "summaries and topics show");
+check(await page.locator("#subject").isVisible(), "subject opens on its overview");
+check((await page.locator("#tbars .tbar").count()) === 2, "overview lists the topics");
+await page.click('#sTabs [data-tab="topics"]');
+check((await page.locator("#tinfo .card").count()) === 2, "topics show");
+await page.click('#sTabs [data-tab="files"]');
+check((await page.locator("#files .card").count()) === 4, "summaries show");
 await page.fill("#studySearch", "tazke");
-check((await page.locator("#files .card:not([hidden])").count()) === 1 && await page.locator("#tinfoWrap").isHidden(), "search finds a summary without diacritics");
+check((await page.locator("#files .card:not([hidden])").count()) === 1, "search finds a summary without diacritics");
 await page.fill("#studySearch", "");
 await page.click('#studySort [data-s="az"]');
-check((await page.locator("#files .card summary span").first().textContent()) === "Algebra", "summaries sort by name");
+check((await page.locator("#files .card .rc-title").first().textContent()) === "Algebra", "summaries sort by name");
+await page.locator("#files .card").first().click();
+check(await page.locator("#reader").isVisible() && (await page.textContent("#rBody")).includes("Algebra"), "a summary opens in the reading view");
+await page.click("#rBack");
+
+await page.click("#custom");
 await page.click('#counts [data-n="all"]');
 await page.click("#go");
 for (let n = 0; n < SUBJECT.questions.length; n++) {
   await page.locator("#opts .opt").first().click();
   if (await page.locator("#check").isVisible()) await page.click("#check");
+  check(await page.locator("#fb").isVisible() && await page.locator("#tabbar").isHidden(), "the verdict slides up on question " + (n + 1));
   await page.click("#next");
 }
 check(await page.locator("#end").isVisible(), "a full round ends on the result screen");
-await page.click("#crumb");
-check((await page.locator(".subj").count()) === 2, "home lists the subject and the add card");
+await page.click("#endBack");
+
+await page.click("#sMore");
+const soon = new Date(Date.now() + 3 * 864e5);
+await page.fill("#examDate", `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`);
+await page.click("#moreSheet [data-close]");
+check((await page.textContent("#sMeta")).includes("o 3 dni"), "an exam date shows as a countdown");
+await page.click('#tabbar [data-go="home"]');
+check((await page.locator("#subjects .sj").count()) === 2, "subjects screen lists the subject and the add card");
+await page.click('#tabbar [data-go="today"]');
+check((await page.textContent("#todayBody .hero")).includes("Testovací predmet"), "today leads with the subject whose exam is nearest");
+await page.click("#todayBody .hero .btn");
+check(await page.locator("#quiz").isVisible(), "today's button starts a round");
+await page.click("#quit");
+await page.click('#tabbar [data-go="profile"]');
+await page.click('#looks [data-l="riso"]');
+check((await page.evaluate(() => document.body.dataset.look)) === "riso", "profile switches the look");
 
 await browser.close();
 server.close();

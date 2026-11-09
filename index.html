@@ -14,57 +14,226 @@
 </head>
 <body>
 <main>
-  <header>
-    <button class="crumb" id="crumb" type="button" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span data-i18n="header.crumb">Všetky predmety</span></button>
-    <div class="eyebrow" id="eyebrow"></div>
-    <h1 id="h1"></h1>
-    <p class="lede" id="lede"></p>
-    <div class="looks" id="looks"><span class="eyebrow" data-i18n="header.looks">Vzhľad</span>
-      <button type="button" data-l="kocky" aria-pressed="true" data-i18n="look.kocky">Kocky</button>
-      <button type="button" data-l="riso" aria-pressed="false" data-i18n="look.riso">Riso</button>
-      <button type="button" data-l="" aria-pressed="false" data-i18n="look.kniha">Účtovná kniha</button>
-      <button type="button" data-l="zosit" aria-pressed="false" data-i18n="look.zosit">Zošit</button>
-      <button type="button" data-l="tabula" aria-pressed="false" data-i18n="look.tabula">Tabuľa</button>
-      <button type="button" data-l="cisty" aria-pressed="false" data-i18n="look.cisty">Čistý</button>
-    </div>
-  </header>
-
-  <section id="home" hidden>
-    <div class="subjects" id="subjects"></div>
+  <section class="screen" id="today" hidden>
+    <header class="top"><div class="eyebrow" id="todayDate"></div><h1 data-i18n="today.title">Dnes</h1></header>
+    <div class="stack" id="todayBody"></div>
   </section>
 
-  <section class="sheet" id="setup" hidden>
-    <div class="group study-tools" id="studyTools" hidden>
-      <input class="search" id="studySearch" type="search" autocomplete="off" data-i18n-placeholder="study.search">
-      <div class="seg" id="studySort">
-        <button type="button" data-s="order" aria-pressed="true" data-i18n="study.sortOrder">Ako boli nahraté</button>
-        <button type="button" data-s="az" aria-pressed="false" data-i18n="study.sortAz">Podľa názvu</button>
-        <button type="button" data-s="long" aria-pressed="false" data-i18n="study.sortLong">Najdlhšie</button>
+  <section class="screen" id="home" hidden>
+    <header class="top"><div class="eyebrow" data-i18n="home.eyebrow">Študijná aplikácia</div><h1 data-i18n="home.title">Predmety</h1></header>
+    <div class="stack" id="subjects"></div>
+  </section>
+
+  <section class="screen" id="subject" hidden>
+    <div class="topbar">
+      <button class="iconbtn" id="sBack" type="button" data-i18n-label="nav.back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="grow"><h1 class="title" id="sName"></h1><p class="hint" id="sMeta"></p></div>
+      <button class="iconbtn" id="sMore" type="button" data-i18n-label="subject.more"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+    </div>
+    <div class="sheet" id="sCard">
+      <div class="meta"><b id="sPct"></b><span class="hint" id="sDue"></span></div>
+      <div class="bar"><i id="sBar"></i></div>
+      <button class="btn wide" id="learn" type="button" data-i18n="subject.learn">Učiť sa</button>
+      <button class="link center" id="custom" type="button" data-i18n="subject.custom">Vlastné kolo</button>
+    </div>
+    <div class="seg fill" id="sTabs">
+      <button type="button" data-tab="overview" aria-pressed="true" data-i18n="subject.tabOverview">Prehľad</button>
+      <button type="button" data-tab="files" aria-pressed="false" data-i18n="study.files">Zhrnutia</button>
+      <button type="button" data-tab="topics" aria-pressed="false" data-i18n="subject.tabTopics">Témy</button>
+    </div>
+    <div class="stack" id="tabOverview">
+      <div class="sheet"><p class="label" data-i18n="subject.weakFirst">Témy od najslabšej</p><div class="stack" id="tbars"></div></div>
+    </div>
+    <div class="stack" id="tabFiles" hidden>
+      <div class="group study-tools" id="studyTools" hidden>
+        <input class="search" id="studySearch" type="search" autocomplete="off" data-i18n-placeholder="study.search">
+        <div class="seg" id="studySort">
+          <button type="button" data-s="order" aria-pressed="true" data-i18n="study.sortOrder">Ako boli nahraté</button>
+          <button type="button" data-s="az" aria-pressed="false" data-i18n="study.sortAz">Podľa názvu</button>
+          <button type="button" data-s="long" aria-pressed="false" data-i18n="study.sortLong">Najdlhšie</button>
+        </div>
       </div>
+      <div class="stack" id="files"></div>
       <p class="hint" id="studyNone" hidden data-i18n="study.none">Nič sa nenašlo.</p>
+      <p class="hint" id="checked" hidden></p>
     </div>
-    <details class="fold" id="filesWrap" data-fold="files" open hidden>
-      <summary><span class="label" data-i18n="study.files">Zhrnutia</span><span class="n" id="filesN"></span></summary>
-      <div class="group">
-        <button class="link fold-all" type="button" data-target="files"></button>
-        <div class="cards" id="files"></div>
-        <p class="hint" id="checked" hidden></p>
-      </div>
-    </details>
-    <details class="fold" id="tinfoWrap" data-fold="topics" open hidden>
-      <summary><span class="label" data-i18n="study.topics">Témy a slabé miesta</span><span class="n" id="tinfoN"></span></summary>
-      <div class="group">
-        <button class="link fold-all" type="button" data-target="tinfo"></button>
-        <div class="cards" id="tinfo"></div>
-      </div>
-    </details>
-    <div><button class="btn ghost" id="addFiles" type="button" data-i18n="study.addFiles">+ Pridať súbory do predmetu</button></div>
-    <div class="group" id="progWrap">
-      <p class="label" data-i18n="setup.progress">Tvoj postup na tomto zariadení</p>
-      <div class="progress" id="prog"></div>
-      <div><button class="link" id="reset" type="button" data-i18n="setup.reset">Vymazať postup</button></div>
-      <div class="confirm" id="confirm" hidden><span data-i18n="setup.confirm">Naozaj vymazať celý postup?</span><button class="tiny danger" id="yes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="no" type="button" data-i18n="setup.no">Zrušiť</button></div>
+    <div class="stack" id="tabTopics" hidden><div class="stack" id="tinfo"></div></div>
+    <p class="hint" id="sEmpty" hidden data-i18n="subject.empty">Tento predmet je zatiaľ prázdny. Pridaj doň súbory cez ponuku vpravo hore.</p>
+  </section>
+
+  <section class="screen" id="reader" hidden>
+    <div class="topbar">
+      <button class="iconbtn" id="rBack" type="button" data-i18n-label="nav.back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="grow"><h1 class="title" id="rTitle"></h1><p class="hint" id="rMeta"></p></div>
     </div>
+    <div class="chips toc" id="rToc" hidden></div>
+    <div class="sheet" id="rBody"></div>
+    <div class="sheet" id="rTermsWrap" hidden><p class="label" data-i18n="study.terms">Kľúčové pojmy</p><dl class="terms" id="rTerms"></dl></div>
+    <button class="btn wide" id="rPractise" type="button" data-i18n="reader.practise">Precvičiť túto časť</button>
+  </section>
+
+  <section class="screen" id="quiz" hidden>
+    <div class="topbar">
+      <button class="iconbtn" id="quit" type="button" data-i18n-label="quiz.quit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="bar grow"><i id="pg"></i></div>
+      <span class="count" id="pos"></span>
+    </div>
+    <div class="eyebrow" id="qtopic"></div>
+    <p class="q" id="q"></p>
+    <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
+    <div class="opts" id="opts"></div>
+    <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
+    <div class="fb" id="fb" role="status" hidden>
+      <div class="fb-in">
+        <p class="verdict" id="verdict"></p>
+        <div class="more" id="more"></div>
+        <button class="btn wide" id="next" type="button"></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="end" hidden>
+    <div class="sheet">
+      <p class="label" data-i18n="end.result">Výsledok kola</p>
+      <div class="score" id="final"></div>
+      <p class="lede" id="note"></p>
+      <div class="group" id="missWrap">
+        <p class="label" data-i18n="end.review">Na zopakovanie</p>
+        <ul class="miss" id="miss"></ul>
+      </div>
+    </div>
+    <button class="btn wide" id="retry" type="button" data-i18n="end.retry">Zopakovať chyby</button>
+    <button class="btn wide ghost" id="again" type="button" data-i18n="end.again">Ďalšie kolo</button>
+    <button class="link center" id="endBack" type="button" data-i18n="end.back">Späť na predmet</button>
+  </section>
+
+  <section class="screen" id="upload" hidden>
+    <div class="topbar">
+      <button class="iconbtn" id="upClose" type="button" data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="dots" id="upDots" hidden><i></i><i></i><i></i></div>
+    </div>
+    <header class="top"><h1 class="title" id="upTitle"></h1><p class="lede" id="upLede"></p></header>
+    <div class="sheet">
+    <div class="group" id="upOff" hidden>
+      <p class="label" data-i18n="upload.offLabel">Online spracovanie</p>
+      <p class="hint" data-i18n="upload.off">Táto verzia ešte nie je pripojená na server, ktorý spracúva súbory.</p>
+    </div>
+    <div class="group" id="upLogin" hidden>
+      <p class="label" data-i18n="upload.loginLabel">Prihlásenie</p>
+      <div class="group" id="upAsk">
+        <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s kódom na prihlásenie. Môžeš ho otvoriť aj v mobile.</p>
+        <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" data-i18n-placeholder="upload.emailPlaceholder">
+        <button class="btn wide" id="upSend" type="button" data-i18n="upload.send">Poslať kód</button>
+      </div>
+      <div class="group" id="upCodeBox" hidden>
+        <p class="tipbox" id="upSent"></p>
+        <label class="label" for="upCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
+        <input class="search code-input" id="upCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+        <button class="btn wide" id="upVerify" type="button" data-i18n="upload.verify">Prihlásiť sa</button>
+        <div><button class="link" id="upAgain" type="button" data-i18n="upload.again">Poslať nový kód alebo zmeniť e-mail</button></div>
+      </div>
+    </div>
+    <div class="group" id="upConsent" hidden>
+      <p class="label" data-i18n="upload.consentLabel">Spracovanie umelou inteligenciou</p>
+      <p data-i18n="upload.consent1">Text tvojich súborov pošleme na spracovanie službe Claude od spoločnosti Anthropic. Z neho vzniknú zhrnutia, otázky a témy.</p>
+      <p class="hint" data-i18n="upload.consent2">Samotný súbor zostáva v tvojom zariadení. Posiela sa iba jeho text a obrázky strán, na ktorých text nie je. Anthropic tieto údaje nepoužíva na trénovanie modelov.</p>
+      <button class="btn wide" id="upAgree" type="button" data-i18n="upload.agree">Súhlasím a pokračovať</button>
+    </div>
+    <div class="group" id="upForm" hidden>
+      <div class="group" id="upStep1">
+        <div class="group" id="upSubjectBox" hidden>
+          <label class="label" for="upSubject" data-i18n="upload.subjectLabel">Predmet</label>
+          <select class="search" id="upSubject"></select>
+        </div>
+        <div class="group" id="upNameBox">
+          <label class="label" for="upName" data-i18n="upload.nameLabel">Názov predmetu</label>
+          <input class="search" id="upName" type="text" maxlength="80" data-i18n-placeholder="upload.namePlaceholder">
+        </div>
+        <div class="group">
+          <p class="label" data-i18n="upload.filesLabel">Súbory</p>
+          <label class="drop" for="upFiles"><b data-i18n="upload.pick">Vybrať súbory</b><span data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
+          <input id="upFiles" class="visually-hidden" type="file" multiple>
+          <ul class="miss" id="upList" hidden></ul>
+        </div>
+        <button class="btn wide" id="upNext" type="button" data-i18n="upload.next">Ďalej</button>
+        <p class="hint"><span id="upWho"></span> <button class="link" id="upOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button></p>
+      </div>
+      <div class="group" id="upStep2" hidden>
+        <div class="group">
+          <p class="label" data-i18n="upload.makeLabel">Čo chceš vytvoriť</p>
+          <div class="chips" id="upMake">
+            <button type="button" data-k="summary" aria-pressed="true" data-i18n="upload.makeSummary">Zhrnutia</button>
+            <button type="button" data-k="quiz" aria-pressed="true" data-i18n="upload.makeQuiz">Otázky na precvičenie</button>
+            <button type="button" data-k="topics" aria-pressed="true" data-i18n="upload.makeTopics">Témy a slabé miesta</button>
+          </div>
+          <div class="seg" id="upAmount">
+            <span class="hint" data-i18n="upload.amountLabel">Počet otázok:</span>
+            <button type="button" data-a="0.5" aria-pressed="false" data-i18n="upload.amountFew">Menej</button>
+            <button type="button" data-a="1" aria-pressed="true" data-i18n="upload.amountNormal">Bežne</button>
+            <button type="button" data-a="1.5" aria-pressed="false" data-i18n="upload.amountMany">Viac</button>
+          </div>
+          <p class="hint" id="upMakeHint" hidden data-i18n="upload.makeNone">Vyber aspoň zhrnutia alebo otázky.</p>
+        </div>
+        <div class="group limit" id="upLimit" hidden>
+          <p class="label" data-i18n="upload.limitLabel">Mesačný limit</p>
+          <div class="bar"><i id="upLimitBar"></i></div>
+          <p class="hint" id="upUsage"></p>
+        </div>
+        <button class="btn wide" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
+        <button class="link center" id="upPrev" type="button" data-i18n="nav.back">Späť</button>
+      </div>
+    </div>
+    <div class="group" id="upWork" hidden>
+      <p class="label" data-i18n="upload.workLabel">Spracúvam</p>
+      <div class="up-head"><span class="up-pct" id="upPct">0 %</span><span class="hint" id="upEta"></span></div>
+      <div class="bar"><i id="upBar"></i></div>
+      <p class="avail" id="upStep"></p>
+      <ul class="up-steps" id="upSteps"></ul>
+      <p class="hint" data-i18n="upload.workHint">Väčší súbor trvá pár minút. Nechaj túto stránku otvorenú.</p>
+    </div>
+    <p class="err" id="upErr" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <section class="screen" id="profile" hidden>
+    <header class="top"><h1 data-i18n="profile.title">Profil</h1></header>
+    <div class="sheet">
+      <p class="label" data-i18n="profile.account">Účet</p>
+      <p class="hint" id="pWho"></p>
+      <button class="btn wide ghost" id="pSign" type="button" hidden></button>
+      <div class="group limit" id="pLimit" hidden>
+        <p class="label" data-i18n="upload.limitLabel">Mesačný limit</p>
+        <div class="bar"><i id="pLimitBar"></i></div>
+        <p class="hint" id="pUsage"></p>
+      </div>
+    </div>
+    <div class="sheet">
+      <p class="label" data-i18n="header.looks">Vzhľad</p>
+      <div class="chips" id="looks">
+        <button type="button" data-l="kocky" aria-pressed="true" data-i18n="look.kocky">Kocky</button>
+        <button type="button" data-l="riso" aria-pressed="false" data-i18n="look.riso">Riso</button>
+        <button type="button" data-l="" aria-pressed="false" data-i18n="look.kniha">Účtovná kniha</button>
+        <button type="button" data-l="zosit" aria-pressed="false" data-i18n="look.zosit">Zošit</button>
+        <button type="button" data-l="tabula" aria-pressed="false" data-i18n="look.tabula">Tabuľa</button>
+        <button type="button" data-l="cisty" aria-pressed="false" data-i18n="look.cisty">Čistý</button>
+      </div>
+    </div>
+    <p class="hint" data-i18n="home.foot">Postup sa zatiaľ ukladá iba v tomto prehliadači.</p>
+  </section>
+</main>
+
+<nav class="tabbar" id="tabbar" data-i18n-label="nav.main" hidden>
+  <div class="tabbar-in">
+    <button class="tab" type="button" data-go="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span data-i18n="today.title">Dnes</span></button>
+    <button class="tab" type="button" data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4v16H5zM10 4h4v16h-4z"/><path d="M15.5 5.2l3.4-.9 3.6 14.5-3.4.9z"/></svg><span data-i18n="home.title">Predmety</span></button>
+    <button class="tab" type="button" data-go="upload"><span class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span data-i18n="nav.add">Pridať</span></button>
+    <button class="tab" type="button" data-go="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span data-i18n="profile.title">Profil</span></button>
+  </div>
+</nav>
+
+<dialog class="bsheet" id="roundSheet">
+  <div class="bsheet-in">
+    <div class="bsheet-head"><h2 data-i18n="subject.custom">Vlastné kolo</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="group">
       <p class="label" data-i18n="setup.topic">Téma</p>
       <div class="topics" id="topics"></div>
@@ -76,7 +245,7 @@
         <button type="button" data-n="20" aria-pressed="true">20</button>
         <button type="button" data-n="50" aria-pressed="false">50</button>
         <button type="button" data-n="all" aria-pressed="false" data-i18n="setup.countAll">Všetky</button>
-        <label class="custom" for="customN"><span data-i18n="setup.custom">Vlastný:</span><input id="customN" type="number" inputmode="numeric" min="1" step="1" placeholder="napr. 15"></label>
+        <label class="custom" for="customN"><span data-i18n="setup.custom">Vlastný:</span><input id="customN" type="number" inputmode="numeric" min="1" step="1" placeholder="15"></label>
       </div>
     </div>
     <div class="group">
@@ -88,119 +257,29 @@
       </div>
     </div>
     <p class="avail" id="avail"></p>
-    <button class="btn" id="go" type="button" data-i18n="setup.go">Začať kolo</button>
-    <p class="hint"><span data-i18n="setup.keys">Odpovedaj myšou alebo klávesmi 1–4, na ďalšiu otázku Enter.</span></p>
+    <button class="btn wide" id="go" type="button" data-i18n="setup.go">Začať kolo</button>
+  </div>
+</dialog>
+
+<dialog class="bsheet" id="moreSheet">
+  <div class="bsheet-in">
+    <div class="bsheet-head"><h2 id="mName"></h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="group">
+      <label class="label" for="examDate" data-i18n="exam.label">Dátum skúšky</label>
+      <input class="search" id="examDate" type="date">
+      <p class="hint" data-i18n="exam.hint">Predmet s najbližšou skúškou uvidíš na obrazovke Dnes ako prvý.</p>
+    </div>
+    <button class="btn wide ghost" id="addFiles" type="button" data-i18n="study.addFiles">+ Pridať súbory do predmetu</button>
+    <div class="group" id="progWrap">
+      <p class="label" data-i18n="setup.progress">Tvoj postup na tomto zariadení</p>
+      <div class="progress" id="prog"></div>
+      <div><button class="link" id="reset" type="button" data-i18n="setup.reset">Vymazať postup</button></div>
+      <div class="confirm" id="confirm" hidden><span data-i18n="setup.confirm">Naozaj vymazať celý postup?</span><button class="tiny danger" id="yes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="no" type="button" data-i18n="setup.no">Zrušiť</button></div>
+    </div>
     <div><button class="link" id="delSubj" type="button" data-i18n="setup.delete">Odstrániť predmet</button></div>
     <div class="confirm" id="delConfirm" hidden><span data-i18n="setup.deleteConfirm">Odstrániť predmet aj s otázkami a postupom?</span><button class="tiny danger" id="delYes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="delNo" type="button" data-i18n="setup.no">Zrušiť</button></div>
-  </section>
-
-  <section class="sheet" id="quiz" hidden>
-    <div class="meta"><span class="eyebrow" id="qtopic"></span><span class="count" id="pos"></span></div>
-    <div class="bar"><i id="pg"></i></div>
-    <p class="q" id="q"></p>
-    <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
-    <div class="opts" id="opts"></div>
-    <div class="fb" id="fb" hidden>
-      <p class="verdict" id="verdict"></p>
-      <button class="link" id="toggle" type="button"></button>
-      <div class="more" id="more" hidden></div>
-    </div>
-    <div class="row">
-      <button class="btn" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
-      <button class="btn" id="next" type="button" hidden></button>
-      <button class="link" id="quit" type="button" data-i18n="quiz.quit">Ukončiť kolo</button>
-    </div>
-  </section>
-
-  <section class="sheet" id="end" hidden>
-    <p class="label" data-i18n="end.result">Výsledok kola</p>
-    <div class="score" id="final"></div>
-    <p class="lede" id="note"></p>
-    <div class="group" id="missWrap">
-      <p class="label" data-i18n="end.review">Na zopakovanie</p>
-      <ul class="miss" id="miss"></ul>
-    </div>
-    <div class="row">
-      <button class="btn" id="retry" type="button" data-i18n="end.retry">Zopakovať chyby</button>
-      <button class="btn ghost" id="again" type="button" data-i18n="end.again">Nové kolo</button>
-    </div>
-  </section>
-
-  <section class="sheet" id="upload" hidden>
-    <div class="group" id="upOff" hidden>
-      <p class="label" data-i18n="upload.offLabel">Online spracovanie</p>
-      <p class="hint" data-i18n="upload.off">Táto verzia ešte nie je pripojená na server, ktorý spracúva súbory.</p>
-    </div>
-    <div class="group" id="upLogin" hidden>
-      <p class="label" data-i18n="upload.loginLabel">Prihlásenie</p>
-      <div class="group" id="upAsk">
-        <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s kódom na prihlásenie. Môžeš ho otvoriť aj v mobile.</p>
-        <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" data-i18n-placeholder="upload.emailPlaceholder">
-        <button class="btn" id="upSend" type="button" data-i18n="upload.send">Poslať kód</button>
-      </div>
-      <div class="group" id="upCodeBox" hidden>
-        <p class="tipbox" id="upSent"></p>
-        <label class="label" for="upCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
-        <input class="search code-input" id="upCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
-        <button class="btn" id="upVerify" type="button" data-i18n="upload.verify">Prihlásiť sa</button>
-        <div><button class="link" id="upAgain" type="button" data-i18n="upload.again">Poslať nový kód alebo zmeniť e-mail</button></div>
-      </div>
-    </div>
-    <div class="group" id="upConsent" hidden>
-      <p class="label" data-i18n="upload.consentLabel">Spracovanie umelou inteligenciou</p>
-      <p data-i18n="upload.consent1">Text tvojich súborov pošleme na spracovanie službe Claude od spoločnosti Anthropic. Z neho vzniknú zhrnutia, otázky a témy.</p>
-      <p class="hint" data-i18n="upload.consent2">Samotný súbor zostáva v tvojom zariadení. Posiela sa iba jeho text a obrázky strán, na ktorých text nie je. Anthropic tieto údaje nepoužíva na trénovanie modelov.</p>
-      <button class="btn" id="upAgree" type="button" data-i18n="upload.agree">Súhlasím a pokračovať</button>
-    </div>
-    <div class="group" id="upForm" hidden>
-      <div class="group" id="upNameBox">
-        <label class="label" for="upName" data-i18n="upload.nameLabel">Názov predmetu</label>
-        <input class="search" id="upName" type="text" maxlength="80" data-i18n-placeholder="upload.namePlaceholder">
-      </div>
-      <p class="tipbox" id="upInto" hidden></p>
-      <div class="group">
-        <p class="label" data-i18n="upload.filesLabel">Súbory</p>
-        <p class="hint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</p>
-        <label class="btn ghost" for="upFiles" data-i18n="upload.pick">Vybrať súbory</label>
-        <input id="upFiles" class="visually-hidden" type="file" multiple>
-        <ul class="miss" id="upList" hidden></ul>
-      </div>
-      <div class="group">
-        <p class="label" data-i18n="upload.makeLabel">Čo chceš vytvoriť</p>
-        <div class="chips" id="upMake">
-          <button type="button" data-k="summary" aria-pressed="true" data-i18n="upload.makeSummary">Zhrnutia</button>
-          <button type="button" data-k="quiz" aria-pressed="true" data-i18n="upload.makeQuiz">Otázky na precvičenie</button>
-          <button type="button" data-k="topics" aria-pressed="true" data-i18n="upload.makeTopics">Témy a slabé miesta</button>
-        </div>
-        <div class="seg" id="upAmount">
-          <span class="hint" data-i18n="upload.amountLabel">Počet otázok:</span>
-          <button type="button" data-a="0.5" aria-pressed="false" data-i18n="upload.amountFew">Menej</button>
-          <button type="button" data-a="1" aria-pressed="true" data-i18n="upload.amountNormal">Bežne</button>
-          <button type="button" data-a="1.5" aria-pressed="false" data-i18n="upload.amountMany">Viac</button>
-        </div>
-        <p class="hint" id="upMakeHint" hidden data-i18n="upload.makeNone">Vyber aspoň zhrnutia alebo otázky.</p>
-      </div>
-      <button class="btn" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
-      <div class="group limit" id="upLimit" hidden>
-        <p class="label" data-i18n="upload.limitLabel">Mesačný limit</p>
-        <div class="bar"><i id="upLimitBar"></i></div>
-        <p class="hint" id="upUsage"></p>
-      </div>
-      <p class="hint"><span id="upWho"></span> <button class="link" id="upOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button></p>
-    </div>
-    <div class="group" id="upWork" hidden>
-      <p class="label" data-i18n="upload.workLabel">Spracúvam</p>
-      <div class="up-head"><span class="up-pct" id="upPct">0 %</span><span class="hint" id="upEta"></span></div>
-      <div class="bar"><i id="upBar"></i></div>
-      <p class="avail" id="upStep"></p>
-      <ul class="up-steps" id="upSteps"></ul>
-      <p class="hint" data-i18n="upload.workHint">Väčší súbor trvá pár minút. Nechaj túto stránku otvorenú.</p>
-    </div>
-    <p class="err" id="upErr" role="alert" hidden></p>
-  </section>
-
-  <footer id="foot"></footer>
-</main>
+  </div>
+</dialog>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
