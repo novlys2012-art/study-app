@@ -6,7 +6,7 @@ How it fits together:
 
 - **In the browser:** sign-in by email link, the AI consent screen, reading the files (PDF, PPTX, DOCX, TXT). The files themselves never leave the device; only their text, and pictures of pages that have no text, are sent.
 - **Supabase server function `generate`:** holds the Claude key, checks who is calling, checks the spending caps, calls Claude, and records the cost of every call in the `ai_usage` table.
-- **Results** are saved in the browser like every other subject (accounts and sync come later).
+- **Results** are saved in the browser and, for a signed-in student, in their account (tables `subjects` and `progress`), so they come back after signing in on another device or after the browser cleared its storage.
 
 All keys go into the Supabase or GitHub settings pages below. Never paste a key into a chat, an issue or a file in this repo.
 

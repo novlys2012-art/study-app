@@ -1,7 +1,8 @@
 // The app's screens: Today, Subjects, one subject (overview, summaries, topics), the summary reader,
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, progressKey } from "./subjects.js";
+import { loadSubjects, saveSubjects, readProgress, writeProgress } from "./subjects.js";
+import { startSync } from "./autosync.js";
 import { renderMarkdown } from "./md.js";
 
 const LOOK_KEY = "studyapp-look";
@@ -20,12 +21,11 @@ let SUBJECTS = [];
 let CUR = null, QUESTIONS = [], TOPICS = {};
 let picked = new Set();
 let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", order = [];
-let KEY = "", P = {};
+let P = {};
 let tab = "overview", sortBy = "order", query = "";
 let roundOf = null; // what "next round" repeats: a topic key, or null for the whole subject
 
-function readProgress(sj) { try { return JSON.parse(localStorage.getItem(progressKey(sj))) || {}; } catch (e) { return {}; } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {} }
+function save() { writeProgress(CUR, P); }
 function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function button(cls, text, onclick) { const b = el("button", cls, text); b.type = "button"; b.onclick = onclick; return b; }
@@ -164,7 +164,7 @@ function goHome() {
 
 function enter(sj) {
   if (CUR !== sj) { CUR = sj; QUESTIONS = sj.questions; TOPICS = sj.topics; topic = "all"; mode = "all"; list = []; query = ""; tab = "overview"; }
-  KEY = progressKey(sj); P = readProgress(sj);
+  P = readProgress(sj);
   try { localStorage.setItem(LAST_KEY, sj.id); } catch (e) {}
 }
 function openSubject(id) {
@@ -376,7 +376,6 @@ $("delSubj").onclick = () => { $("delConfirm").hidden = false; $("delSubj").hidd
 $("delNo").onclick = () => { $("delConfirm").hidden = true; $("delSubj").hidden = false; };
 $("delYes").onclick = () => {
   saveSubjects(loadSubjects().filter((x) => x.id !== CUR.id));
-  try { localStorage.removeItem(KEY); } catch (e) {}
   goHome();
 };
 
@@ -494,7 +493,7 @@ async function renderAccount() {
     $("pSign").textContent = t("upload.verify"); $("pSign").onclick = () => openUpload();
     return;
   }
-  $("pWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
+  $("pWho").textContent = t("upload.signedIn", { email: s.user.email || "" }) + " " + t("profile.saved");
   $("pSign").textContent = t("upload.signOut"); $("pSign").onclick = async () => { await cloud.signOut(); renderAccount(); };
   try {
     const u = (await cloud.call("usage", {}, getLang())).usage;
@@ -533,3 +532,16 @@ function route() {
 }
 route();
 window.addEventListener("hashchange", route);
+
+// Subjects or progress arrived from the account (another device, or this one after its storage was cleared).
+startSync(() => {
+  SUBJECTS = loadSubjects();
+  const sj = CUR && SUBJECTS.find((x) => x.id === CUR.id);
+  if (sj) P = readProgress(sj);
+  if (!$("today").hidden) goToday();
+  else if (!$("home").hidden) goHome();
+  else if (!$("subject").hidden) {
+    if (!sj) { goHome(); return; }
+    const keep = tab; CUR = null; enter(sj); tab = keep; renderSubject();
+  }
+});

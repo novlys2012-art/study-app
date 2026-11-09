@@ -1,7 +1,8 @@
 // The upload screen: sign in, AI consent, pick files, then the pipeline runs and the new subject opens.
 // Loaded only when the screen opens, so pdf.js and Supabase stay out of the first page load.
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, progressKey } from "../app/subjects.js";
+import { loadSubjects, saveSubjects, readProgress, writeProgress } from "../app/subjects.js";
+import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, ExtractError, TYPES } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE } from "./pipeline.js";
@@ -175,11 +176,9 @@ async function run() {
 // Topics are sorted again when files are added, which changes question ids; the progress follows them.
 function moveProgress(sj, renamed) {
   if (!Object.keys(renamed).length) return;
-  const key = progressKey(sj);
-  let p = {}; try { p = JSON.parse(localStorage.getItem(key)) || {}; } catch (e) {}
-  const out = {};
+  const p = readProgress(sj), out = {};
   Object.keys(p).forEach((id) => { out[renamed[id] || id] = p[id]; });
-  try { localStorage.setItem(key, JSON.stringify(out)); } catch (e) {}
+  writeProgress(sj, out);
 }
 
 let wired = false;
@@ -199,7 +198,7 @@ function wire() {
     const code = $("upCode").value.replace(/\s/g, "");
     if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat")); return; }
     error(""); $("upVerify").disabled = true;
-    try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await refresh(); }
+    try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await syncNow(true); await refresh(); }
     catch (e) { error(message(e)); }
     finally { $("upVerify").disabled = false; }
   };

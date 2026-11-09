@@ -61,3 +61,24 @@ export async function call(task, input, lang) {
   if (!res.ok) throw new CloudError(body.error || "server", body.message || res.statusText);
   return body;
 }
+
+// ----- The student's own rows in the "subjects" and "progress" tables (row level security keeps them apart).
+const KEYS = { subjects: "user_id,id", progress: "user_id,subject_id" };
+const fail = (error) => new CloudError(error.code ? "db" : "network", error.message);
+
+// Rows of one table; with ids, only those rows (the id column is "id" or "subject_id").
+export async function rows(table, columns, ids) {
+  let q = client().from(table).select(columns);
+  if (ids) q = q.in(table === "progress" ? "subject_id" : "id", ids);
+  const { data, error } = await q;
+  if (error) throw fail(error);
+  return data;
+}
+export async function upsert(table, list) {
+  const { error } = await client().from(table).upsert(list, { onConflict: KEYS[table] });
+  if (error) throw fail(error);
+}
+export async function removeProgress(ids) {
+  const { error } = await client().from("progress").delete().in("subject_id", ids);
+  if (error) throw fail(error);
+}
