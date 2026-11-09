@@ -279,7 +279,9 @@ try {
   await other.locator("#subjects .sj").first().click();
   await other.click("#learn");
   await other.locator("#opts .opt").first().click();
-  await until(() => Object.keys([...db.progress.values()][0].data).length === 2, "answers from the second device reach the account");
+  // The round may repeat the question the first device got wrong, so count answers, not questions.
+  const answers = () => Object.values([...db.progress.values()][0].data).reduce((n, r) => n + r.n, 0);
+  await until(() => answers() === 2, "answers from the second device reach the account");
   await other.close();
   await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("studyapp-") && k !== "studyapp-ai-consent").forEach((k) => localStorage.removeItem(k)));
   await page.reload();
