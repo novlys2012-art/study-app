@@ -156,7 +156,7 @@ const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("�
 
 try {
   await page.goto(base);
-  await page.click(".subj.add");
+  await page.click(".sj.add");
   await page.locator("#upLogin").waitFor();
   check(page.url().endsWith("#upload"), "the add card opens the upload screen");
   await page.fill("#upEmail", USER.email);
@@ -189,18 +189,26 @@ try {
     { name: "rovnovaha.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: await makePptx() },
   ]);
   check((await page.locator("#upList li").count()) === 3, "three files picked");
+  check(await page.locator("#upSubjectBox").isHidden(), "the first upload asks only for a name");
+  await page.click("#upNext");
+  check(await page.locator("#upLimit").isVisible(), "the monthly limit shows as a bar");
   await page.click("#upGo");
-  await page.locator("#setup").waitFor({ timeout: 30000 });
+  await page.locator("#subject").waitFor({ timeout: 30000 });
   check(true, "processing ends on the new subject");
 
   check(tasks.filter((x) => x === "vision").length === 1, "the drawing-only PDF page went to vision once");
   check(!bodyBytes.includes("%PDF") && !bodyBytes.includes("[Content_Types]"), "original files never leave the browser");
+  await page.click('#sTabs [data-tab="files"]');
   check((await page.locator("#files .card").count()) === 3, "a summary for each file");
   check((await page.textContent("#files")).includes("2 str."), "page counts before and after");
   check((await page.textContent("#checked")).includes("vyradila 3"), "checked-out questions are counted");
+  await page.locator("#files .card").first().click();
+  await page.locator("#reader").waitFor();
+  check((await page.locator("#rBody li").count()) > 0, "a summary opens in the reading view");
+  if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "reader.png"), fullPage: true });
+  await page.click("#rBack");
+  await page.click('#sTabs [data-tab="topics"]');
   check((await page.locator("#tinfo .card").count()) === 2, "topics with their summaries");
-  await page.click("#tinfo .card summary");
-  await page.click("#files .card summary");
   // E2E_SHOTS=folder saves screenshots of the result screen, for checking the design.
   if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "subject.png"), fullPage: true });
   check((await page.textContent("#tinfo")).includes("Posun krivky"), "weak spots show");
@@ -208,28 +216,33 @@ try {
   await page.locator("#quiz").waitFor();
   check((await page.textContent("#qtopic")) === "Dopyt", "practising a topic starts its round");
   await page.locator("#opts .opt").first().click();
-  await page.click("#toggle");
   check((await page.textContent("#more")).includes("prednaska1"), "the source quote names the file");
   check(await page.locator("#upPct").textContent() === "100 %", "the upload bar ends at 100 %");
-  await page.click("#crumb");
-  check((await page.locator(".subj").count()) === 2, "home lists the new subject");
+  await page.click("#quit");
+  await page.click("#endBack");
+  await page.click('#tabbar [data-go="home"]');
+  check((await page.locator("#subjects .sj").count()) === 2, "the subjects screen lists the new subject");
 
-  await page.locator(".subj").first().click();
+  await page.locator("#subjects .sj").first().click();
+  await page.click("#sMore");
   await page.click("#addFiles");
   await page.locator("#upForm").waitFor();
-  check(await page.locator("#upNameBox").isHidden() && (await page.textContent("#upInto")).includes("Mikroekonómia"), "adding files names the subject");
-  check(await page.locator("#upLimit").isVisible(), "the monthly limit shows as a bar");
-  await page.click('#upMake [data-k="summary"]');
+  check(await page.locator("#upNameBox").isHidden() && (await page.inputValue("#upSubject")) !== "" && (await page.textContent("#upSubject")).includes("Mikroekonómia"), "adding files names the subject");
   await page.setInputFiles("#upFiles", [{ name: "doplnok.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: await makeDocx() }]);
   if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "add-files.png"), fullPage: true });
+  await page.click("#upNext");
+  await page.click('#upMake [data-k="summary"]');
   const before = tasks.length;
   await page.click("#upGo");
-  await page.locator("#setup").waitFor({ timeout: 30000 });
+  await page.locator("#subject").waitFor({ timeout: 30000 });
   check(!tasks.slice(before).includes("summary"), "summaries can be left out");
+  await page.click("#sMore");
   check(await page.locator("#progWrap").isVisible(), "the subject keeps its progress after adding files");
+  await page.click("#moreSheet [data-close]");
+  await page.click('#sTabs [data-tab="files"]');
   check((await page.locator("#files .card").count()) === 3, "a file without a summary adds only questions");
-  await page.click("#crumb");
-  check((await page.locator(".subj").count()) === 2, "adding files does not make a second subject");
+  await page.click('#tabbar [data-go="home"]');
+  check((await page.locator("#subjects .sj").count()) === 2, "adding files does not make a second subject");
   check(ledger.length === tasks.filter((x) => x !== "usage").length, "every AI call is recorded for the limit");
 } catch (e) {
   errors.push(e.message);

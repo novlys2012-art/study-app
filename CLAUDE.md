@@ -38,7 +38,7 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 - **Cost targets.** A 200-page PDF should cost under €0.10 to process; a heavy paying user under about €0.75 a month in AI. Extract text locally, strip repeated headers and footers, split into sections of about 8–10k tokens, hash files and sections so a shared file is processed once, and use Batch (half price) for anything not needed right away. Limits are counted in pages, not uploads.
 - **Generated questions use the quiz site's format** (`q`, `o`, `a`, `e`, `x`, `s`), so the existing quiz mode can show them unchanged. Every question keeps a source quote.
 - **UI strings go through `src/i18n/`.** Static markup uses `data-i18n="section.key"`; code uses `t("key")`. `sk.json` is the source, `cs.json` is filled in phase 7, missing keys fall back to Slovak.
-- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. New screens reuse its classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`) and colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
+- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. The app layout (bottom tab bar, `rowcard`, `hero`, `bsheet` bottom sheets, the quiz's slide-up `fb` panel) is the app's own and sits at the end of the file. New screens reuse the classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`, `rowcard`, `pill`, `iconbtn`) and colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
 - **Privacy.** 16+ only unless parental consent is added. Original uploads are deleted once text extraction succeeds. An AI consent screen naming the provider is shown before the first upload (an App Store requirement).
 
 ## Pricing (planned)
@@ -50,7 +50,7 @@ Free tier with a small monthly page limit. Plus at €3.99 a month or €29.99 a
 ```
 index.html            page shell, markup tagged with data-i18n
 src/main.js           entry: styles, i18n, then the app
-src/app/app.js        home screen and the multiple-choice quiz
+src/app/app.js        screens: Today, Subjects, one subject (tabs), summary reader, quiz, Profile, and the bottom tab bar
 src/app/subjects.js   subjects and questions on the device (localStorage until sync arrives)
 src/app/md.js         safe renderer for the summaries' Markdown
 src/upload/           upload screen (ui.js), extraction on the device (extract.js, text.js), pipeline (pipeline.js)
