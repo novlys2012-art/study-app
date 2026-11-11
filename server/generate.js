@@ -4,7 +4,12 @@
 import * as T from "../ai/tasks.js";
 
 // Defaults when the secrets are not set. USD, because that is what Anthropic bills.
-export const DEFAULT_LIMITS = { userMonthUsd: 1, dailyUsd: 5 };
+// perMinute: AI tasks one account may run in a minute (answers from the cache count too).
+export const DEFAULT_LIMITS = { userMonthUsd: 1, dailyUsd: 5, perMinute: 60 };
+
+// Part of every cache key. Raise it when a change outside the prompts (a parser, a model setting
+// the key does not cover) should stop old cached answers from being reused.
+export const CACHE_VERSION = 1;
 
 const MAX_TEXT = 60_000;          // characters per request, about 15k tokens
 const MAX_IMAGES = 6;             // pages per vision request
@@ -21,6 +26,7 @@ export function limitsFrom(env = {}) {
   return {
     userMonthUsd: num(env.USER_MONTHLY_LIMIT_USD, DEFAULT_LIMITS.userMonthUsd),
     dailyUsd: num(env.DAILY_LIMIT_USD, DEFAULT_LIMITS.dailyUsd),
+    perMinute: num(env.USER_RATE_PER_MINUTE, DEFAULT_LIMITS.perMinute),
     allowed: allowed.length ? allowed : null,
   };
 }
@@ -79,9 +85,31 @@ const TASKS = {
   },
 };
 
-// body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId) -> {month, today}, record(row), env }.
+// The cache key: a SHA-256 of everything that decides the answer (task, provider, model, settings,
+// instructions, prompt with the source text, pictures). The same section sent again, by the same student
+// after a failed upload or by another student with the same file, gets the stored answer for free.
+export async function cacheKey(task, ai, req) {
+  const model = ai.models?.[req.tier] ?? "";
+  const material = JSON.stringify([CACHE_VERSION, task, ai.name ?? "", model, req.effort ?? "", req.maxTokens ?? 0, req.system, req.prompt, req.images ?? []]);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Provider errors become codes the app can act on: "ai_busy" is worth retrying, the others are not.
+function aiFailure(e) {
+  if (e?.code === "no_price") return new HttpError(503, "no_price", "This AI model has no price set, so it is not used.");
+  if (e?.code === "refused") return new HttpError(422, "refused", "The AI declined this part of the file.");
+  const status = e?.status;
+  if ([408, 409, 429, 500, 502, 503, 504, 529].includes(status) || (!status && /connection|timeout|timed out|overloaded|fetch failed/i.test(`${e?.name} ${e?.message}`))) {
+    return new HttpError(503, "ai_busy", "The AI service is busy. Try again in a moment.");
+  }
+  return e;
+}
+
+// body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId) -> {month, today, minute},
+// record(row), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, log? }.
 // task "usage" returns the caller's spending without an AI call.
-export async function handle(body, { user, ai, spend, record, env }) {
+export async function handle(body, { user, ai, spend, record, env, cache = null, log = console.error }) {
   if (!user) throw new HttpError(401, "auth", "Sign in first.");
   const lim = limitsFrom(env);
   if (lim.allowed && !lim.allowed.includes(String(user.email || "").toLowerCase())) throw new HttpError(403, "not_allowed", "This account is not on the test list.");
@@ -92,17 +120,39 @@ export async function handle(body, { user, ai, spend, record, env }) {
   if (task === "usage") return { usage: usage() };
   const def = TASKS[task];
   if (!def) throw new HttpError(400, "bad_task", `Unknown task "${task}".`);
+  if ((s.minute || 0) >= lim.perMinute) throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+
+  const req = { tier: def.tier, effort: def.effort, maxTokens: def.maxTokens, ...def.build(input, lang) };
+  const model = ai.models?.[def.tier] ?? "";
+  const row = (extra) => ({ user_id: user.id, task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false, ...extra });
+
+  // A stored answer costs nothing, so it is served even when a spending cap is reached.
+  const key = cache ? await cacheKey(task, ai, req) : null;
+  if (key) {
+    let hit = null;
+    try { hit = await cache.get(key); } catch (e) { log("ai_cache read failed", e); }
+    if (hit != null) {
+      let result = null;
+      try { result = def.parse(hit); } catch (e) { /* stored before a parser change: ask the AI again */ }
+      if (result != null) {
+        await record(row({ cached: true }));
+        return { result, truncated: false, cached: true, costUsd: 0, usage: usage() };
+      }
+    }
+  }
+
   if (s.month >= lim.userMonthUsd) throw new HttpError(429, "user_limit", "Monthly limit reached.");
   if (s.today >= lim.dailyUsd) throw new HttpError(429, "daily_limit", "The app's daily limit is reached.");
 
-  const req = def.build(input, lang);
-  const res = await ai.complete({ tier: def.tier, effort: def.effort, maxTokens: def.maxTokens, ...req });
+  let res;
+  try { res = await ai.complete(req); } catch (e) { throw aiFailure(e); }
   const cost = res.costUsd ?? 0;
-  await record({
-    user_id: user.id, task, model: res.model,
-    input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost,
-  });
+  await record(row({ model: res.model || model, input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost }));
   let result;
   try { result = def.parse(res.text); } catch (e) { throw new HttpError(502, "bad_reply", "The AI reply could not be read. Try again."); }
-  return { result, truncated: !!res.truncated, costUsd: cost, usage: usage(cost) };
+  // Only complete answers are kept: a cut-off one should be asked for again next time.
+  if (key && !res.truncated) {
+    try { await cache.put({ key, task, model: res.model || model, result: res.text }); } catch (e) { log("ai_cache write failed", e); }
+  }
+  return { result, truncated: !!res.truncated, cached: false, costUsd: cost, usage: usage(cost) };
 }

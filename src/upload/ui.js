@@ -1,7 +1,7 @@
 // The upload screen: sign in, AI consent, pick files, then the pipeline runs and the new subject opens.
 // Loaded only when the screen opens, so pdf.js and Supabase stay out of the first page load.
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, writeProgress } from "../app/subjects.js";
+import { loadSubjects, saveSubjects } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, ExtractError, TYPES } from "./extract.js";
@@ -37,7 +37,7 @@ function message(e) {
   if (e instanceof ExtractError) return t("upload.err." + e.code, e.vars);
   if (e instanceof cloud.CloudError) {
     const k = "upload.err." + e.code;
-    return t(k) === k ? t("upload.err.server", { msg: e.message }) : t(k);
+    return t(k) === k ? t("upload.err.server", { msg: e.message }) : t(k, { msg: e.message });
   }
   return t("upload.err.server", { msg: e.message || String(e) });
 }
@@ -148,6 +148,7 @@ async function run() {
     const subject = await buildSubject({
       name, docs, call, make, existing: into, otherTopic: t("upload.otherTopic"),
       onFile: (k, phase) => setFile(k, phase),
+      onRetry: () => { $("upStep").textContent = t("upload.retrying"); },
       onStep: (done, total) => {
         progress(10 + (done / total) * 90, t(done === total ? "upload.finishing" : "upload.working", { done, total }));
         if (done >= 2 && done < total) {
@@ -157,13 +158,22 @@ async function run() {
       },
     });
     if (!subject.questions.length && !subject.files.some((f) => f.summary)) throw new Error(t("upload.err.nothing"));
-    const { renamed, ...saved } = subject;
-    if (into) {
-      saveSubjects(loadSubjects().map((x) => (x.id === into.id ? saved : x)));
-      moveProgress(saved, renamed || {});
-    } else saveSubjects([...loadSubjects(), saved]);
+    const { failed = [], ...saved } = subject;
+    if (into) saveSubjects(loadSubjects().map((x) => (x.id === into.id ? saved : x)));
+    else saveSubjects([...loadSubjects(), saved]);
     progress(100);
-    picked = []; $("upName").value = ""; $("upFiles").value = "";
+    $("upName").value = ""; $("upFiles").value = "";
+    if (failed.length) {
+      // The finished files are saved; the failed ones stay picked, ready to be added to the same subject.
+      const left = new Set(failed.map((f) => f.index));
+      picked = picked.filter((_, k) => left.has(k));
+      ctx.target = saved.id;
+      step(2); panel("upForm"); renderSubjects(); renderPicked();
+      const reason = message(failed[0].error);
+      error(t("upload.partial", { done: saved.files.length - (into?.files?.length || 0), failed: failed.map((f) => f.name).join(", "), reason }));
+      return;
+    }
+    picked = [];
     ctx.opened(saved.id);
   } catch (e) {
     step(2); panel("upForm"); renderPicked();
@@ -171,14 +181,6 @@ async function run() {
   } finally {
     busy = false;
   }
-}
-
-// Topics are sorted again when files are added, which changes question ids; the progress follows them.
-function moveProgress(sj, renamed) {
-  if (!Object.keys(renamed).length) return;
-  const p = readProgress(sj), out = {};
-  Object.keys(p).forEach((id) => { out[renamed[id] || id] = p[id]; });
-  writeProgress(sj, out);
 }
 
 let wired = false;

@@ -62,7 +62,7 @@ export async function call(task, input, lang) {
   return body;
 }
 
-// ----- The student's own rows in the "subjects" and "progress" tables (row level security keeps them apart).
+// ----- The student's own rows in the "subjects", "progress" and "reviews" tables (row level security keeps them apart).
 const KEYS = { subjects: "user_id,id", progress: "user_id,subject_id" };
 const fail = (error) => new CloudError(error.code ? "db" : "network", error.message);
 
@@ -80,5 +80,28 @@ export async function upsert(table, list) {
 }
 export async function removeProgress(ids) {
   const { error } = await client().from("progress").delete().in("subject_id", ids);
+  if (error) throw fail(error);
+}
+
+// The answer log. Rows are only ever added (a row the account already has is skipped) or, with their
+// subject, deleted; never changed.
+export async function addReviews(list) {
+  const { error } = await client().from("reviews").upsert(list, { onConflict: "user_id,id", ignoreDuplicates: true });
+  if (error) throw fail(error);
+}
+// Rows the server stamped after a time (ISO), oldest first, a page at a time.
+export async function reviewsSince(since) {
+  const out = [], PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    let q = client().from("reviews").select("id,subject_id,question_id,kind,correct,n,c,at,created_at");
+    if (since) q = q.gt("created_at", since);
+    const { data, error } = await q.order("created_at").order("id").range(from, from + PAGE - 1);
+    if (error) throw fail(error);
+    out.push(...data);
+    if (data.length < PAGE) return out;
+  }
+}
+export async function removeReviews(ids) {
+  const { error } = await client().from("reviews").delete().in("subject_id", ids);
   if (error) throw fail(error);
 }

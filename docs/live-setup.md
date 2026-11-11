@@ -5,8 +5,8 @@ The site at https://novlys2012-art.github.io/study-app/ can upload files and tur
 How it fits together:
 
 - **In the browser:** sign-in by email link, the AI consent screen, reading the files (PDF, PPTX, DOCX, TXT). The files themselves never leave the device; only their text, and pictures of pages that have no text, are sent.
-- **Supabase server function `generate`:** holds the Claude key, checks who is calling, checks the spending caps, calls Claude, and records the cost of every call in the `ai_usage` table.
-- **Results** are saved in the browser and, for a signed-in student, in their account (tables `subjects` and `progress`), so they come back after signing in on another device or after the browser cleared its storage.
+- **Supabase server function `generate`:** holds the Claude key, checks who is calling, checks the per-minute limit and the spending caps, calls Claude, and records the cost of every call in the `ai_usage` table. Answers are also kept in `ai_cache`, so the same request again (an upload that failed half-way and is run again) costs nothing.
+- **Results** are saved in the browser and, for a signed-in student, in their account (table `subjects`, and the answer log in `reviews`), so they come back after signing in on another device or after the browser cleared its storage.
 
 All keys go into the Supabase or GitHub settings pages below. Never paste a key into a chat, an issue or a file in this repo.
 
@@ -55,6 +55,7 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 | `ALLOWED_EMAILS` | your email; add testers separated by commas. Leave it out to let anyone who signs in use it. |
 | `USER_MONTHLY_LIMIT_USD` | optional, default `1` (each account's AI spending per calendar month) |
 | `DAILY_LIMIT_USD` | optional, default `5` (the whole app's AI spending per day, UTC) |
+| `USER_RATE_PER_MINUTE` | optional, default `60` (AI tasks one account may run in a minute; the app waits and tries again when it is reached) |
 
 ## 5. GitHub settings
 
@@ -75,7 +76,7 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 
 ## What it costs
 
-Each file goes through: pictures of text-less pages read by Sonnet, a summary and questions by Haiku, a check of the questions by Sonnet, and one topic call by Haiku. A typical lecture deck should cost a few cents; the upload screen shows what you have spent this month against your limit. Every call is in the `ai_usage` table (Table Editor) with its tokens and cost.
+Each file goes through: pictures of text-less pages read by Sonnet, a summary and questions by Haiku, a check of the questions by Sonnet, and one topic call by Haiku. A typical lecture deck should cost a few cents; the upload screen shows what you have spent this month against your limit. Every call is in the `ai_usage` table (Table Editor) with its tokens and cost; rows with `cached` ticked were answered from `ai_cache` for free. If an upload stops half-way, add the same files again: the parts that finished are not paid for twice.
 
 ## Running it on your computer
 

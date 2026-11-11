@@ -1,19 +1,31 @@
-// Keeps the subjects and quiz progress on this device and in the student's account the same.
-// The device notes each change (src/app/subjects.js); a sync sends what changed here, fetches what
-// changed in the account, and when both changed the newer subject wins and the progress is merged.
+// Keeps the subjects and the answer log on this device and in the student's account the same.
+// The device notes each change (src/app/subjects.js); a sync sends what changed here and fetches what
+// changed in the account. When both changed a subject, the newer one wins. Answers are separate rows
+// that are only ever added, so answers from two devices are all kept.
 import * as cloud from "./supabase.js";
-import { loadSubjects, loadMeta, saveMeta, readProgress, applyRemote, clearLocal, decide, mergeProgress } from "../app/subjects.js";
+import { loadSubjects, loadMeta, saveMeta, unsent, markSent, toRow, applyRemote, clearLocal, decide } from "../app/subjects.js";
 
 const ms = (iso) => Date.parse(iso);
 const iso = (at) => new Date(at).toISOString();
+// Answers are pulled from a little before the newest one seen, because a row can become visible
+// a moment after a newer one; rows seen twice are simply the same entry.
+const OVERLAP_MS = 5 * 60 * 1000;
+const PUSH_BATCH = 500;
 
 let running = null, again = false;
 // Returns true when the device's data changed. Calls made during a sync run once more after it.
 export function sync() {
   if (running) { again = true; return running; }
+  // A run that fails (offline) still runs again when asked to meanwhile, e.g. by the "online" event.
   running = (async () => {
-    let any = false;
-    try { do { again = false; any = (await once()) || any; } while (again); } finally { running = null; }
+    let any = false, error = null;
+    try {
+      do {
+        again = false;
+        try { any = (await once()) || any; error = null; } catch (e) { error = e; }
+      } while (again);
+    } finally { running = null; }
+    if (error) throw error;
     return any;
   })();
   return running;
@@ -34,12 +46,10 @@ async function once() {
   let meta = loadMeta(), any = false;
   if (meta.user && meta.user !== s.user.id) { clearLocal(); meta = loadMeta(); any = true; }
   if (!meta.user) {
-    // First sync on this device: everything made before signing in goes to the account.
+    // First sync on this device: everything made before signing in goes to the account
+    // (the answer log's entries are all still unsent).
     const now = Date.now();
-    loadSubjects().forEach((sj) => {
-      if (!meta.s[sj.id]) meta.s[sj.id] = { at: now, dirty: true };
-      if (!meta.p[sj.id] && Object.keys(readProgress(sj)).length) meta.p[sj.id] = { at: now, dirty: true };
-    });
+    loadSubjects().forEach((sj) => { if (!meta.s[sj.id]) meta.s[sj.id] = { at: now, dirty: true }; });
     meta.user = s.user.id; saveMeta(meta);
   }
   const user_id = s.user.id;
@@ -59,7 +69,7 @@ async function once() {
   if (push.length) {
     await cloud.upsert("subjects", push);
     const gone = push.filter((r) => r.deleted).map((r) => r.id);
-    if (gone.length) await cloud.removeProgress(gone);
+    if (gone.length) { await cloud.removeReviews(gone); await cloud.removeProgress(gone); }
     push.forEach((r) => sent("s", r.id, ms(r.updated_at)));
   }
   if (pull.length) {
@@ -68,38 +78,29 @@ async function once() {
     const subjects = [], removed = [];
     got.forEach((r) => {
       if (meta.s[r.id] && meta.s[r.id].dirty && meta.s[r.id].at >= ms(r.updated_at)) return;
-      if (r.deleted || !r.data) { removed.push(r.id); delete meta.p[r.id]; } else subjects.push({ ...r.data, id: r.id });
+      if (r.deleted || !r.data) removed.push(r.id); else subjects.push({ ...r.data, id: r.id });
       meta.s[r.id] = { at: ms(r.updated_at), base: ms(r.updated_at), dirty: false, del: !!r.deleted };
     });
     applyRemote({ subjects, removed }); saveMeta(meta);
     any = any || subjects.length > 0 || removed.length > 0;
   }
 
-  // ----- Progress, for the subjects that are on the device now
-  const rp = new Map((await cloud.rows("progress", "subject_id,updated_at")).map((r) => [r.subject_id, { at: ms(r.updated_at) }]));
+  // ----- Answer log: send the new entries, then fetch what other devices added
+  const out = unsent();
+  for (let k = 0; k < out.length; k += PUSH_BATCH) {
+    const batch = out.slice(k, k + PUSH_BATCH);
+    await cloud.addReviews(batch.map(({ sid, e }) => toRow(user_id, sid, e)));
+    const bySubject = new Map();
+    batch.forEach(({ sid, e }) => (bySubject.get(sid) || bySubject.set(sid, []).get(sid)).push(e.id));
+    bySubject.forEach((ids, sid) => markSent(sid, ids));
+  }
   meta = loadMeta();
-  const ids = loadSubjects().map((sj) => sj.id);
-  const plan = ids.map((id) => [id, decide(meta.p[id], rp.get(id))]);
-  const fetchIds = plan.filter(([, what]) => what === "pull" || what === "both").map(([id]) => id);
-  const got = new Map((fetchIds.length ? await cloud.rows("progress", "subject_id,data,updated_at", fetchIds) : []).map((r) => [r.subject_id, r]));
-  meta = loadMeta();
-  const up = [], down = {};
-  plan.forEach(([id, what]) => {
-    const r = got.get(id), l = meta.p[id];
-    if (what === "none" || ((what === "pull" || what === "both") && !r)) return;
-    // An answer given while the rows were on their way makes this a merge.
-    if (what === "pull" && l && l.dirty) what = "both";
-    if (what === "pull") { down[id] = r.data || {}; meta.p[id] = { at: ms(r.updated_at), base: ms(r.updated_at), dirty: false }; return; }
-    let data = readProgress(id), at = (l && l.at) || Date.now();
-    if (what === "both") { data = mergeProgress(data, r.data); at = Math.max(at, ms(r.updated_at) + 1); down[id] = data; }
-    meta.p[id] = { ...l, at, dirty: true };
-    up.push({ user_id, subject_id: id, data, updated_at: iso(at) });
-  });
-  applyRemote({ progress: down }); saveMeta(meta);
-  any = any || Object.keys(down).length > 0;
-  if (up.length) {
-    await cloud.upsert("progress", up);
-    up.forEach((r) => sent("p", r.subject_id, ms(r.updated_at)));
+  const got = await cloud.reviewsSince(meta.rc ? iso(ms(meta.rc) - OVERLAP_MS) : null);
+  if (got.length) {
+    any = applyRemote({ reviews: got }) || any;
+    meta = loadMeta();
+    meta.rc = got.reduce((m, r) => (!m || ms(r.created_at) > ms(m) ? r.created_at : m), meta.rc);
+    saveMeta(meta);
   }
   return any;
 }

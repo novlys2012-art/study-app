@@ -4,9 +4,15 @@
 // To add a provider, add a file in providers/ that exports DEFAULT_MODELS and complete().
 import * as anthropic from "./providers/anthropic.js";
 import * as google from "./providers/google.js";
-import { costUsd } from "./prices.js";
+import { costUsd, hasPrice } from "./prices.js";
 
 const PROVIDERS = { anthropic, google };
+
+// An error the server can name to the app: "no_price" (model missing from ai/prices.js),
+// "refused" (the model declined the content). Provider errors keep their HTTP status in .status.
+export class AiError extends Error {
+  constructor(code, message) { super(message || code); this.code = code; }
+}
 
 export function getProvider(env = process.env) {
   const name = env.AI_PROVIDER || "anthropic";
@@ -21,8 +27,10 @@ export function getProvider(env = process.env) {
   }
 
   // tier "fast" for summaries, quizzes and topics; "strong" for checks and scanned past exams.
+  // A model with no price in ai/prices.js is never run: its cost could not count toward the caps.
   async function complete({ tier = "fast", system, prompt, images, effort, maxTokens = 16000 }) {
     const model = models[tier];
+    if (!hasPrice(name, model)) throw new AiError("no_price", `No price for ${name}:${model} in ai/prices.js, so it is not run.`);
     const out = await impl.complete({ model, system, prompt, images, effort, maxTokens, env });
     return { ...out, provider: name, model, costUsd: costUsd(name, model, out.usage) };
   }
