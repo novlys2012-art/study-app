@@ -49,8 +49,8 @@ const fakeAi = {
 
 // ----- Fake Supabase: sign-in link request and the generate function.
 const USER = { id: "11111111-1111-1111-1111-111111111111", email: "student@example.com", aud: "authenticated", role: "authenticated" };
-const ledger = [], tasks = [];
-const db = { subjects: new Map(), progress: new Map() };
+const ledger = [], tasks = [], cache = new Map();
+const db = { subjects: new Map(), progress: new Map(), reviews: new Map() };
 let bodyBytes = "";
 const api = createServer(async (req, res) => {
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-version, prefer, accept-profile, content-profile", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS" };
@@ -76,25 +76,36 @@ const api = createServer(async (req, res) => {
       const out = await handle(body, {
         user: token === "fake-token" ? { id: USER.id, email: USER.email } : null,
         env: { USER_MONTHLY_LIMIT_USD: "1" }, ai: fakeAi,
-        spend: async () => ({ month: ledger.reduce((s, r) => s + r.cost_usd, 0), today: 0 }),
+        spend: async () => ({ month: ledger.reduce((s, r) => s + r.cost_usd, 0), today: 0, minute: 0 }),
         record: async (row) => { ledger.push(row); },
+        cache: { get: async (k) => cache.get(k) ?? null, put: async (r) => { cache.set(r.key, r.result); } },
       });
       return send(200, out);
     } catch (e) {
-      return e instanceof HttpError ? send(e.status, { error: e.code, message: e.message }) : send(500, { error: "server", message: e.message });
+      return e instanceof HttpError ? send(e.status, { error: e.code, message: e.message }) : send(500, { error: "server_error" });
     }
   }
   // The account's tables, as PostgREST serves them: list (optionally "in" some ids), upsert, delete.
-  const table = (path.match(/^\/rest\/v1\/(subjects|progress)$/) || [])[1];
+  // reviews: rows are only added (a known id is skipped), stamped with the server's time, listed after a time, a page at a time.
+  const table = (path.match(/^\/rest\/v1\/(subjects|progress|reviews)$/) || [])[1];
   if (table) {
     if (req.headers.authorization !== "Bearer fake-token") return send(401, { message: "no session" });
-    const q = new URL(req.url, API).searchParams, key = table === "progress" ? "subject_id" : "id";
+    const q = new URL(req.url, API).searchParams, key = table === "subjects" ? "id" : "subject_id";
     const only = q.get(key) && q.get(key).replace(/^in\.\(|\)$/g, "").split(",").map((x) => x.replace(/^"|"$/g, ""));
     if (req.method === "GET") {
       const cols = q.get("select").split(",");
-      return send(200, [...db[table].values()].filter((r) => !only || only.includes(r[key])).map((r) => Object.fromEntries(cols.map((c) => [c, r[c]]))));
+      let list = [...db[table].values()].filter((r) => !only || only.includes(r[key]));
+      if (table === "reviews") {
+        const after = (q.get("created_at") || "").replace(/^gt\./, "");
+        list = list.filter((r) => !after || r.created_at > after).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+        list = list.slice(+(q.get("offset") || 0), +(q.get("offset") || 0) + +(q.get("limit") || 1e9));
+      }
+      return send(200, list.map((r) => Object.fromEntries(cols.map((c) => [c, r[c]]))));
     }
-    if (req.method === "POST") JSON.parse(raw).forEach((r) => db[table].set(r[key], { ...db[table].get(r[key]), ...r }));
+    if (req.method === "POST" && table === "reviews") {
+      JSON.parse(raw).forEach((r) => { if (!db.reviews.has(r.id)) db.reviews.set(r.id, { ...r, created_at: new Date().toISOString() }); });
+    } else if (req.method === "POST") JSON.parse(raw).forEach((r) => db[table].set(r[key], { ...db[table].get(r[key]), ...r }));
+    else if (req.method === "DELETE" && table === "reviews") [...db.reviews.values()].filter((r) => only.includes(r.subject_id)).forEach((r) => db.reviews.delete(r.id));
     else if (req.method === "DELETE") only.forEach((id) => db[table].delete(id));
     res.writeHead(req.method === "POST" ? 201 : 204, cors); res.end(); return;
   }
@@ -261,10 +272,11 @@ try {
   check(ledger.length === tasks.filter((x) => x !== "usage").length, "every AI call is recorded for the limit");
 
   // ----- The account keeps a copy: it survives a cleared browser, and a delete reaches the account.
-  const until = async (fn, msg) => { for (let k = 0; k < 50 && !fn(); k++) await page.waitForTimeout(100); check(fn(), msg); };
+  const until = async (fn, msg, tries = 50) => { for (let k = 0; k < tries && !fn(); k++) await page.waitForTimeout(100); check(fn(), msg); };
   const row = () => [...db.subjects.values()][0];
   await until(() => db.subjects.size === 1 && row().data.files.length === 4 && row().data.name === "Mikroekonómia", "the subject is saved to the account");
-  await until(() => db.progress.size === 1 && Object.keys([...db.progress.values()][0].data).length === 1, "the quiz progress is saved to the account");
+  const answers = () => [...db.reviews.values()].filter((r) => r.kind === "answer").length;
+  await until(() => answers() === 1 && db.progress.size === 0, "the answer is saved to the account's answer log");
   const other = await (await browser.newContext()).newPage();
   other.on("pageerror", (e) => errors.push("second device: " + e.message));
   await other.goto(base + "#upload");
@@ -279,9 +291,29 @@ try {
   await other.locator("#subjects .sj").first().click();
   await other.click("#learn");
   await other.locator("#opts .opt").first().click();
-  // The round may repeat the question the first device got wrong, so count answers, not questions.
-  const answers = () => Object.values([...db.progress.values()][0].data).reduce((n, r) => n + r.n, 0);
   await until(() => answers() === 2, "answers from the second device reach the account");
+
+  // Both devices answer the same questions while the second one is offline: every answer is kept.
+  await other.context().setOffline(true);
+  await other.click("#next");
+  await other.locator("#opts .opt").first().click();
+  await page.click("#subjects .sj:not(.add)");
+  await page.click("#learn");
+  await page.locator("#opts .opt").first().click();
+  await until(() => answers() === 3, "the first device's answer arrives while the second is offline");
+  await other.context().setOffline(false);
+  // Requests that failed offline are retried for a few seconds before the sync gives up and runs again.
+  await until(() => answers() === 4, "the offline answer arrives when the second device is back online", 200);
+  await page.click("#quit");
+  await page.click("#endBack");
+  await page.click("#sMore");
+  // The app coming back to the front (here: the "online" event) pulls the other device's answers.
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  const held = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("studyapp-log:")).reduce((n, k) => n + JSON.parse(localStorage.getItem(k)).length, 0));
+  for (let k = 0; k < 50 && (await held()) !== 4; k++) await page.waitForTimeout(100);
+  check((await held()) === 4, "the first device holds all four answers");
+  await page.click("#moreSheet [data-close]");
+  await page.click('#tabbar [data-go="home"]');
   await other.close();
   await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("studyapp-") && k !== "studyapp-ai-consent").forEach((k) => localStorage.removeItem(k)));
   await page.reload();
@@ -292,10 +324,27 @@ try {
   check(await page.locator("#progWrap").isVisible(), "the progress comes back too");
   await page.click("#delSubj");
   await page.click("#delYes");
-  await until(() => row().deleted === true && row().data === null && db.progress.size === 0, "deleting a subject removes it from the account");
+  await until(() => row().deleted === true && row().data === null && db.reviews.size === 0, "deleting a subject removes it and its answers from the account");
   await page.reload();
   await page.waitForTimeout(800);
   check((await page.locator("#subjects .sj").count()) === 1, "a deleted subject does not come back");
+
+  // ----- The same files again (an upload that was interrupted and started over): every answer comes from the cache.
+  const paid = () => ledger.filter((r) => !r.cached).length;
+  const paidBefore = paid(), rowsBefore = ledger.length;
+  await page.click(".sj.add");
+  await page.locator("#upForm").waitFor();
+  await page.fill("#upName", "Mikroekonómia");
+  await page.setInputFiles("#upFiles", [
+    { name: "prednaska1.pdf", mimeType: "application/pdf", buffer: makePdf() },
+    { name: "elasticita.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: await makeDocx() },
+    { name: "rovnovaha.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: await makePptx() },
+  ]);
+  await page.click("#upNext");
+  if (await page.locator('#upMake [data-k="summary"][aria-pressed="false"]').count()) await page.click('#upMake [data-k="summary"]');
+  await page.click("#upGo");
+  await page.locator("#subject").waitFor({ timeout: 30000 });
+  check(ledger.length > rowsBefore && paid() === paidBefore, "running the same files again costs nothing");
 } catch (e) {
   errors.push(e.message);
   const shown = await page.locator("#upErr").textContent().catch(() => "");

@@ -1,18 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handle, HttpError, limitsFrom } from "../server/generate.js";
-import { buildSubject, stepsFor } from "../src/upload/pipeline.js";
+import { handle, HttpError, limitsFrom, cacheKey } from "../server/generate.js";
+import { buildSubject, stepsFor, retrying, backoff } from "../src/upload/pipeline.js";
 import { parseQuiz, parseTopics, parseVision, parseChecks } from "../ai/tasks.js";
+import { getProvider } from "../ai/index.js";
 
 const user = { id: "u1", email: "simon@example.com" };
-function deps({ month = 0, today = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}' } = {}) {
+function deps({ month = 0, today = 0, minute = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null } = {}) {
   const rows = [], calls = [];
   return {
-    rows, calls, user, env,
-    spend: async () => ({ month, today }),
+    rows, calls, user, env, cache, log: () => {},
+    spend: async () => ({ month, today, minute }),
     record: async (r) => rows.push(r),
-    ai: { complete: async (req) => { calls.push(req); return { text, usage: { inputTokens: 1000, outputTokens: 100 }, model: "m", costUsd: 0.01 }; } },
+    ai: {
+      name: "fake", models: { fast: "m", strong: "m2" },
+      complete: async (req) => {
+        calls.push(req);
+        if (fail) throw fail;
+        return { text, truncated, usage: { inputTokens: 1000, outputTokens: 100 }, model: "m", costUsd: 0.01 };
+      },
+    },
   };
+}
+// The ai_cache table, in memory.
+function memCache() {
+  const m = new Map();
+  return { m, get: async (k) => m.get(k) ?? null, put: async (r) => { if (!m.has(r.key)) m.set(r.key, r.result); } };
 }
 const rejects = (p, code) => assert.rejects(p, (e) => e instanceof HttpError && e.code === code);
 
@@ -125,7 +138,7 @@ test("pipeline: makes only what was chosen", async () => {
   assert.deepEqual(Object.values(sj.topics), ["L1"]);
 });
 
-test("pipeline: adds files to a subject, sorts topics again and renames moved questions", async () => {
+test("pipeline: adds files to a subject and sorts topics again; every question keeps its id", async () => {
   const { call } = fakeCall();
   const docs = [{ name: "L1", pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }];
   const first = await buildSubject({ name: "Mikro", docs, call });
@@ -151,6 +164,113 @@ test("pipeline: adds files to a subject, sorts topics again and renames moved qu
   assert.equal(sj.questions.length, 2);
   const moved = sj.questions.find((x) => x.q === first.questions[0].q);
   assert.equal(moved.t, "t2");
-  assert.equal(sj.renamed[oldId], moved.id);
+  assert.equal(moved.id, oldId, "a question keeps its id when the topics are sorted again");
+  const added = sj.questions.find((x) => x.q !== first.questions[0].q);
+  assert.match(added.id, /^q[0-9a-f]{10}$/);
+  assert.notEqual(added.id, oldId);
   assert.equal(sj.checkedOut, first.checkedOut);
+  assert.deepEqual(sj.failed, []);
+});
+
+// ----- Phase 0: the price gate, error codes, the per-minute limit and the result cache
+
+test("ai: a model with no price is never run", async () => {
+  const ai = getProvider({ AI_MODEL_FAST: "claude-unknown-1", ANTHROPIC_API_KEY: "not-used" });
+  await assert.rejects(ai.complete({ tier: "fast", system: "s", prompt: "p" }), (e) => e.code === "no_price");
+  const d = deps({ fail: Object.assign(new Error("x"), { code: "no_price" }) });
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, d), "no_price");
+  assert.equal(d.rows.length, 0, "nothing is recorded at $0");
+});
+
+test("server: provider errors become codes, and only a busy AI is worth retrying", async () => {
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ fail: Object.assign(new Error("Overloaded"), { status: 529 }) })), "ai_busy");
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ fail: Object.assign(new TypeError("fetch failed")) })), "ai_busy");
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ fail: Object.assign(new Error("declined"), { code: "refused" }) })), "refused");
+  await assert.rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ fail: new RangeError("bug") })), (e) => e instanceof RangeError);
+});
+
+test("server: the per-minute limit stops a burst", async () => {
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ minute: 60 })), "rate_limit");
+  await handle({ task: "summary", input: { text: "abc" } }, deps({ minute: 60, env: { USER_RATE_PER_MINUTE: "100" } }));
+  await handle({ task: "usage" }, deps({ minute: 999 }));
+});
+
+test("server: the same request is answered from the cache, for free and even over the cap", async () => {
+  const cache = memCache();
+  const d = deps({ cache });
+  const body = { task: "summary", input: { title: "L1", text: "[1]\nText" } };
+  const first = await handle(body, d);
+  assert.equal(first.cached, false);
+  assert.equal(cache.m.size, 1);
+  const again = await handle(body, { ...d, spend: async () => ({ month: 5, today: 0 }) });
+  assert.equal(again.cached, true);
+  assert.deepEqual(again.result, first.result);
+  assert.equal(d.calls.length, 1, "the AI was asked once");
+  assert.deepEqual([d.rows[1].cached, d.rows[1].cost_usd], [true, 0]);
+  // Another language, another text or another model is a different request.
+  await handle({ ...body, lang: "cs" }, d);
+  await handle({ ...body, input: { ...body.input, text: "[1]\nOther" } }, d);
+  assert.equal(d.calls.length, 3);
+  const req = { tier: "fast", system: "s", prompt: "p" };
+  assert.notEqual(await cacheKey("summary", { name: "a", models: { fast: "x" } }, req), await cacheKey("summary", { name: "a", models: { fast: "y" } }, req));
+  assert.match(await cacheKey("summary", d.ai, req), /^[0-9a-f]{64}$/);
+});
+
+test("server: unreadable, cut-off and failed answers are not cached", async () => {
+  const cache = memCache();
+  await rejects(handle({ task: "quiz", input: { text: "abc" } }, deps({ cache, text: "sorry" })), "bad_reply");
+  await handle({ task: "summary", input: { text: "abc" } }, deps({ cache, truncated: true }));
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ cache, fail: Object.assign(new Error("x"), { status: 503 }) })), "ai_busy");
+  assert.equal(cache.m.size, 0);
+  // A broken cache never breaks the call.
+  const broken = { get: async () => { throw new Error("db down"); }, put: async () => { throw new Error("db down"); } };
+  const out = await handle({ task: "summary", input: { text: "abc" } }, deps({ cache: broken }));
+  assert.equal(out.result.summary, "- a");
+});
+
+test("pipeline: a failed call is tried again with growing waits", async () => {
+  const busy = Object.assign(new Error("busy"), { code: "ai_busy" });
+  let n = 0;
+  const waits = [];
+  const call = retrying(async () => { if (++n < 3) throw busy; return "ok"; }, { sleep: async (ms) => waits.push(ms) });
+  assert.equal(await call("summary", {}), "ok");
+  assert.deepEqual(waits, [2000, 4000]);
+  const limit = Object.assign(new Error("limit"), { code: "user_limit" });
+  let m = 0;
+  await assert.rejects(retrying(async () => { m++; throw limit; }, { base: 0 })("summary", {}), (e) => e === limit);
+  assert.equal(m, 1, "a spending limit is not retried");
+  assert.deepEqual([backoff(2, "rate_limit"), backoff(3, "rate_limit")], [15000, 30000]);
+});
+
+test("pipeline: a file that keeps failing is left out, and the others are kept", async () => {
+  const { call } = fakeCall();
+  const refused = Object.assign(new Error("refused"), { code: "refused" });
+  const tries = {};
+  const flaky = async (task, input) => {
+    if (task === "quiz" && input.title === "L2") { tries.L2 = (tries.L2 || 0) + 1; throw refused; }
+    return call(task, input);
+  };
+  const docs = ["L1", "L2", "L3"].map((name) => ({ name, pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }));
+  const states = [], steps = [];
+  const sj = await buildSubject({ name: "M", docs, call: flaky, retry: { base: 0 }, onFile: (k, st) => states.push(k + st), onStep: (d, n) => steps.push([d, n]) });
+  assert.deepEqual(sj.files.map((f) => f.name), ["L1", "L3"]);
+  assert.deepEqual(sj.failed.map((f) => [f.index, f.name, f.code]), [[1, "L2", "refused"]]);
+  assert.equal(tries.L2, 1, "a refusal is not retried");
+  assert.deepEqual(states, ["0ai", "0done", "1ai", "1failed", "2ai", "2done"]);
+  assert.deepEqual(steps.at(-1), [stepsFor(docs), stepsFor(docs)], "the bar still ends full");
+});
+
+test("pipeline: a spending limit stops the upload but keeps what finished", async () => {
+  const { call } = fakeCall();
+  const limit = Object.assign(new Error("limit"), { code: "user_limit" });
+  const docs = ["L1", "L2", "L3"].map((name) => ({ name, pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }));
+  const log = [];
+  const capped = async (task, input) => { log.push(task + ":" + (input.title || "")); if (input.title === "L2") throw limit; return call(task, input); };
+  const sj = await buildSubject({ name: "M", docs, call: capped, retry: { base: 0 } });
+  assert.deepEqual(sj.files.map((f) => f.name), ["L1"]);
+  assert.deepEqual(sj.failed.map((f) => [f.name, f.code]), [["L2", "user_limit"], ["L3", "user_limit"]]);
+  assert.ok(!log.some((x) => x.endsWith(":L3")), "nothing more is sent after the limit");
+  assert.ok(!log.includes("topics:"), "no topic sort over the limit");
+  // Nothing finished at all: the error itself comes back.
+  await assert.rejects(buildSubject({ name: "M", docs: docs.slice(1, 2), call: capped, retry: { base: 0 } }), (e) => e === limit);
 });

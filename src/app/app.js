@@ -1,7 +1,7 @@
 // The app's screens: Today, Subjects, one subject (overview, summaries, topics), the summary reader,
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, writeProgress } from "./subjects.js";
+import { loadSubjects, saveSubjects, readProgress, logAnswer, resetProgress } from "./subjects.js";
 import { startSync } from "./autosync.js";
 import { renderMarkdown } from "./md.js";
 
@@ -25,7 +25,6 @@ let P = {};
 let tab = "overview", sortBy = "order", query = "";
 let roundOf = null; // what "next round" repeats: a topic key, or null for the whole subject
 
-function save() { writeProgress(CUR, P); }
 function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function button(cls, text, onclick) { const b = el("button", cls, text); b.type = "button"; b.onclick = onclick; return b; }
@@ -371,7 +370,7 @@ $("examDate").onchange = () => {
 $("addFiles").onclick = () => openUpload(CUR.id);
 $("reset").onclick = () => { $("confirm").hidden = false; $("reset").hidden = true; };
 $("no").onclick = () => { $("confirm").hidden = true; $("reset").hidden = false; };
-$("yes").onclick = () => { P = {}; save(); $("moreSheet").close(); renderSubject(); };
+$("yes").onclick = () => { resetProgress(CUR); P = {}; $("moreSheet").close(); renderSubject(); };
 $("delSubj").onclick = () => { $("delConfirm").hidden = false; $("delSubj").hidden = true; };
 $("delNo").onclick = () => { $("delConfirm").hidden = true; $("delSubj").hidden = false; };
 $("delYes").onclick = () => {
@@ -419,7 +418,8 @@ function grade(sel) {
   const x = list[i], C = new Set(corr(x).map((a) => order.indexOf(a)));
   const ok = C.size === sel.size && [...sel].every((n) => C.has(n));
   if (ok) score++; else wrong.push(x);
-  const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r; save();
+  const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
+  logAnswer(CUR, x.id, ok);
   [...$("opts").children].forEach((b, n) => {
     b.setAttribute("aria-disabled", "true"); b.removeAttribute("aria-pressed");
     if (C.has(n)) { b.classList.add("ok"); if (!sel.has(n) && Array.isArray(x.a)) b.classList.add("missed"); }

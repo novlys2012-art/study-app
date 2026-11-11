@@ -16,8 +16,9 @@ export async function complete({ model, system, prompt, images = [], maxTokens, 
     model,
     max_tokens: maxTokens,
     ...(effort ? { output_config: { effort } } : {}),
-    // The instructions are the same on every call, so they are cached once a file has several sections.
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    // No prompt-cache marker: the instructions are far below the model's minimum cacheable length,
+    // and ai/prices.js does not count cache writes and reads. Repeated work is cached by the server instead (ai_cache).
+    system,
     messages: [{
       role: "user",
       content: [
@@ -26,7 +27,7 @@ export async function complete({ model, system, prompt, images = [], maxTokens, 
       ],
     }],
   }).finalMessage();
-  if (res.stop_reason === "refusal") throw new Error("The model declined this section.");
+  if (res.stop_reason === "refusal") throw Object.assign(new Error("The model declined this section."), { code: "refused" });
   const text = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
   return {
     text,

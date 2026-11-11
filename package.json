@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test test/*.test.mjs",
+    "test:db": "node test/db.mjs",
     "smoke": "node test/smoke.mjs",
     "cap:sync": "vite build && cap sync",
     "trial": "node --env-file-if-exists=.env scripts/ai-trial.mjs",
