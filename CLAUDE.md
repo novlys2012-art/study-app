@@ -43,7 +43,8 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 - **Cost targets.** A 200-page PDF should cost under €0.10 to process; a heavy paying user under about €0.75 a month in AI. Extract text locally, strip repeated headers and footers, split into sections of about 8–10k tokens, cache answers by a hash of the request (`ai_cache`) so a shared file is processed once, and use Batch (half price) for anything not needed right away. Limits are counted in pages, not uploads.
 - **Generated questions use the quiz site's format** (`q`, `o`, `a`, `e`, `x`, `s`), so the existing quiz mode can show them unchanged. Every question keeps a source quote.
 - **UI strings go through `src/i18n/`.** Static markup uses `data-i18n="section.key"`; code uses `t("key")`. `sk.json` is the source, `cs.json` is filled in phase 7, missing keys fall back to Slovak.
-- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. The app layout (bottom tab bar, `rowcard`, `hero`, `bsheet` bottom sheets, the quiz's slide-up `fb` panel) is the app's own and sits at the end of the file. New screens reuse the classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`, `rowcard`, `pill`, `iconbtn`) and colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
+- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Kocky is the default; Riso, Účtovná kniha, Zošit, Tabuľa, Čistý) come from the quiz site. The app layout is the app's own and sits at the end of the file. New screens reuse the classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`, `rowcard`, `iconbtn`, `menu`, `empty`, `dock`, `bsheet`), the shape and motion tokens (`--r-card`, `--r-ctl`, `--bw`, `--press`, `--ease`, `--t`) and the colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
+- **Follow the design brief.** `docs/design.md` says how screens behave: one main action per screen, a subject always opens on tap, back always works (every screen and open sheet is a history entry; move between screens with `go()` and `back()`, open sheets with `openSheet()`), every tap answers, and a toast confirms a change with no visible result. Wide screens get a side rail instead of the bottom tab bar.
 - **Privacy.** 16+ only unless parental consent is added. Original uploads are deleted once text extraction succeeds. An AI consent screen naming the provider is shown before the first upload (an App Store requirement).
 
 ## Pricing (planned)
@@ -55,7 +56,8 @@ Free tier with a small monthly page limit. Plus at €3.99 a month or €29.99 a
 ```
 index.html            page shell, markup tagged with data-i18n
 src/main.js           entry: styles, i18n, then the app
-src/app/app.js        screens: Today, Subjects, one subject (tabs), summary reader, quiz, Profile, and the bottom tab bar
+src/app/app.js        screens: Today, Subjects, one subject (tabs), summary reader, quiz, Profile, and navigation (history, sheets, toast)
+src/app/icons.js      icons and the progress ring for parts built in code
 src/app/subjects.js   subjects, questions and the answer log on the device (localStorage), with marks of what changed
 src/app/autosync.js   when to sync with the account (start, after a change, back in front, after sign-in)
 src/app/md.js         safe renderer for the summaries' Markdown
@@ -67,6 +69,7 @@ ai/                   provider layer (index.js, providers/, prices.js) and promp
 server/generate.js    server task runner: auth, caps, one AI task, cost record (runs in the Edge Function and in tests)
 supabase/             config, migrations (ai_usage, subjects, ai_cache, reviews), functions/generate (Deno entry; shared code copied in by fn:prepare)
 docs/live-setup.md    connecting the live site: Supabase, keys, GitHub settings
+docs/design.md        design brief: how screens are laid out and behave
 scripts/ai-trial.mjs  phase 0 trial: run generation on real files and log tokens and cost
 android/, ios/        Capacitor native projects
 test/                 unit tests (npm test), browser smoke test (npm run smoke), upload end-to-end test (npm run e2e),

@@ -6,6 +6,7 @@ import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, ExtractError, TYPES } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE } from "./pipeline.js";
+import { icon } from "../app/icons.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
 const MAKE_KEY = "studyapp-make";
@@ -66,6 +67,8 @@ async function refresh() {
   let s;
   try { s = await cloud.session(); } catch (e) { error(message(e)); }
   if (!s) { panel("upLogin"); return; }
+  // Opened from Profile only to sign in: that is done, so go back there.
+  if (ctx.signIn) { ctx.done(); return; }
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}
   if (!agreed) { panel("upConsent"); return; }
   $("upWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
@@ -89,16 +92,18 @@ function renderPicked() {
   const ul = $("upList"); ul.innerHTML = "";
   picked.forEach((f, k) => {
     const li = el("li", "up-file");
-    const rm = el("button", "link", t("upload.remove")); rm.type = "button";
+    const rm = el("button", "iconbtn small"); rm.type = "button";
+    rm.setAttribute("aria-label", t("upload.remove") + ": " + f.name); rm.appendChild(icon("x"));
     rm.onclick = () => { picked.splice(k, 1); renderPicked(); };
-    li.append(el("span", null, f.name), el("span", "qid", Math.max(1, Math.round(f.size / 1024)) + " kB"), rm);
+    const art = el("span", "file-art"); art.appendChild(icon("doc"));
+    li.append(art, el("span", "grow", f.name), el("span", "qid", Math.max(1, Math.round(f.size / 1024)) + " kB"), rm);
     ul.appendChild(li);
   });
   ul.hidden = !picked.length;
   const ready = picked.length && (ctx.target || $("upName").value.trim());
   const ok = ready && (make.summary || make.quiz);
-  $("upNext").disabled = !ready; $("upNext").style.opacity = ready ? 1 : 0.5;
-  $("upGo").disabled = !ok; $("upGo").style.opacity = ok ? 1 : 0.5;
+  $("upNext").disabled = !ready;
+  $("upGo").disabled = !ok;
 }
 
 const STATE = {
@@ -205,6 +210,7 @@ function wire() {
     finally { $("upVerify").disabled = false; }
   };
   $("upCode").onkeydown = (e) => { if (e.key === "Enter") $("upVerify").click(); };
+  $("upEmail").onkeydown = (e) => { if (e.key === "Enter") $("upSend").click(); };
   $("upAgain").onclick = () => { error(""); askCode(false); };
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
@@ -230,7 +236,8 @@ function wire() {
   $("upOut").onclick = async () => { await cloud.signOut(); refresh(); };
 }
 
-// app: { opened(subjectId), target } from the home screen; target is the id of a subject to add files to.
+// app: { opened(subjectId), target, signIn, done() }; target is the id of a subject to add files to,
+// signIn means the screen was opened only to sign in and done() goes back.
 export function open(app) {
   if (!busy) { if (ctx && ctx.target !== app.target) picked = []; ctx = app; }
   wire();
