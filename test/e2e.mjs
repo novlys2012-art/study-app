@@ -19,7 +19,19 @@ const API = `http://localhost:${API_PORT}`;
 const fakeAi = {
   async complete({ system, prompt, images = [] }) {
     let out;
-    if (/transcribe/.test(system)) {
+    if (/read old university exams/.test(system)) {
+      // A photographed exam asks about demand; the typed one about elasticity and market equilibrium.
+      out = images.length
+        ? { questions: [{ n: "1", text: "Nakreslite krivku dopytu.", topic: "Krivka dopytu", points: 4 }], unreadable: "" }
+        : { questions: [{ n: "1", text: "Definujte elasticitu dopytu.", topic: "Elasticita dopytu", points: 5 }, { n: "2", text: "Čo je trhová rovnováha?", topic: "Rovnováha na trhu", points: 3 }], unreadable: "" };
+      if (images.length && !/attached page images/.test(prompt)) throw new Error("photos without the note");
+    } else if (/sort the questions of one university course's old exams/.test(system)) {
+      // Everything about demand is one topic, named as the subject names it.
+      const qs = [...prompt.matchAll(/^(e\d+#\d+) \[(.*?)\]/gm)];
+      const by = new Map();
+      qs.forEach(([, ref, tag]) => { const name = /dopyt/i.test(tag) ? "Dopyt" : tag; by.set(name, [...(by.get(name) || []), ref]); });
+      out = { topics: [...by].map(([name, questions]) => ({ name, questions })) };
+    } else if (/transcribe/.test(system)) {
       const pages = prompt.match(/pages ([\d, ]+),/)[1].split(", ").map(Number);
       out = { pages: pages.map((page, k) => ({ page, text: `Graf ponuky a dopytu z obrázka ${k + 1}. `.repeat(10) })) };
       if (images.length !== pages.length) throw new Error("image count");
@@ -37,7 +49,7 @@ const fakeAi = {
       const qs = JSON.parse(prompt.match(/<questions>\n([\s\S]*)\n<\/questions>/)[1]);
       out = { checks: qs.map((x) => ({ i: x.i, verdict: x.q.startsWith("Nesprávne") ? "wrong" : "ok", note: "" })) };
     } else if (/organise one subject/.test(system)) {
-      const ids = [...prompt.matchAll(/^(f\d+#\d+):/gm)].map((m) => m[1]);
+      const ids = [...prompt.matchAll(/^([fn]\d+#\d+|p\d+):/gm)].map((m) => m[1]);
       out = { subject: "Mikro", topics: [
         { name: "Dopyt", files: [], summary: "Ako dopyt reaguje na cenu.", questions: ids.slice(0, 1), weak_spots: ["Posun krivky vs. pohyb po krivke"] },
         { name: "Ponuka", files: [], summary: "Ponuka a cena.", questions: ids.slice(1), weak_spots: [] },
@@ -270,12 +282,45 @@ try {
   check((await page.locator("#files .file").count()) === 3, "a file without a summary adds only questions");
   await page.click('#tabbar [data-go="home"]');
   check((await page.locator("#subjects .sj").count()) === 1, "adding files does not make a second subject");
+
+  // ----- Past exams: a typed exam and two photos of another, ranked against the subject's topics.
+  await page.locator("#subjects .sj").first().click();
+  await page.click('#sTabs [data-tab="exams"]');
+  check((await page.textContent("#tabExams")).includes("Nie je to predpoveď"), "the past exams tab explains itself before any upload");
+  await page.click("#tabExams .empty .btn");
+  await page.locator("#upForm").waitFor();
+  check(page.url().includes("#exams/") && await page.locator("#upSubjectBox").isHidden() && await page.locator("#upNameBox").isHidden(), "old exams go into the open subject");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await page.setInputFiles("#upFiles", [
+    { name: "skuska_2024.txt", mimeType: "text/plain", buffer: Buffer.from("1. Definujte elasticitu dopytu. (5 b.)\n2. Čo je trhová rovnováha? (3 b.)") },
+    { name: "foto2.png", mimeType: "image/png", buffer: png },
+    { name: "foto1.png", mimeType: "image/png", buffer: png },
+  ]);
+  check((await page.locator("#upList li").count()) === 2, "a file is one exam, photos picked together are one exam");
+  check((await page.inputValue("#upList li:first-child input")) === "2024", "the year is read from the file name");
+  await page.fill("#upList li:nth-child(2) input", "2022");
+  await page.click("#upNext");
+  check(await page.locator("#upMakeBox").isHidden(), "exams skip the choice of what to make");
+  const was = tasks.length;
+  await page.click("#upGo");
+  await page.locator("#tabExams .tbar").first().waitFor({ timeout: 30000 });
+  check(tasks.slice(was).join(",") === "exam,exam,group", "each exam is read in one call, then all are sorted into topics");
+  const ranked = await page.locator("#tabExams .tbar .tbar-top span:first-child").allTextContents();
+  check(ranked.join("|") === "1. Dopyt|2. Rovnováha na trhu", "the ranking uses the subject's topic names: " + ranked.join(", "));
+  check((await page.textContent("#tabExams .tbar")).includes("v 2 z 2 skúšok"), "a topic asked in both exams says so");
+  check((await page.textContent("#tabExams")).includes("nie je v tvojich materiáloch"), "a topic missing from the materials is marked");
+  await page.click("#tabExams .btn");
+  await page.locator("#quiz").waitFor();
+  check((await page.textContent("#qtopic")) === "Dopyt", "practising in ranked order starts with the most asked topic");
+  await page.click("#quit");
+  await page.click('#tabbar [data-go="home"]');
   check(ledger.length === tasks.filter((x) => x !== "usage").length, "every AI call is recorded for the limit");
 
   // ----- The account keeps a copy: it survives a cleared browser, and a delete reaches the account.
   const until = async (fn, msg, tries = 50) => { for (let k = 0; k < tries && !fn(); k++) await page.waitForTimeout(100); check(fn(), msg); };
   const row = () => [...db.subjects.values()][0];
   await until(() => db.subjects.size === 1 && row().data.files.length === 4 && row().data.name === "Mikroekonómia", "the subject is saved to the account");
+  await until(() => (row().data.exams || []).length === 2 && row().data.exams.some((e) => e.year === 2022), "its past exams are saved with it");
   const answers = () => [...db.reviews.values()].filter((r) => r.kind === "answer").length;
   await until(() => answers() === 1 && db.progress.size === 0, "the answer is saved to the account's answer log");
   const other = await (await browser.newContext()).newPage();

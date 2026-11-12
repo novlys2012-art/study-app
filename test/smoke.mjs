@@ -1,5 +1,5 @@
 // Opens the built app in Chromium at phone size, checks the empty start screen, then walks a made-up
-// test subject: tabs, a summary, one quiz round, an exam date, Today and Profile. Fails on any page error.
+// test subject: tabs, a summary, the past exam ranking, one quiz round, an exam date, Today and Profile. Fails on any page error.
 // Usage: npm run build && npm run smoke
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -30,6 +30,16 @@ const SUBJECT = {
     { t: "a", q: "Koľko je 2 + 2?", o: ["3", "4", "5", "6"], a: 1, e: "Dva a dva sú štyri.", x: "", s: "test" },
     { t: "a", q: "Ktoré čísla sú párne?", o: ["1", "2", "3", "4"], a: [1, 3], e: "Párne sú 2 a 4.", x: "", s: "test" },
     { t: "b", q: "Aká farba je obloha cez deň?", o: ["modrá", "zelená", "červená", "čierna"], a: 0, e: "", x: "", s: "" },
+  ],
+  exams: [
+    { id: "x1", name: "Skúška 2024", year: 2024, questions: [
+      { id: "e1", n: "1", text: "Sčítajte 2 + 2.", topic: "Téma A", points: 5 },
+      { id: "e2", n: "2", text: "Vynásobte dve matice.", topic: "Matice", points: 3 },
+    ] },
+    { id: "x2", name: "Skúška 2023", year: 2023, questions: [
+      { id: "e3", n: "1", text: "Akej farby je obloha?", topic: "téma b", points: 2 },
+      { id: "e4", n: "2", text: "Ktoré čísla sú párne?", topic: "Téma A", points: 2 },
+    ] },
   ],
 };
 
@@ -63,6 +73,31 @@ check(await page.locator("#reader").isVisible() && (await page.textContent("#rBo
 check(await page.locator("#tabbar").isHidden() && page.url().endsWith("#test/read/1"), "the reader is full screen and has its own address");
 await page.goBack();
 check(await page.locator("#subject").isVisible(), "the back button goes from the summary to the subject");
+
+await page.click('#sTabs [data-tab="exams"]');
+const rows = await page.locator("#tabExams .tbar .tbar-top span:first-child").allTextContents();
+check(rows.join("|") === "1. Téma A|2. Matice|3. Téma B", "past exams rank topics, the newer exam counting more: " + rows.join(", "));
+check((await page.textContent("#tabExams")).includes("v 2 z 2 skúšok") && (await page.textContent("#tabExams")).includes("Nie je to predpoveď"), "the ranking shows raw counts and its limits");
+check(await page.locator("#tabExams .tipbox").isVisible(), "fewer than three exams are flagged as a rough guess");
+await page.locator("#tabExams .tbar").nth(1).click();
+check(await page.locator("#pastSheet").isVisible() && (await page.textContent("#xBody")).includes("Vynásobte dve matice."), "a topic opens with its old exam questions");
+await page.locator("#xBody select").first().selectOption("Téma B");
+await page.locator("#pastSheet").waitFor({ state: "hidden" });
+check(await page.locator("#toast").isVisible(), "moving the topic's only question closes its sheet with a toast");
+const after = await page.locator("#tabExams .tbar .tbar-top span:first-child").allTextContents();
+check(after.join("|") === "1. Téma A|2. Téma B", "a topic not in the materials is linked to a subject topic");
+await page.locator("#tabExams .rowcard").first().click();
+check((await page.textContent("#xTitle")) === "Skúška 2024", "an uploaded exam opens, newest first");
+await page.fill("#xYear", "2021"); await page.press("#xYear", "Tab");
+await page.goBack();
+await page.locator("#pastSheet").waitFor({ state: "hidden" });
+check(await page.locator("#subject").isVisible(), "the back button closes the exam sheet and stays on the subject");
+check((await page.textContent("#tabExams .rowcard .hint")).startsWith("2023"), "changing an exam's year re-sorts the list");
+await page.click("#tabExams .btn");
+check(await page.locator("#quiz").isVisible() && (await page.textContent("#qtopic")) === "Téma A", "practising in ranked order starts with the most asked topic");
+await page.click("#quit");
+await page.goto(base + "#test");
+check((await page.evaluate(() => JSON.parse(localStorage.getItem("studyapp-subjects-v1"))[0].exams[0].year)) === 2021, "exam changes are saved in the subject");
 
 await page.click("#custom");
 await page.click('#counts [data-n="all"]');

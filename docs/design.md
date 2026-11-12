@@ -21,7 +21,7 @@ A student with a phone in one hand, a week before an exam, who wants to know wha
 
 - **Dnes**: what to do now. The subject with the nearest exam (or the one opened last) as a big card with the countdown and today's round. Other subjects below, each with a play button.
 - **Predmety**: the library. Every subject, then the add card.
-- **A subject**: progress, exam date, "Učiť sa" and "Vlastné kolo", then tabs: Témy (weakest first, each opens to its summary, weak spots and a practise button) and Zhrnutia.
+- **A subject**: progress, exam date, "Učiť sa" and "Vlastné kolo", then tabs: Témy (weakest first, each opens to its summary, weak spots and a practise button), Zhrnutia, and Skúšky (old exams: topics ranked by how often they were asked, each opening to its old questions in a sheet, a round in that order, the uploaded exams, and the add button).
 - **Reader, quiz, result, upload**: full screen, no tab bar. They have their own way out in the top bar.
 - **Profil**: account, monthly limit, look and light/dark.
 - **Adding** is the floating "+" on a phone and the button at the top of the side rail on a wide screen.

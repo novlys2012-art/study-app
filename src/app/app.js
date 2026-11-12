@@ -6,6 +6,7 @@ import { loadSubjects, saveSubjects, readProgress, logAnswer, resetProgress } fr
 import { startSync } from "./autosync.js";
 import { renderMarkdown } from "./md.js";
 import { icon, ring } from "./icons.js";
+import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 
 const LOOK_KEY = "studyapp-look";
 const THEME_KEY = "studyapp-theme";
@@ -26,18 +27,21 @@ let picked = new Set();
 let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", order = [];
 let P = {};
 let tab = "overview", sortBy = "order", query = "", openTopic = null;
-let roundOf = null;   // what "next round" repeats: a topic key, or null for the whole subject
+let roundOf = null;   // what "next round" repeats: a topic key, RANKED, or null for the whole subject
+const RANKED = "@exams"; // a round in the order of the past exam ranking
 let stage = "quiz";   // the quiz entry shows a question ("quiz") or the result ("end")
 
 function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function button(cls, text, onclick) { const b = el("button", cls, text); b.type = "button"; b.onclick = onclick; return b; }
+// Slovak and Czech plurals: base.one (1), base.few (2 to 4), base.many (0, 5 and more).
+const plural = (base, n, vars) => t(base + (n === 1 ? ".one" : n >= 2 && n <= 4 ? ".few" : ".many"), { n, ...vars });
 function bar(pct) { const b = el("span", "bar"), fill = el("i"); fill.style.width = pct + "%"; b.appendChild(fill); return b; }
 function buzz(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
 
 // ===== Navigation: every screen is a history entry, so the back button always goes one step back
 //
-// Hashes: "" Today, "subjects", "profile", "upload", "upload/<subject>", "signin", "<subject>",
+// Hashes: "" Today, "subjects", "profile", "upload", "upload/<subject>", "exams/<subject>", "signin", "<subject>",
 // "<subject>/read/<file number>", "<subject>/quiz". history.state.d counts the steps taken inside the app,
 // so back() knows whether there is somewhere to go back to. An open bottom sheet is an entry too.
 
@@ -88,6 +92,7 @@ function route() {
   const code = !booted && /[?&]code=/.test(location.search);
   booted = true;
   if (h.startsWith("upload/")) showUpload(h.slice(7));
+  else if (h.startsWith("exams/")) showUpload(h.slice(6), false, "exams");
   else if (h === "upload" || code) showUpload();
   else if (h === "signin") showUpload(null, true);
   else if (h === "subjects") showHome();
@@ -303,7 +308,8 @@ function renderSubject() {
   $("sName").textContent = CUR.name;
   $("sMeta").textContent = [st.total ? t("today.count", { n: st.total }) : "", files ? t("subject.summaries", { n: files }) : ""].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
-  const has = { overview: topicKeys().length > 0, files: files > 0 };
+  const exams = CUR.exams || [];
+  const has = { overview: topicKeys().length > 0, files: files > 0, exams: st.total > 0 || exams.length > 0 };
   const open = Object.keys(has).filter((k) => has[k]);
   $("sCard").hidden = !open.length;
   $("sStat").hidden = !st.total; $("sActions").hidden = !st.total;
@@ -322,8 +328,10 @@ function renderSubject() {
   $("sEmpty").hidden = open.length > 0;
   $("tabOverview").hidden = tab !== "overview" || !has.overview;
   $("tabFiles").hidden = tab !== "files" || !has.files;
+  $("tabExams").hidden = tab !== "exams" || !has.exams;
   if (!$("tabOverview").hidden) renderOverview();
   if (!$("tabFiles").hidden) renderFiles();
+  if (!$("tabExams").hidden) renderExams();
 }
 function showSubject() { renderSubject(); show("subject"); }
 $("sTabs").onclick = (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderSubject(); } };
@@ -398,6 +406,148 @@ function filterFiles() {
 $("studySearch").oninput = () => { query = $("studySearch").value; filterFiles(); };
 $("studySort").onchange = () => { sortBy = $("studySort").value; renderFiles(); };
 
+// ===== Past exams: which topics the old exams asked about, how often, and a round in that order
+
+function saveExams(exams, msg) {
+  CUR.exams = exams;
+  saveSubjects(loadSubjects().map((x) => (x.id === CUR.id ? { ...x, exams } : x)));
+  renderSubject();
+  if (msg) toast(t(msg));
+}
+// Topic names a question can be moved to: the subject's topics, then the other names the exams use.
+function topicChoices() {
+  const out = Object.keys(TOPICS).filter((k) => k !== "t0").map((k) => TOPICS[k]);
+  (CUR.exams || []).forEach((ex) => ex.questions.forEach((q) => {
+    if (!matchTopic(q.topic, TOPICS) && !out.some((n) => n.toLowerCase() === q.topic.toLowerCase())) out.push(q.topic);
+  }));
+  return out;
+}
+function topicSelect(current, onpick, placeholder) {
+  const sel = el("select", "search");
+  sel.setAttribute("aria-label", t("exams.moveTo"));
+  if (placeholder) sel.append(new Option(placeholder, ""));
+  topicChoices().forEach((n) => sel.append(new Option(n, n)));
+  sel.value = current;
+  sel.onchange = () => { if (sel.value) onpick(sel.value); };
+  return sel;
+}
+// Fills the past exam sheet; opens it when it is not open yet (a history entry, so back closes it).
+function pastSheet(title, nodes) {
+  $("xTitle").textContent = title;
+  $("xBody").replaceChildren(...nodes);
+  if (!$("pastSheet").open) openSheet($("pastSheet"));
+}
+const examLine = (q) => [q.year || "", q.n ? t("exams.task", { n: q.n }) : "", q.points ? t("exams.points", { n: q.points }) : ""].filter(Boolean).join(" · ");
+// One old exam question: its wording, where it is from, and a choice of topic. after() redraws the sheet.
+function examQuestion(q, after) {
+  const li = el("li");
+  const name = TOPICS[matchTopic(q.topic, TOPICS)] || q.topic;
+  li.append(el("div", null, q.text));
+  const line = examLine(q); if (line) li.append(el("div", "hint", line));
+  li.append(topicSelect(name, (to) => { saveExams(retagQuestion(CUR.exams, q.id, to), "exams.movedToast"); after(); }));
+  return li;
+}
+const askedIn = (r) => (r.of > 1 ? t("exams.inN", { n: r.exams, of: r.of }) : t("exams.inOne"));
+function addExamsButton(label, cls) {
+  const b = button(cls, null, () => openUpload(CUR.id, "exams"));
+  b.append(icon("plus"), el("span", null, t(label)));
+  return b;
+}
+
+function renderExams() {
+  const box = $("tabExams"), exams = CUR.exams || [];
+  if (!exams.length) {
+    // Empty state: one sentence and the button that fixes it.
+    const c = el("div", "empty");
+    const art = el("span", "empty-art"); art.appendChild(icon("doc"));
+    c.append(art, el("p", null, t("exams.emptyText")), addExamsButton("exams.add", "btn"), el("p", "hint", t("exams.honest")));
+    box.replaceChildren(c);
+    return;
+  }
+  const rank = rankExams(exams, TOPICS), top = rank.length ? rank[0].score : 1;
+  const span = yearSpan(exams);
+  const head = [el("p", "label", t("exams.rankLabel")), el("p", "hint", plural("exams.sample", exams.length, { years: span ? " (" + span + ")" : "" }))];
+  if (exams.length < FEW_EXAMS) head.push(el("p", "tipbox", t("exams.few", { n: FEW_EXAMS })));
+  const rows = el("div", "stack ranks");
+  rank.forEach((r, k) => {
+    const b = button("tbar rank", null, () => openExamTopic(r.id));
+    const t1 = el("span", "tbar-top");
+    t1.append(el("span", null, (k + 1) + ". " + r.name), el("span", "hint", askedIn(r)), icon("chev", "chev"));
+    const sub = [plural("exams.q", r.questions.length), r.points ? t("exams.points", { n: r.points }) : "", r.topic ? "" : t("exams.noMaterial")];
+    b.append(t1, bar(Math.max(4, Math.round((r.score / top) * 100))), el("span", "hint", sub.filter(Boolean).join(" · ")));
+    rows.appendChild(b);
+  });
+  const out = [...head, rows];
+  if (rank.some((r) => r.topic && QUESTIONS.some((x) => x.t === r.topic))) {
+    const go = button("btn wide ghost", null, () => learn(RANKED));
+    go.append(icon("play"), el("span", null, t("exams.practise")));
+    out.push(go);
+  }
+  out.push(el("p", "hint", t("exams.honest")), el("p", "label", t("exams.listLabel")));
+  exams.slice().sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name)).forEach((ex) => {
+    const b = button("rowcard file", null, () => openPastExam(ex.id));
+    const g = el("span", "grow"), art = el("span", "file-art");
+    art.appendChild(icon("doc"));
+    g.append(el("span", "rc-title", ex.name), el("span", "hint", [ex.year || t("exams.noYear"), plural("exams.q", ex.questions.length)].join(" · ")));
+    b.append(art, g, icon("chev", "chev"));
+    out.push(b);
+  });
+  out.push(addExamsButton("exams.addMore", "btn wide ghost"));
+  box.replaceChildren(...out);
+}
+
+// One topic of the ranking: the old questions it covers, a round on it, or a link to a topic of the materials.
+function openExamTopic(id) {
+  const r = rankExams(CUR.exams || [], TOPICS).find((x) => x.id === id);
+  if (!r) { closeSheet($("pastSheet")); return; }
+  const again = () => openExamTopic(id);
+  const nodes = [el("p", "hint", [askedIn(r), plural("exams.q", r.questions.length)].join(" · "))];
+  if (r.topic && QUESTIONS.some((x) => x.t === r.topic)) {
+    const go = button("btn wide", null, () => learn(r.topic));
+    go.append(icon("play"), el("span", null, t("exams.practiseTopic")));
+    nodes.push(go);
+  }
+  if (!r.topic) {
+    nodes.push(el("p", "tipbox", t("exams.unlinked")));
+    if (Object.keys(TOPICS).some((k) => k !== "t0")) {
+      nodes.push(el("p", "label", t("exams.linkLabel")),
+        topicSelect("", (to) => { saveExams(retagTopic(CUR.exams, r.name, to, TOPICS), "exams.linkedToast"); closeSheet($("pastSheet")); }, t("exams.linkPick")));
+    }
+  }
+  const ul = el("ul", "miss");
+  r.questions.forEach((q) => ul.appendChild(examQuestion(q, again)));
+  nodes.push(el("p", "label", t("exams.oldQuestions")), ul);
+  pastSheet(r.name, nodes);
+}
+
+// One uploaded exam: its year, its questions with their topics, and deleting it.
+function openPastExam(id) {
+  const ex = (CUR.exams || []).find((x) => x.id === id);
+  if (!ex) { closeSheet($("pastSheet")); return; }
+  const again = () => openPastExam(id);
+  const year = el("input", "search");
+  Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, value: ex.year || "", placeholder: t("upload.year") });
+  year.id = "xYear";
+  year.onchange = () => {
+    const y = parseInt(year.value, 10);
+    saveExams(CUR.exams.map((x) => (x.id === id ? { ...x, year: y >= 1990 && y <= 2100 ? y : null } : x)), "exams.yearToast");
+  };
+  const lab = el("label", "label", t("exams.year")); lab.htmlFor = "xYear";
+  const nodes = [lab, year];
+  if (ex.unreadable) nodes.push(el("p", "tipbox", t("exams.unreadable", { what: ex.unreadable })));
+  const ul = el("ul", "miss");
+  ex.questions.forEach((q) => ul.appendChild(examQuestion({ ...q, year: null }, again)));
+  nodes.push(el("p", "label", plural("exams.q", ex.questions.length)), ul);
+  // Deleting asks once, in place, and says what is lost.
+  const del = button("btn ghost danger wide", t("exams.delete"), () => { del.hidden = true; sure.hidden = false; });
+  const sure = el("div", "confirm"); sure.hidden = true;
+  sure.append(el("span", null, t("exams.deleteConfirm")),
+    button("tiny danger", t("setup.yes"), () => { closeSheet($("pastSheet")); saveExams(CUR.exams.filter((x) => x.id !== id), "exams.deletedToast"); }),
+    button("tiny", t("setup.no"), () => { del.hidden = false; sure.hidden = true; }));
+  nodes.push(del, sure);
+  pastSheet(ex.name, nodes);
+}
+
 // ===== Summary reader
 
 function showReader(f) {
@@ -434,6 +584,11 @@ window.addEventListener("scroll", () => {
 
 function learn(topicKey = null) {
   roundOf = topicKey;
+  if (topicKey === RANKED) {
+    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), QUESTIONS, P, ROUND);
+    if (qs.length) start(qs);
+    return;
+  }
   const qs = topicKey ? QUESTIONS.filter((x) => x.t === topicKey) : QUESTIONS;
   if (qs.length) start(smartRound(qs, P));
 }
@@ -710,19 +865,23 @@ function showProfile() { CUR = null; show("profile"); if (dir !== "none") render
 
 // ===== Upload
 
-// With a subject id the files go into that subject instead of a new one.
-function openUpload(target) { go(typeof target === "string" ? "upload/" + target : "upload"); }
+// With a subject id the files go into that subject instead of a new one; mode "exams" adds old exams to it.
+function openUpload(target, mode) {
+  go(typeof target === "string" ? (mode === "exams" ? "exams/" : "upload/") + target : "upload");
+}
 // The upload screen loads its code (pdf.js, Supabase) only when opened. It is also where the student signs in;
 // opened from Profile (signIn) it asks only for that and goes back.
-function showUpload(target, signIn) {
+function showUpload(target, signIn, mode) {
   const into = target ? SUBJECTS.find((x) => x.id === target) : null;
-  $("upTitle").textContent = t(signIn ? "upload.verify" : into ? "upload.addTitle" : "upload.title");
-  $("upLede").textContent = t(signIn ? "profile.signedOut" : into ? "upload.addLede" : "upload.lede");
+  const exams = mode === "exams" && !!into;
+  $("upTitle").textContent = t(signIn ? "upload.verify" : exams ? "upload.examsTitle" : into ? "upload.addTitle" : "upload.title");
+  $("upLede").textContent = t(signIn ? "profile.signedOut" : exams ? "upload.examsLede" : into ? "upload.addLede" : "upload.lede");
   $("upClose").onclick = () => back(signIn ? "profile" : into ? into.id : "");
   show("upload");
   import("../upload/ui.js").then((m) => m.open({
-    target: into ? into.id : null, signIn: !!signIn,
-    opened: (id) => { CUR = null; go(id, true); },
+    target: into ? into.id : null, signIn: !!signIn, mode: exams ? "exams" : "files",
+    // tabName: the subject tab to open on ("exams" after reading old exams).
+    opened: (id, tabName) => { CUR = null; go(id, true); if (tabName) { tab = tabName; refresh(); } },
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
   }));
 }

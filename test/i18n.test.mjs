@@ -15,10 +15,14 @@ test("every UI string key is defined in sk.json, and every sk.json key is used",
     ...[...html.matchAll(/data-i18n(?:-placeholder|-label)?="([^"]+)"/g)].map((m) => m[1]),
     ...[...code.matchAll(/\bt\("([^"]+)"/g)].map((m) => m[1]),
   ]);
+  // Plurals: plural("exams.q", n) uses exams.q.one, exams.q.few and exams.q.many.
+  const plurals = [...code.matchAll(/\bplural\("([^"]+)"/g)].map((m) => m[1]);
+  plurals.forEach((b) => ["one", "few", "many"].forEach((f) => used.add(b + "." + f)));
   // Keys picked at runtime from a list, e.g. t(k) over ["setup.statSeen", ...] or t(cond ? "a" : "b").
-  for (const m of code.matchAll(/"((?:home|subject|setup|quiz|end|upload|study|today|exam|nav|profile|reader)\.[A-Za-z_.]*[A-Za-z_])"/g)) used.add(m[1]);
+  for (const m of code.matchAll(/"((?:home|subject|setup|quiz|end|upload|study|today|exams?|nav|profile|reader)\.[A-Za-z_.]*[A-Za-z_])"/g)) used.add(m[1]);
   // Keys built from an error code, t("upload.err." + e.code): the prefix is skipped, every key under it counts as used.
   for (const k of Object.keys(sk)) if (k.startsWith("upload.err.")) used.add(k);
+  plurals.forEach((b) => used.delete(b));
   assert.deepEqual([...used].filter((k) => !k.endsWith(".") && !(k in sk)), []);
   assert.deepEqual(Object.keys(sk).filter((k) => !used.has(k)), []);
 });

@@ -54,6 +54,7 @@
     <div class="seg fill" id="sTabs">
       <button type="button" data-tab="overview" aria-pressed="true" data-i18n="subject.tabTopics">Témy</button>
       <button type="button" data-tab="files" aria-pressed="false" data-i18n="study.files">Zhrnutia</button>
+      <button type="button" data-tab="exams" aria-pressed="false" data-i18n="subject.tabExams">Skúšky</button>
     </div>
     <div class="stack" id="tabOverview">
       <p class="label" data-i18n="subject.weakFirst">Od najslabšej</p>
@@ -72,6 +73,7 @@
       <p class="hint" id="studyNone" hidden data-i18n="study.none">Nič sa nenašlo.</p>
       <p class="hint" id="checked" hidden></p>
     </div>
+    <div class="stack" id="tabExams" hidden></div>
     <div class="empty" id="sEmpty" hidden>
       <span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M13 12v6M10 15h6"/></svg></span>
       <p data-i18n="subject.empty">Tento predmet je zatiaľ prázdny.</p>
@@ -176,7 +178,7 @@
         </div>
         <div class="group">
           <p class="label" data-i18n="upload.filesLabel">Súbory</p>
-          <label class="drop" for="upFiles" id="upDrop"><span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><b data-i18n="upload.pick">Vybrať súbory</b><span data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
+          <label class="drop" for="upFiles" id="upDrop"><span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><b data-i18n="upload.pick">Vybrať súbory</b><span id="upFilesHint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
           <input id="upFiles" class="visually-hidden" type="file" multiple>
           <ul class="up-list" id="upList" hidden></ul>
         </div>
@@ -184,7 +186,7 @@
         <p class="hint"><span id="upWho"></span> <button class="link" id="upOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button></p>
       </div>
       <div class="group" id="upStep2" hidden>
-        <div class="group">
+        <div class="group" id="upMakeBox">
           <p class="label" data-i18n="upload.makeLabel">Čo chceš vytvoriť</p>
           <div class="chips" id="upMake">
             <button type="button" data-k="summary" aria-pressed="true" data-i18n="upload.makeSummary">Zhrnutia</button>
@@ -255,6 +257,13 @@
 
 <button class="fab" id="fab" type="button" data-i18n-label="nav.addLong" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 <div class="toast" id="toast" role="status" popover="manual" hidden></div>
+
+<dialog class="bsheet" id="pastSheet">
+  <div class="bsheet-in">
+    <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 id="xTitle"></h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="group" id="xBody"></div>
+  </div>
+</dialog>
 
 <dialog class="bsheet" id="roundSheet">
   <div class="bsheet-in">
