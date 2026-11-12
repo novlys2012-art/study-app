@@ -40,6 +40,7 @@
       <button type="button" data-tab="overview" aria-pressed="true" data-i18n="subject.tabOverview">Prehľad</button>
       <button type="button" data-tab="files" aria-pressed="false" data-i18n="study.files">Zhrnutia</button>
       <button type="button" data-tab="topics" aria-pressed="false" data-i18n="subject.tabTopics">Témy</button>
+      <button type="button" data-tab="exams" aria-pressed="false" data-i18n="subject.tabExams">Skúšky</button>
     </div>
     <div class="stack" id="tabOverview">
       <div class="sheet"><p class="label" data-i18n="subject.weakFirst">Témy od najslabšej</p><div class="stack" id="tbars"></div></div>
@@ -58,6 +59,7 @@
       <p class="hint" id="checked" hidden></p>
     </div>
     <div class="stack" id="tabTopics" hidden><div class="stack" id="tinfo"></div></div>
+    <div class="stack" id="tabExams" hidden></div>
     <p class="hint" id="sEmpty" hidden data-i18n="subject.empty">Tento predmet je zatiaľ prázdny. Pridaj doň súbory cez ponuku vpravo hore.</p>
   </section>
 
@@ -151,7 +153,7 @@
         </div>
         <div class="group">
           <p class="label" data-i18n="upload.filesLabel">Súbory</p>
-          <label class="drop" for="upFiles"><b data-i18n="upload.pick">Vybrať súbory</b><span data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
+          <label class="drop" for="upFiles"><b data-i18n="upload.pick">Vybrať súbory</b><span id="upFilesHint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
           <input id="upFiles" class="visually-hidden" type="file" multiple>
           <ul class="miss" id="upList" hidden></ul>
         </div>
@@ -159,7 +161,7 @@
         <p class="hint"><span id="upWho"></span> <button class="link" id="upOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button></p>
       </div>
       <div class="group" id="upStep2" hidden>
-        <div class="group">
+        <div class="group" id="upMakeBox">
           <p class="label" data-i18n="upload.makeLabel">Čo chceš vytvoriť</p>
           <div class="chips" id="upMake">
             <button type="button" data-k="summary" aria-pressed="true" data-i18n="upload.makeSummary">Zhrnutia</button>
@@ -230,6 +232,13 @@
     <button class="tab" type="button" data-go="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span data-i18n="profile.title">Profil</span></button>
   </div>
 </nav>
+
+<dialog class="bsheet" id="examSheet">
+  <div class="bsheet-in">
+    <div class="bsheet-head"><h2 id="xTitle"></h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="group" id="xBody"></div>
+  </div>
+</dialog>
 
 <dialog class="bsheet" id="roundSheet">
   <div class="bsheet-in">

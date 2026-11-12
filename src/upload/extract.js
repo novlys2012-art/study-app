@@ -8,12 +8,15 @@ export const MAX_PAGES = 300;       // per file, for the free test
 export const MAX_PICTURES = 40;     // picture pages per file
 export const MAX_BYTES = 60 * 1024 * 1024;
 export const TYPES = [".pdf", ".pptx", ".docx", ".txt", ".md"];
+// Photos of exam pages (past exam mode). HEIC opens in Safari, which is where iPhone photos come from.
+export const PHOTO_TYPES = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+export const PHOTO_SIDE = 1600;      // px, long side: a whole phone photo of a page stays readable
 
 export class ExtractError extends Error {
   constructor(code, vars) { super(code); this.code = code; this.vars = vars; }
 }
 
-const ext = (name) => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
+export const ext = (name) => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
 const words = (s) => s.replace(/\s+/g, " ").trim();
 
 let pdfjs;
@@ -88,8 +91,40 @@ async function docx(buf) {
   return { pages, images: [], skipped: 0 };
 }
 
+// One photo as a JPEG, long side at most PHOTO_SIDE. The browser turns it upright (EXIF) when drawing it.
+async function photo(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    try { await img.decode(); } catch (e) { throw new ExtractError("photo", { name: file.name }); }
+    const k = Math.min(1, PHOTO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * k)); canvas.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let data = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+    if (data.length > 1_400_000) data = canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
+    return data;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// Photos of one exam, in the order given: one page each. Returns the same shape as extractFile().
+export async function extractPhotos(files) {
+  if (files.length > MAX_PICTURES) throw new ExtractError("tooManyPages", { n: files.length, max: MAX_PICTURES });
+  const images = [];
+  for (const [k, f] of files.entries()) {
+    if (!PHOTO_TYPES.includes(ext(f.name))) throw new ExtractError("type", { types: TYPES.concat(PHOTO_TYPES).join(", ") });
+    if (f.size > MAX_BYTES) throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
+    images.push({ page: k + 1, mediaType: "image/jpeg", data: await photo(f) });
+  }
+  return { name: files[0].name.replace(/\.[^.]+$/, ""), pages: files.map(() => ""), images, skipped: 0 };
+}
+
 // file: a File from <input type="file">. Returns { name, pages: [text], images: [{ page, mediaType, data }], skipped }.
-export async function extractFile(file) {
+// minChars: less text than this (and no picture pages) means the file is empty; an old exam can be short.
+export async function extractFile(file, { minChars = 200 } = {}) {
   const type = ext(file.name);
   if (!TYPES.includes(type)) throw new ExtractError("type", { types: TYPES.join(", ") });
   if (file.size > MAX_BYTES) throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
@@ -101,6 +136,6 @@ export async function extractFile(file) {
   else if (type === ".docx") out = await docx(buf);
   else out = { pages: splitPages(new TextDecoder().decode(buf)), images: [], skipped: 0 };
   const chars = out.pages.reduce((s, p) => s + words(p).length, 0);
-  if (!out.images.length && chars < 200) throw new ExtractError("empty");
+  if (!out.images.length && chars < minChars) throw new ExtractError("empty");
   return { name, ...out };
 }

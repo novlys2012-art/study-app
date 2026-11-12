@@ -38,19 +38,43 @@ const text = (v, max = MAX_TEXT) => {
 };
 const title = (v) => String(v || "").slice(0, 200);
 
+// Page pictures: [{ page, mediaType, data (base64) }], at most MAX_IMAGES.
+function pictures(images) {
+  if (!Array.isArray(images)) throw new HttpError(400, "bad_input", "Bad images.");
+  if (images.length > MAX_IMAGES) throw new HttpError(413, "too_large", `At most ${MAX_IMAGES} pages per request.`);
+  for (const im of images) {
+    if (!im || !Number.isInteger(im.page) || !/^image\/(png|jpeg|webp)$/.test(im.mediaType) || typeof im.data !== "string") throw new HttpError(400, "bad_input", "Bad image.");
+    if (im.data.length > MAX_IMAGE_CHARS) throw new HttpError(413, "too_large", "Image too large.");
+  }
+  return images;
+}
+const names = (v) => (Array.isArray(v) ? [...new Set(v.filter((s) => typeof s === "string").map((s) => s.trim().slice(0, 80)).filter(Boolean))].slice(0, 80) : []);
+
 const TASKS = {
   vision: {
     tier: "strong", effort: "medium", maxTokens: 16000, parse: T.parseVision,
     build({ images }) {
       if (!Array.isArray(images) || !images.length) throw new HttpError(400, "bad_input", "No images.");
-      if (images.length > MAX_IMAGES) throw new HttpError(413, "too_large", `At most ${MAX_IMAGES} pages per request.`);
-      for (const im of images) {
-        if (!Number.isInteger(im.page) || !/^image\/(png|jpeg|webp)$/.test(im.mediaType) || typeof im.data !== "string") throw new HttpError(400, "bad_input", "Bad image.");
-        if (im.data.length > MAX_IMAGE_CHARS) throw new HttpError(413, "too_large", "Image too large.");
-      }
+      pictures(images);
       return {
         system: T.visionSystem(),
         prompt: T.visionPrompt({ pages: images.map((im) => im.page) }),
+        images: images.map((im) => ({ mediaType: im.mediaType, data: im.data })),
+      };
+    },
+  },
+  // Past exam mode: one old exam (its text, or pictures of its pages, or both) becomes a list of questions,
+  // each tagged with a topic, reusing the subject's topic names where they fit.
+  exam: {
+    tier: "strong", effort: "medium", maxTokens: 16000, parse: T.parsePastExam,
+    build(input, lang) {
+      const images = pictures(input.images ?? []);
+      const body = typeof input.text === "string" ? input.text : "";
+      if (body.length > MAX_TEXT) throw new HttpError(413, "too_large", `Text over ${MAX_TEXT} characters.`);
+      if (!body.trim() && !images.length) throw new HttpError(400, "bad_input", "No exam text or pages.");
+      return {
+        system: T.pastExamSystem(lang),
+        prompt: T.pastExamPrompt({ title: title(input.title), text: body, knownTopics: names(input.knownTopics), pages: images.length && body.trim() ? images.map((im) => im.page) : [] }),
         images: images.map((im) => ({ mediaType: im.mediaType, data: im.data })),
       };
     },
@@ -82,6 +106,27 @@ const TASKS = {
       const questions = input.questions.map((x) => ({ id: String(x.id), q: String(x.q) }));
       return { system: T.topicSystem(lang), prompt: text(T.topicPrompt({ files, questions }), MAX_TEXT * 2) };
     },
+  },
+};
+
+// Questions sent to the "group" task: their wording is cut, so a long exam stays a short request.
+const MAX_EXAM_QUESTIONS = 600;
+const GROUP_TEXT = 300;
+TASKS.group = {
+  tier: "strong", effort: "medium", maxTokens: 12000, parse: T.parseExamGroups,
+  build(input, lang) {
+    const exams = input.exams;
+    if (!Array.isArray(exams) || !exams.length) throw new HttpError(400, "bad_input", "No exams.");
+    const list = exams.map((e) => ({
+      name: title(e && e.name), year: Number.isInteger(e && e.year) ? e.year : null,
+      questions: (Array.isArray(e && e.questions) ? e.questions : []).map((q) => ({
+        ref: String(q.ref).slice(0, 20), topic: String(q.topic || "").slice(0, 80), text: String(q.text || "").replace(/\s+/g, " ").slice(0, GROUP_TEXT),
+      })),
+    }));
+    const n = list.reduce((s, e) => s + e.questions.length, 0);
+    if (!n) throw new HttpError(400, "bad_input", "No questions.");
+    if (n > MAX_EXAM_QUESTIONS) throw new HttpError(413, "too_large", `At most ${MAX_EXAM_QUESTIONS} questions.`);
+    return { system: T.examGroupSystem(lang), prompt: text(T.examGroupPrompt({ topics: names(input.topics), exams: list }), MAX_TEXT * 4) };
   },
 };
 

@@ -4,8 +4,9 @@ import { t, getLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
-import { extractFile, ExtractError, TYPES } from "./extract.js";
+import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ext } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE } from "./pipeline.js";
+import { readExams, guessYear } from "./exams.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
 const MAKE_KEY = "studyapp-make";
@@ -14,6 +15,9 @@ const $ = (id) => document.getElementById(id);
 const PANELS = ["upOff", "upLogin", "upConsent", "upForm", "upWork"];
 
 let ctx, picked = [], busy = false, make = { ...DEFAULT_MAKE };
+// Past exam mode: the exams to read, each { files: [File], photos: bool, name, year }.
+let exams = [];
+const examMode = () => !!(ctx && ctx.mode === "exams");
 try { make = { ...make, ...JSON.parse(localStorage.getItem(MAKE_KEY)) }; } catch (e) {}
 
 // The subject the files go into, when adding to one that exists.
@@ -35,6 +39,7 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 
 function message(e) {
   if (e instanceof ExtractError) return t("upload.err." + e.code, e.vars);
+  if (e && e.code === "no_questions") return t("upload.err.no_questions");
   if (e instanceof cloud.CloudError) {
     const k = "upload.err." + e.code;
     return t(k) === k ? t("upload.err.server", { msg: e.message }) : t(k, { msg: e.message });
@@ -69,6 +74,9 @@ async function refresh() {
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}
   if (!agreed) { panel("upConsent"); return; }
   $("upWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
+  $("upFiles").accept = (examMode() ? TYPES.concat(PHOTO_TYPES) : TYPES).join(",");
+  $("upFilesHint").textContent = t(examMode() ? "upload.examsHint" : "upload.filesHint");
+  $("upMakeBox").hidden = examMode();
   renderSubjects(); step(1);
   panel("upForm"); renderMake(); renderPicked();
   try { showUsage((await cloud.call("usage", {}, getLang())).usage); } catch (e) { error(message(e)); }
@@ -80,12 +88,33 @@ function renderSubjects() {
   if (ctx.target && !all.some((x) => x.id === ctx.target)) ctx.target = null;
   sel.replaceChildren(...all.map((x) => new Option(x.name, x.id)), new Option(t("upload.newSubject"), ""));
   sel.value = ctx.target || "";
-  $("upSubjectBox").hidden = !all.length;
+  $("upSubjectBox").hidden = !all.length || examMode();
   $("upNameBox").hidden = !!ctx.target;
-  $("upGo").textContent = t(ctx.target ? "upload.goAdd" : "upload.go");
+  $("upGo").textContent = t(examMode() ? "upload.goExams" : ctx.target ? "upload.goAdd" : "upload.go");
+}
+
+// Each exam to read, with its year (guessed from the file name, the student can change it).
+function renderExams() {
+  const ul = $("upList"); ul.innerHTML = "";
+  exams.forEach((x, k) => {
+    const li = el("li", "up-file");
+    const year = el("input", "search year");
+    Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, placeholder: t("upload.year"), value: x.year || "" });
+    year.setAttribute("aria-label", t("upload.yearOf", { name: x.name }));
+    year.oninput = () => { const y = parseInt(year.value, 10); x.year = y >= 1990 && y <= 2100 ? y : null; };
+    const rm = el("button", "link", t("upload.remove")); rm.type = "button";
+    rm.onclick = () => { exams.splice(k, 1); renderPicked(); };
+    li.append(el("span", null, x.photos ? t("upload.photoExam", { name: x.name, n: x.files.length }) : x.name), year, rm);
+    ul.appendChild(li);
+  });
+  ul.hidden = !exams.length;
+  const ready = exams.length > 0 && !!target();
+  $("upNext").disabled = !ready; $("upNext").style.opacity = ready ? 1 : 0.5;
+  $("upGo").disabled = !ready; $("upGo").style.opacity = ready ? 1 : 0.5;
 }
 
 function renderPicked() {
+  if (examMode()) { renderExams(); return; }
   const ul = $("upList"); ul.innerHTML = "";
   picked.forEach((f, k) => {
     const li = el("li", "up-file");
@@ -114,7 +143,63 @@ function fileList(names) {
   };
 }
 
+async function runExams() {
+  const into = target();
+  if (busy || !into || !exams.length) return;
+  busy = true; error(""); panel("upWork");
+  const setFile = fileList(exams.map((x) => x.name));
+  exams.forEach((_, k) => setFile(k, "wait"));
+  const progress = (pct, label) => {
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    $("upBar").style.width = pct + "%"; $("upPct").textContent = pct + " %";
+    if (label) $("upStep").textContent = label;
+  };
+  $("upEta").textContent = "";
+  try {
+    const items = [];
+    for (const [k, x] of exams.entries()) {
+      progress((k / exams.length) * 10, t("upload.reading", { name: x.name }));
+      setFile(k, "reading");
+      let doc;
+      try { doc = x.photos ? await extractPhotos(x.files) : await extractFile(x.files[0], { minChars: 40 }); }
+      catch (e) { setFile(k, "failed"); throw new Error(x.name + ": " + message(e)); }
+      setFile(k, "read");
+      items.push({ doc, name: x.name, year: x.year });
+    }
+    const call = async (task, input) => {
+      const out = await cloud.call(task, input, getLang());
+      showUsage(out.usage);
+      return out.result;
+    };
+    const knownTopics = Object.keys(into.topics || {}).filter((k) => k !== "t0").map((k) => into.topics[k]);
+    const { exams: all, added, failed } = await readExams({
+      items, knownTopics, earlier: into.exams || [], call,
+      onFile: (k, phase) => setFile(k, phase),
+      onRetry: () => { $("upStep").textContent = t("upload.retrying"); },
+      onStep: (done, total) => progress(10 + (done / total) * 90, t(done === total ? "upload.finishing" : "upload.examsWorking", { done, total })),
+    });
+    saveSubjects(loadSubjects().map((x) => (x.id === into.id ? { ...x, exams: all } : x)));
+    progress(100);
+    $("upFiles").value = "";
+    if (failed.length) {
+      const left = new Set(failed.map((f) => f.index));
+      exams = exams.filter((_, k) => left.has(k));
+      step(2); panel("upForm"); renderPicked();
+      error(t("upload.partialExams", { done: added, failed: failed.map((f) => f.name).join(", "), reason: message(failed[0].error) }));
+      return;
+    }
+    exams = [];
+    ctx.opened(into.id, "exams");
+  } catch (e) {
+    step(2); panel("upForm"); renderPicked();
+    error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) && !e.code ? e.message : message(e));
+  } finally {
+    busy = false;
+  }
+}
+
 async function run() {
+  if (examMode()) return runExams();
   if (busy) return;
   const into = target();
   const name = into ? into.name : $("upName").value.trim();
@@ -186,7 +271,6 @@ async function run() {
 let wired = false;
 function wire() {
   if (wired) return; wired = true;
-  $("upFiles").accept = TYPES.join(",");
   const askCode = (on) => { $("upAsk").hidden = on; $("upCodeBox").hidden = !on; if (on) $("upCode").focus(); };
   $("upSend").onclick = async () => {
     const email = $("upEmail").value.trim();
@@ -209,6 +293,21 @@ function wire() {
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
     error("");
+    if (examMode()) {
+      // Every file is one exam; photos picked together are the pages of one exam, in name order.
+      const files = [...$("upFiles").files];
+      const photos = files.filter((f) => PHOTO_TYPES.includes(ext(f.name))).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      files.filter((f) => !photos.includes(f)).forEach((f) => {
+        if (!exams.some((x) => !x.photos && x.files[0].name === f.name && x.files[0].size === f.size)) {
+          exams.push({ files: [f], photos: false, name: f.name.replace(/\.[^.]+$/, ""), year: guessYear(f.name) });
+        }
+      });
+      if (photos.length) exams.push({ files: photos, photos: true, name: photos[0].name.replace(/\.[^.]+$/, ""), year: guessYear(photos[0].name) });
+      if (exams.length > MAX_FILES) { exams = exams.slice(0, MAX_FILES); error(t("upload.err.tooMany", { max: MAX_FILES })); }
+      $("upFiles").value = "";
+      renderPicked();
+      return;
+    }
     for (const f of $("upFiles").files) if (!picked.some((p) => p.name === f.name && p.size === f.size)) picked.push(f);
     if (picked.length > MAX_FILES) { picked = picked.slice(0, MAX_FILES); error(t("upload.err.tooMany", { max: MAX_FILES })); }
     $("upFiles").value = "";
@@ -230,9 +329,13 @@ function wire() {
   $("upOut").onclick = async () => { await cloud.signOut(); refresh(); };
 }
 
-// app: { opened(subjectId), target } from the home screen; target is the id of a subject to add files to.
+// app: { opened(subjectId, tab), target, mode } from the app; target is the id of a subject to add files to,
+// mode "exams" reads old exams into that subject instead of course files.
 export function open(app) {
-  if (!busy) { if (ctx && ctx.target !== app.target) picked = []; ctx = app; }
+  if (!busy) {
+    if (ctx && (ctx.target !== app.target || ctx.mode !== app.mode)) { picked = []; exams = []; }
+    ctx = app;
+  }
   wire();
   if (!busy) refresh();
 }

@@ -57,9 +57,13 @@ Reply with one JSON object and nothing else:
 "points" is a number when the exam shows it, otherwise null.`;
 }
 
-export function pastExamPrompt({ title, text = "", knownTopics = [] }) {
-  return `Exam: ${title}\nKnown topics: ${knownTopics.length ? knownTopics.join("; ") : "none yet"}\n`
-    + (text.trim() ? `\n<exam_text>\n${text}\n</exam_text>\n` : "\nThe exam is in the attached page images.\n");
+// pages: the page numbers of the attached images, when the exam is part text and part pictures.
+export function pastExamPrompt({ title, text = "", knownTopics = [], pages = [] }) {
+  let out = `Exam: ${title}\nKnown topics: ${knownTopics.length ? knownTopics.join("; ") : "none yet"}\n`;
+  if (text.trim()) out += `\n<exam_text>\n${text}\n</exam_text>\n`;
+  if (pages.length) out += `\nPages ${pages.join(", ")} of the exam are in the attached images, in this order.\n`;
+  else if (!text.trim()) out += "\nThe exam is in the attached page images.\n";
+  return out;
 }
 
 export function parsePastExam(reply) {
@@ -67,9 +71,34 @@ export function parsePastExam(reply) {
   if (start < 0 || end < start) throw new Error("No JSON object in the reply.");
   const data = JSON.parse(reply.slice(start, end + 1));
   const questions = (Array.isArray(data.questions) ? data.questions : [])
-    .filter((x) => typeof x.text === "string" && typeof x.topic === "string" && x.topic.trim())
-    .map((x) => ({ n: String(x.n ?? ""), text: x.text, topic: x.topic.trim(), points: typeof x.points === "number" ? x.points : null }));
+    .filter((x) => x && typeof x.text === "string" && x.text.trim() && typeof x.topic === "string" && x.topic.trim())
+    .map((x) => ({
+      n: String(x.n ?? "").slice(0, 20), text: x.text.trim().slice(0, 4000), topic: x.topic.trim().slice(0, 80),
+      points: typeof x.points === "number" && Number.isFinite(x.points) ? x.points : null,
+    }));
   return { questions, unreadable: String(data.unreadable || "") };
+}
+
+// Past exam mode, second step: all questions of a subject's old exams sorted into one set of topics, so
+// a topic worded differently in two exams ("Primitívna funkcia", "Neurčitý integrál") counts as one.
+// The app counts how often each topic came up; the model only sorts.
+export const examGroupSystem = (lang = "sk") => `You sort the questions of one university course's old exams into study topics, so a student can see which topics come up most often.
+Use 4 to 15 topics, named in ${langName(lang)} the way a course syllabus would name them, 1 to 6 words.
+When one of the course's own topics fits, use its name exactly as given.
+Questions that test the same concept or skill belong to one topic, even when the exams word it differently or the earlier tag differs. Do not make a topic for a single question when it fits a broader one.
+Every question belongs to exactly one topic.
+Reply with one JSON object only: {"topics":[{"name":"topic name","questions":["question refs"]}]}`;
+
+// exams: [{ name, year, questions: [{ ref, topic, text }] }]
+export const examGroupPrompt = ({ topics = [], exams }) =>
+  `Course topics: ${topics.length ? topics.join("; ") : "none"}\n\n` +
+  exams.map((e) => `## ${e.name}${e.year ? ` (${e.year})` : ""}\n` + e.questions.map((q) => `${q.ref} [${q.topic}] ${q.text}`).join("\n")).join("\n\n");
+
+export function parseExamGroups(reply) {
+  const data = parseJson(reply);
+  return (Array.isArray(data.topics) ? data.topics : [])
+    .filter((x) => x && typeof x.name === "string" && x.name.trim() && Array.isArray(x.questions))
+    .map((x) => ({ name: x.name.trim().slice(0, 80), questions: x.questions.filter((r) => typeof r === "string") }));
 }
 
 // How often each topic appears across exams, most frequent first.

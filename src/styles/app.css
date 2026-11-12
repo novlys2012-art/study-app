@@ -465,6 +465,7 @@ input[type="file"]:focus-visible + .btn,.btn:focus-visible{outline:2px solid var
 .err{margin:0;color:var(--no);font-weight:600}
 .up-file{display:flex !important;align-items:baseline;gap:12px}
 .up-file span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.up-file .year{width:6.5em;flex:0 0 auto;padding:6px 10px}
 .cards{display:grid;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
 .card{border-top:1px solid var(--rule)}
 .card:first-child{border-top:0}

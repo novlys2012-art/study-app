@@ -4,6 +4,7 @@ import { t, getLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, readProgress, logAnswer, resetProgress } from "./subjects.js";
 import { startSync } from "./autosync.js";
 import { renderMarkdown } from "./md.js";
+import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 
 const LOOK_KEY = "studyapp-look";
 const LAST_KEY = "studyapp-last-subject";
@@ -23,11 +24,14 @@ let picked = new Set();
 let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", order = [];
 let P = {};
 let tab = "overview", sortBy = "order", query = "";
-let roundOf = null; // what "next round" repeats: a topic key, or null for the whole subject
+let roundOf = null; // what "next round" repeats: a topic key, RANKED, or null for the whole subject
+const RANKED = "@exams"; // a round in the order of the past exam ranking
 
 function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function button(cls, text, onclick) { const b = el("button", cls, text); b.type = "button"; b.onclick = onclick; return b; }
+// Slovak and Czech plurals: base.one (1), base.few (2 to 4), base.many (0, 5 and more).
+const plural = (base, n, vars) => t(base + (n === 1 ? ".one" : n >= 2 && n <= 4 ? ".few" : ".many"), { n, ...vars });
 function setHash(h) { try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {} }
 
 // ===== Screens and the tab bar
@@ -185,7 +189,8 @@ function renderSubject() {
   $("sDue").textContent = dueText(st);
   $("sBar").style.width = st.pct + "%";
   // Only the tabs that have something to show.
-  const has = { overview: st.total > 0, files: summaries().length > 0, topics: topicKeys().length > 0 };
+  const exams = CUR.exams || [];
+  const has = { overview: st.total > 0, files: summaries().length > 0, topics: topicKeys().length > 0, exams: st.total > 0 || exams.length > 0 };
   const open = Object.keys(has).filter((k) => has[k]);
   if (!has[tab]) tab = open[0] || "overview";
   [...$("sTabs").children].forEach((b) => { b.hidden = !has[b.dataset.tab]; b.setAttribute("aria-pressed", b.dataset.tab === tab); });
@@ -194,9 +199,11 @@ function renderSubject() {
   $("tabOverview").hidden = tab !== "overview" || !has.overview;
   $("tabFiles").hidden = tab !== "files" || !has.files;
   $("tabTopics").hidden = tab !== "topics" || !has.topics;
+  $("tabExams").hidden = tab !== "exams" || !has.exams;
   if (!$("tabOverview").hidden) renderOverview();
   if (!$("tabFiles").hidden) renderFiles();
   if (!$("tabTopics").hidden) renderTopics();
+  if (!$("tabExams").hidden) renderExams();
 }
 $("sTabs").onclick = (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderSubject(); } };
 $("sBack").onclick = goHome;
@@ -265,6 +272,134 @@ function renderTopics() {
   }));
 }
 
+// ===== Past exams: which topics the old exams asked about, how often, and a round in that order
+
+function saveExams(exams) {
+  CUR.exams = exams;
+  saveSubjects(loadSubjects().map((x) => (x.id === CUR.id ? { ...x, exams } : x)));
+}
+// Topic names a question can be moved to: the subject's topics, then the other names the exams use.
+function topicChoices() {
+  const out = Object.keys(TOPICS).filter((k) => k !== "t0").map((k) => TOPICS[k]);
+  (CUR.exams || []).forEach((ex) => ex.questions.forEach((q) => {
+    if (!matchTopic(q.topic, TOPICS) && !out.some((n) => n.toLowerCase() === q.topic.toLowerCase())) out.push(q.topic);
+  }));
+  return out;
+}
+function topicSelect(current, onpick, placeholder) {
+  const sel = el("select", "search");
+  sel.setAttribute("aria-label", t("exams.moveTo"));
+  if (placeholder) sel.append(new Option(placeholder, ""));
+  topicChoices().forEach((n) => sel.append(new Option(n, n)));
+  sel.value = current;
+  sel.onchange = () => { if (sel.value) onpick(sel.value); };
+  return sel;
+}
+function openSheet(title, nodes) {
+  $("xTitle").textContent = title;
+  $("xBody").replaceChildren(...nodes);
+  if (!$("examSheet").open) $("examSheet").showModal();
+}
+const examLine = (q) => [q.year || "", q.n ? t("exams.task", { n: q.n }) : "", q.points ? t("exams.points", { n: q.points }) : ""].filter(Boolean).join(" · ");
+// One old exam question: its wording, where it is from, and a choice of topic. after() refreshes the sheet.
+function examQuestion(q, after) {
+  const li = el("li");
+  const name = TOPICS[matchTopic(q.topic, TOPICS)] || q.topic;
+  li.append(el("div", null, q.text));
+  const line = examLine(q); if (line) li.append(el("div", "hint", line));
+  li.append(topicSelect(name, (to) => { saveExams(retagQuestion(CUR.exams, q.id, to)); renderSubject(); after(); }));
+  return li;
+}
+
+function renderExams() {
+  const box = $("tabExams"), exams = CUR.exams || [];
+  const add = button("drop sj add", null, () => openUpload(CUR.id, "exams"));
+  add.append(el("b", null, t(exams.length ? "exams.addMore" : "exams.add")), el("span", null, t("exams.addHint")));
+  if (!exams.length) {
+    const c = el("div", "sheet");
+    c.append(el("p", "label", t("exams.emptyLabel")), el("p", null, t("exams.emptyText")), el("p", "hint", t("exams.honest")));
+    box.replaceChildren(c, add);
+    return;
+  }
+  const rank = rankExams(exams, TOPICS), top = rank.length ? rank[0].score : 1;
+  const c = el("div", "sheet");
+  const span = yearSpan(exams);
+  c.append(el("p", "label", t("exams.rankLabel")), el("p", "hint", plural("exams.sample", exams.length, { years: span ? " (" + span + ")" : "" })));
+  if (exams.length < FEW_EXAMS) c.append(el("p", "tipbox", t("exams.few", { n: FEW_EXAMS })));
+  const rows = el("div", "stack");
+  rank.forEach((r) => {
+    const b = button("tbar", null, () => openExamTopic(r.id));
+    const head = el("span", "tbar-top");
+    head.append(el("span", null, r.name), el("span", "hint", r.of > 1 ? t("exams.inN", { n: r.exams, of: r.of }) : t("exams.inOne")));
+    const bar = el("span", "bar"), fill = el("i"); fill.style.width = Math.max(4, Math.round((r.score / top) * 100)) + "%"; bar.appendChild(fill);
+    const sub = [plural("exams.q", r.questions.length), r.points ? t("exams.points", { n: r.points }) : "", r.topic ? "" : t("exams.noMaterial")];
+    b.append(head, bar, el("span", "hint", sub.filter(Boolean).join(" · ")));
+    rows.appendChild(b);
+  });
+  c.append(rows);
+  if (rank.some((r) => r.topic && QUESTIONS.some((x) => x.t === r.topic))) c.append(button("btn wide", t("exams.practise"), () => learn(RANKED)));
+  c.append(el("p", "hint", t("exams.honest")));
+  const list = [el("p", "label", t("exams.listLabel"))];
+  exams.slice().sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name)).forEach((ex) => {
+    const b = button("rowcard card", null, () => openExam(ex.id));
+    const g = el("span", "grow");
+    g.append(el("span", "rc-title", ex.name), el("span", "hint", [ex.year || t("exams.noYear"), plural("exams.q", ex.questions.length)].join(" · ")));
+    b.append(g, el("span", "chev", "›"));
+    list.push(b);
+  });
+  box.replaceChildren(c, ...list, add);
+}
+
+// One topic of the ranking: the old questions it covers, a round on it, or a link to a topic of the materials.
+function openExamTopic(id) {
+  const r = rankExams(CUR.exams || [], TOPICS).find((x) => x.id === id);
+  if (!r) { $("examSheet").close(); return; }
+  const again = () => openExamTopic(id);
+  const nodes = [el("p", "hint", [r.of > 1 ? t("exams.inN", { n: r.exams, of: r.of }) : t("exams.inOne"), plural("exams.q", r.questions.length)].join(" · "))];
+  const n = r.topic ? QUESTIONS.filter((x) => x.t === r.topic).length : 0;
+  if (n) nodes.push(button("btn wide", t("exams.practiseTopic"), () => learn(r.topic)));
+  if (!r.topic) {
+    nodes.push(el("p", "tipbox", t("exams.unlinked")));
+    if (Object.keys(TOPICS).some((k) => k !== "t0")) {
+      nodes.push(el("p", "label", t("exams.linkLabel")),
+        topicSelect("", (to) => { saveExams(retagTopic(CUR.exams, r.name, to, TOPICS)); renderSubject(); $("examSheet").close(); }, t("exams.linkPick")));
+    }
+  }
+  const ul = el("ul", "miss");
+  r.questions.forEach((q) => ul.appendChild(examQuestion(q, again)));
+  nodes.push(el("p", "label", t("exams.oldQuestions")), ul);
+  openSheet(r.name, nodes);
+}
+
+// One uploaded exam: its year, its questions with their topics, and deleting it.
+function openExam(id) {
+  const ex = (CUR.exams || []).find((x) => x.id === id);
+  if (!ex) { $("examSheet").close(); return; }
+  const again = () => openExam(id);
+  const year = el("input", "search");
+  Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, value: ex.year || "", placeholder: t("upload.year") });
+  year.id = "xYear";
+  year.onchange = () => {
+    const y = parseInt(year.value, 10);
+    saveExams(CUR.exams.map((x) => (x.id === id ? { ...x, year: y >= 1990 && y <= 2100 ? y : null } : x)));
+    renderSubject();
+  };
+  const lab = el("label", "label", t("exams.year")); lab.htmlFor = "xYear";
+  const nodes = [lab, year];
+  if (ex.unreadable) nodes.push(el("p", "tipbox", t("exams.unreadable", { what: ex.unreadable })));
+  const ul = el("ul", "miss");
+  ex.questions.forEach((q) => ul.appendChild(examQuestion({ ...q, year: null }, again)));
+  nodes.push(el("p", "label", plural("exams.q", ex.questions.length)), ul);
+  const delWrap = el("div"), sure = el("div", "confirm");
+  delWrap.append(button("link", t("exams.delete"), () => { delWrap.hidden = true; sure.hidden = false; }));
+  sure.hidden = true;
+  sure.append(el("span", null, t("exams.deleteConfirm")),
+    button("tiny danger", t("setup.yes"), () => { saveExams(CUR.exams.filter((x) => x.id !== id)); $("examSheet").close(); renderSubject(); }),
+    button("tiny", t("setup.no"), () => { delWrap.hidden = false; sure.hidden = true; }));
+  nodes.push(delWrap, sure);
+  openSheet(ex.name, nodes);
+}
+
 // ===== Summary reader
 
 function openReader(f) {
@@ -294,6 +429,11 @@ $("rBack").onclick = () => { renderSubject(); show("subject"); };
 
 function learn(topicKey = null) {
   roundOf = topicKey;
+  if (topicKey === RANKED) {
+    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), QUESTIONS, P, ROUND);
+    if (qs.length) start(qs);
+    return;
+  }
   const qs = topicKey ? QUESTIONS.filter((x) => x.t === topicKey) : QUESTIONS;
   if (qs.length) start(smartRound(qs, P));
 }
@@ -509,14 +649,17 @@ function goProfile() { CUR = null; show("profile"); setHash("profile"); renderAc
 
 // The upload screen loads its code (pdf.js, Supabase) only when opened.
 // With a subject id it starts on that subject instead of a new one.
-function openUpload(target) {
+// mode "exams": old exams for the subject's past exam ranking, instead of course files.
+function openUpload(target, mode = "files") {
   const into = typeof target === "string" ? SUBJECTS.find((x) => x.id === target) : null;
-  const back = CUR ? CUR.id : null;
-  $("upTitle").textContent = t(into ? "upload.addTitle" : "upload.title");
-  $("upLede").textContent = t(into ? "upload.addLede" : "upload.lede");
-  $("upClose").onclick = () => { SUBJECTS = loadSubjects(); if (back && SUBJECTS.some((x) => x.id === back)) openSubject(back); else goToday(); };
-  show("upload"); setHash(into ? "upload/" + into.id : "upload");
-  import("../upload/ui.js").then((m) => m.open({ target: into ? into.id : null, opened: (id) => { SUBJECTS = loadSubjects(); CUR = null; openSubject(id); } }));
+  const exams = mode === "exams" && !!into;
+  const back = CUR ? CUR.id : (exams ? into.id : null), backTab = exams ? "exams" : tab;
+  $("upTitle").textContent = t(exams ? "upload.examsTitle" : into ? "upload.addTitle" : "upload.title");
+  $("upLede").textContent = t(exams ? "upload.examsLede" : into ? "upload.addLede" : "upload.lede");
+  const reopen = (id, tabName) => { SUBJECTS = loadSubjects(); CUR = null; openSubject(id); if (tabName && tabName !== tab) { tab = tabName; renderSubject(); } };
+  $("upClose").onclick = () => { SUBJECTS = loadSubjects(); if (back && SUBJECTS.some((x) => x.id === back)) reopen(back, backTab); else goToday(); };
+  show("upload"); setHash(exams ? "exams/" + into.id : into ? "upload/" + into.id : "upload");
+  import("../upload/ui.js").then((m) => m.open({ target: into ? into.id : null, mode: exams ? "exams" : "files", opened: reopen }));
 }
 
 function route() {
@@ -524,6 +667,7 @@ function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
   if (h.startsWith("upload/")) openUpload(h.slice(7));
+  else if (h.startsWith("exams/")) openUpload(h.slice(6), "exams");
   else if (h === "upload" || /[?&]code=/.test(location.search)) openUpload();
   else if (h === "subjects") goHome();
   else if (h === "profile") goProfile();
