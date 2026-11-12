@@ -49,18 +49,20 @@ await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.str
 await page.goto(base + "#test");
 check(await page.locator("#subject").isVisible(), "subject opens on its overview");
 check((await page.locator("#tbars .tbar").count()) === 2, "overview lists the topics");
-await page.click('#sTabs [data-tab="topics"]');
-check((await page.locator("#tinfo .card").count()) === 2, "topics show");
+await page.locator("#tbars .tbar").first().click();
+check(await page.locator("#tbars .tcard.open .btn").isVisible() && (await page.textContent("#tbars .tcard.open")).includes("Párne a nepárne"), "a topic opens to its weak spots and a practise button");
 await page.click('#sTabs [data-tab="files"]');
-check((await page.locator("#files .card").count()) === 4, "summaries show");
+check((await page.locator("#files .file").count()) === 4, "summaries show");
 await page.fill("#studySearch", "tazke");
-check((await page.locator("#files .card:not([hidden])").count()) === 1, "search finds a summary without diacritics");
+check((await page.locator("#files .file:not([hidden])").count()) === 1, "search finds a summary without diacritics");
 await page.fill("#studySearch", "");
-await page.click('#studySort [data-s="az"]');
-check((await page.locator("#files .card .rc-title").first().textContent()) === "Algebra", "summaries sort by name");
-await page.locator("#files .card").first().click();
+await page.selectOption("#studySort", "az");
+check((await page.locator("#files .file .rc-title").first().textContent()) === "Algebra", "summaries sort by name");
+await page.locator("#files .file").first().click();
 check(await page.locator("#reader").isVisible() && (await page.textContent("#rBody")).includes("Algebra"), "a summary opens in the reading view");
-await page.click("#rBack");
+check(await page.locator("#tabbar").isHidden() && page.url().endsWith("#test/read/1"), "the reader is full screen and has its own address");
+await page.goBack();
+check(await page.locator("#subject").isVisible(), "the back button goes from the summary to the subject");
 
 await page.click("#custom");
 await page.click('#counts [data-n="all"]');
@@ -73,22 +75,30 @@ for (let n = 0; n < SUBJECT.questions.length; n++) {
 }
 check(await page.locator("#end").isVisible(), "a full round ends on the result screen");
 await page.click("#endBack");
+check(await page.locator("#subject").isVisible(), "leaving the result goes back to the subject");
 
-await page.click("#sMore");
+await page.click("#sExam");
 const soon = new Date(Date.now() + 3 * 864e5);
 await page.fill("#examDate", `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`);
-await page.click("#moreSheet [data-close]");
-check((await page.textContent("#sMeta")).includes("o 3 dni"), "an exam date shows as a countdown");
+await page.click("#examDone");
+check((await page.textContent("#sExam")).includes("o 3 dni"), "an exam date shows as a countdown");
+await page.click("#sMore");
+await page.goBack();
+await page.locator("#moreSheet").waitFor({ state: "hidden" });
+check(await page.locator("#subject").isVisible(), "the back button closes a sheet and stays on the screen");
 await page.click('#tabbar [data-go="home"]');
-check((await page.locator("#subjects .sj").count()) === 2, "subjects screen lists the subject and the add card");
+check((await page.locator("#subjects .sj").count()) === 1 && await page.locator("#fab").isVisible(), "subjects screen lists the subject and shows the add button");
 await page.click('#tabbar [data-go="today"]');
 check((await page.textContent("#todayBody .hero")).includes("Testovací predmet"), "today leads with the subject whose exam is nearest");
 await page.click("#todayBody .hero .btn");
 check(await page.locator("#quiz").isVisible(), "today's button starts a round");
 await page.click("#quit");
+check(await page.locator("#today").isVisible(), "leaving a round started on Today goes back to Today");
 await page.click('#tabbar [data-go="profile"]');
 await page.click('#looks [data-l="riso"]');
 check((await page.evaluate(() => document.body.dataset.look)) === "riso", "profile switches the look");
+await page.click('#themes [data-th="dark"]');
+check((await page.evaluate(() => document.documentElement.dataset.theme)) === "dark", "profile switches to dark");
 
 await browser.close();
 server.close();
