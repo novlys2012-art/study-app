@@ -237,20 +237,21 @@ try {
   check(tasks.filter((x) => x === "vision").length === 1, "the drawing-only PDF page went to vision once");
   check(!bodyBytes.includes("%PDF") && !bodyBytes.includes("[Content_Types]"), "original files never leave the browser");
   await page.click('#sTabs [data-tab="files"]');
-  check((await page.locator("#files .card").count()) === 3, "a summary for each file");
+  check((await page.locator("#files .file").count()) === 3, "a summary for each file");
   check((await page.textContent("#files")).includes("2 str."), "page counts before and after");
   check((await page.textContent("#checked")).includes("vyradila 3"), "checked-out questions are counted");
-  await page.locator("#files .card").first().click();
+  await page.locator("#files .file").first().click();
   await page.locator("#reader").waitFor();
   check((await page.locator("#rBody li").count()) > 0, "a summary opens in the reading view");
   if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "reader.png"), fullPage: true });
   await page.click("#rBack");
-  await page.click('#sTabs [data-tab="topics"]');
-  check((await page.locator("#tinfo .card").count()) === 2, "topics with their summaries");
+  await page.click('#sTabs [data-tab="overview"]');
+  check((await page.locator("#tbars .tcard").count()) === 2, "topics with their summaries");
   // E2E_SHOTS=folder saves screenshots of the result screen, for checking the design.
   if (process.env.E2E_SHOTS) await page.screenshot({ path: join(process.env.E2E_SHOTS, "subject.png"), fullPage: true });
-  check((await page.textContent("#tinfo")).includes("Posun krivky"), "weak spots show");
-  await page.click("#tinfo .card .btn");
+  check((await page.textContent("#tbars")).includes("Posun krivky"), "weak spots show");
+  await page.locator("#tbars .tbar", { hasText: "Dopyt" }).click();
+  await page.click("#tbars .tcard.open .btn");
   await page.locator("#quiz").waitFor();
   check((await page.textContent("#qtopic")) === "Dopyt", "practising a topic starts its round");
   await page.locator("#opts .opt").first().click();
@@ -259,7 +260,7 @@ try {
   await page.click("#quit");
   await page.click("#endBack");
   await page.click('#tabbar [data-go="home"]');
-  check((await page.locator("#subjects .sj").count()) === 2, "the subjects screen lists the new subject");
+  check((await page.locator("#subjects .sj").count()) === 1, "the subjects screen lists the new subject");
 
   await page.locator("#subjects .sj").first().click();
   await page.click("#sMore");
@@ -278,15 +279,15 @@ try {
   check(await page.locator("#progWrap").isVisible(), "the subject keeps its progress after adding files");
   await page.click("#moreSheet [data-close]");
   await page.click('#sTabs [data-tab="files"]');
-  check((await page.locator("#files .card").count()) === 3, "a file without a summary adds only questions");
+  check((await page.locator("#files .file").count()) === 3, "a file without a summary adds only questions");
   await page.click('#tabbar [data-go="home"]');
-  check((await page.locator("#subjects .sj").count()) === 2, "adding files does not make a second subject");
+  check((await page.locator("#subjects .sj").count()) === 1, "adding files does not make a second subject");
 
   // ----- Past exams: a typed exam and two photos of another, ranked against the subject's topics.
   await page.locator("#subjects .sj").first().click();
   await page.click('#sTabs [data-tab="exams"]');
   check((await page.textContent("#tabExams")).includes("Nie je to predpoveď"), "the past exams tab explains itself before any upload");
-  await page.click("#tabExams .drop");
+  await page.click("#tabExams .empty .btn");
   await page.locator("#upForm").waitFor();
   check(page.url().includes("#exams/") && await page.locator("#upSubjectBox").isHidden() && await page.locator("#upNameBox").isHidden(), "old exams go into the open subject");
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
@@ -305,7 +306,7 @@ try {
   await page.locator("#tabExams .tbar").first().waitFor({ timeout: 30000 });
   check(tasks.slice(was).join(",") === "exam,exam,group", "each exam is read in one call, then all are sorted into topics");
   const ranked = await page.locator("#tabExams .tbar .tbar-top span:first-child").allTextContents();
-  check(ranked.join("|") === "Dopyt|Rovnováha na trhu", "the ranking uses the subject's topic names: " + ranked.join(", "));
+  check(ranked.join("|") === "1. Dopyt|2. Rovnováha na trhu", "the ranking uses the subject's topic names: " + ranked.join(", "));
   check((await page.textContent("#tabExams .tbar")).includes("v 2 z 2 skúšok"), "a topic asked in both exams says so");
   check((await page.textContent("#tabExams")).includes("nie je v tvojich materiáloch"), "a topic missing from the materials is marked");
   await page.click("#tabExams .btn");
@@ -319,7 +320,7 @@ try {
   const until = async (fn, msg, tries = 50) => { for (let k = 0; k < tries && !fn(); k++) await page.waitForTimeout(100); check(fn(), msg); };
   const row = () => [...db.subjects.values()][0];
   await until(() => db.subjects.size === 1 && row().data.files.length === 4 && row().data.name === "Mikroekonómia", "the subject is saved to the account");
-  check(row().data.exams.length === 2 && row().data.exams.some((e) => e.year === 2022), "its past exams are saved with it");
+  await until(() => (row().data.exams || []).length === 2 && row().data.exams.some((e) => e.year === 2022), "its past exams are saved with it");
   const answers = () => [...db.reviews.values()].filter((r) => r.kind === "answer").length;
   await until(() => answers() === 1 && db.progress.size === 0, "the answer is saved to the account's answer log");
   const other = await (await browser.newContext()).newPage();
