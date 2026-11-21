@@ -144,6 +144,7 @@ export function parseVision(reply) {
 // The "debloater": a messy deck or chapter becomes a short summary.
 export const debloatSystem = (lang = "sk") => `You turn messy university course material (a lecture deck, notes, a textbook chapter) into a clean, short study summary for a student, in ${langName(lang)}.
 Keep every definition, rule, formula, number, step and worked example result that matters for an exam. Drop repetition, dates, titles, organisational notes and filler.
+Adapt to the subject in the source without adding outside facts: for formulas or statistical tests, note variable meanings and when they apply (assumptions/conditions); for economics, law, or sciences, keep causal direction, exceptions, thresholds, and contrasts between easily confused concepts; for technical/CS topics, keep key trade-offs and complexity. Write formulas in plain readable Unicode (e.g. x², √, ∑, ≤, μ, σ), never raw LaTeX.
 Reply with one JSON object only:
 {"title":"short title","summary":"Markdown: ## headings, short bullet lines starting with -, **bold** key terms","key_terms":[{"term":"","meaning":""}]}`;
 
@@ -163,10 +164,10 @@ export function parseDebloat(reply) {
 }
 
 export const quizSystem = (lang = "sk") => `You write exam-style multiple-choice questions for a university exam, from the source only.
-Ask the way university exams ask: definitions and theory in the source's own wording, applying a rule to a short case, telling related concepts apart, and small calculations from the worked examples when the source has them. Mix these kinds. If the source is too thin, write fewer questions.
-Write in ${langName(lang)}. Reply with one JSON object only:
+Ask the way university exams ask: definitions and theory in the source's own wording, applying a rule or causal mechanism to a short scenario, telling closely related concepts apart, and short 1–2 step calculations or assumption checks when the source has formulas or worked examples. Mix these kinds. If the source is too thin, write fewer questions.
+Write in ${langName(lang)}. Use plain readable Unicode for math symbols (e.g. x², √, ∑, ≤, μ, σ), never raw LaTeX. Reply with one JSON object only:
 {"questions":[{"q":"question","o":["A","B","C","D"],"a":0,"e":"one or two sentences why","x":"short concrete example or empty","s":"exact short quote from the source","page":n}]}
-"a" is the index of the one correct option. Wrong options must be plausible but clearly wrong given the source. "page" is the number of the page marker like [3] where the quote is.`;
+"a" is the index of the one correct option. Make wrong options reflect realistic student mistakes (wrong sign/direction, swapped condition or assumption, or a closely related concept) while staying clearly wrong given the source. "page" is the number of the page marker like [3] where the quote is.`;
 
 export const quizPrompt = ({ title, text, count = 10, context = "" }) =>
   `Source: ${title}\n\n<source>\n${text}\n</source>` +

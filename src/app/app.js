@@ -619,9 +619,8 @@ function showWrongReview() {
     heads.push(h);
     head.appendChild(h);
     if (sec.fi >= 0) {
-      const first = sec.items[0];
       head.appendChild(button("tiny rev-open", t("review.openFull"), () => {
-        readerHint = first ? { fi: sec.fi, quote: first.quote, extras: first.extras } : null;
+        readerHint = null;
         go(CUR.id + "/read/" + sec.fi);
       }));
     }

@@ -51,8 +51,14 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
 - **How it works**:
   - Removed casual "AI" mentions from `study.contextPages`, `study.pictures`, `upload.contextHint`, `upload.consentLabel`, and `upload.err.{bad_reply,ai_busy,refused}` in both `sk.json` and `cs.json` (preserving the required provider disclosure on the one-time upload consent screen).
   - Fixed Slovak/Czech question pluralization in `#sMeta` and topic rows (`plural("exams.q", n)` replacing `today.count`), hid the stray 12-o'clock stroke dot on `0%` progress rings (`icons.js`), added tabular figures, subtle hero sheen, desktop nav/card hover polish, and a grounded topbar + balanced action bar on `#end`.
-  - Added pure `buildWrongStudyPack(wrong, files, topics)` (`src/app/md.js`) that builds an ephemeral (unpersisted, zero-AI) study summary on `#<subject>/review` (rendered via `#reader`): groups missed questions by source summary file (or topic), pulls each question's matching excerpt from the existing summary with inline `<mark class="hl">` highlight, filters relevant `keyTerms` using stem matching for Slovak/Czech inflection, links straight to the highlighted passage in the full summary (`Celé zhrnutie` / `Pozrieť v zhrnutí`), and offers `"Zopakovať tieto chyby"` in the dock.
+  - Added pure `buildWrongStudyPack(wrong, files, topics)` (`src/app/md.js`) that builds an ephemeral (unpersisted, zero-AI) study summary on `#<subject>/review` (rendered via `#reader`): groups missed questions by source summary file (or topic), pulls each question's matching excerpt from the existing summary with inline `<mark class="hl">` highlight, filters relevant `keyTerms` using stem matching for Slovak/Czech inflection, links to the full unhighlighted summary (`Celé zhrnutie`) or straight to each question's highlighted passage (`Pozrieť v zhrnutí`), and offers `"Zopakovať tieto chyby"` in the dock.
   - On `#end` ("Výsledok kola"), `#studyWrong` opens `#<subject>/review` when there are mistakes, or switches to `"Otvoriť zhrnutia"` (opening `#tabFiles`) when the round had 0 mistakes; each missed item in `#miss` also links directly to its highlighted summary passage.
+
+### 1.7 Subject-Adaptive Summary & Quiz Prompt Upgrade (Option 1)
+- **Files**: `ai/tasks.js`
+- **How it works**:
+  - Upgraded `debloatSystem` and `quizSystem` with concise subject-adaptive guidance (~60 tokens each, zero extra API calls, preserves `ai_cache` sharing across students): notes variable meanings & validity assumptions for formulas/stats, causal direction/exceptions/thresholds/contrasts for econ/law/sciences, trade-offs/complexity for technical/CS material, realistic student-mistake distractors in quizzes, and plain Unicode math symbols instead of raw LaTeX.
+  - Because `server/generate.js` hashes `req.system` into `cacheKey`, `summary` and `quiz` automatically get fresh cache keys without invalidating other tasks. Requires `npm run fn:prepare` + Supabase Edge Function redeploy to take effect on live uploads.
 
 ---
 
