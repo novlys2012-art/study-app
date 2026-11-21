@@ -1,12 +1,13 @@
 // The app's screens: Today, Subjects, one subject (topics, summaries), the summary reader,
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
-import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, logAnswer, resetProgress } from "./subjects.js";
+import { t, getLang, setLang } from "../i18n/index.js";
+import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress } from "./subjects.js";
 import { startSync } from "./autosync.js";
 import { renderMarkdown } from "./md.js";
 import { icon, ring } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
+import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
 
 const LOOK_KEY = "studyapp-look";
 const THEME_KEY = "studyapp-theme";
@@ -15,14 +16,14 @@ const ROUND = 20;      // questions in a "learn" round
 const SEARCH_FROM = 4; // summaries before the search box shows
 const L = "ABCD";
 // Options that refer to other options ("none of the above", "a) and b)") keep their order.
-const PIN = /žiadn|všetk|ani jedn|vyššie|predchádzaj|uveden.{0,10}možnost|\b[a-dA-D]\)|\b[a-dA-D] aj [a-dA-D]\b/i;
+const PIN = /žiadn|žádn|všetk|všech|ani jedn|vyššie|výše|predchádzaj|předchoz|uveden.{0,10}možnost|\b[a-dA-D]\)|\b[a-dA-D] (?:aj|a) [a-dA-D]\b/i;
 
 const $ = (id) => document.getElementById(id);
 const corr = (x) => (Array.isArray(x.a) ? x.a : [x.a]);
 const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 let SUBJECTS = [];
-let CUR = null, QUESTIONS = [], TOPICS = {};
+let CUR = null, QUESTIONS = [], TOPICS = {}, LOG = [];
 let picked = new Set();
 let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", order = [];
 let P = {};
@@ -165,24 +166,10 @@ function toast(msg) {
 
 // ===== Progress and exam dates
 
-// How much of a subject is known: a question counts once its last answer was right.
-function stats(qs, p) {
-  let ok = 0, bad = 0;
-  qs.forEach((x) => { const r = p[x.id]; if (r) { if (r.l === 1) ok++; else bad++; } });
-  return { total: qs.length, ok, bad, due: qs.length - ok, pct: qs.length ? Math.round((ok / qs.length) * 100) : 0 };
-}
-// A learn round: mistakes first, then questions not seen yet, then the known ones with the weakest record.
-function smartRound(qs, p, n = ROUND) {
-  const bad = [], fresh = [], known = [];
-  qs.forEach((x) => { const r = p[x.id]; (!r ? fresh : r.l === 1 ? known : bad).push(x); });
-  known.sort((a, b) => p[a.id].c / p[a.id].n - p[b.id].c / p[b.id].n);
-  return [...shuffle(bad), ...shuffle(fresh), ...known].slice(0, n);
-}
-function daysTo(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); if (!m) return null;
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  return Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - now) / 864e5);
-}
+// Stats and rounds follow the answer log's spaced-repetition intervals alongside accuracy.
+const stats = (qs, log = []) => questionStats(qs, log);
+const examTopicOrder = (sj) => ((sj && sj.exams && sj.exams.length) ? rankExams(sj.exams, sj.topics).map((r) => r.topic).filter(Boolean) : []);
+const smartRound = (qs, log = [], n = ROUND, topicOrder = []) => dueRound(qs, log, { limit: n, shuffle, topicOrder });
 function examDate(sj) {
   const [y, m, day] = sj.exam.split("-").map(Number);
   return new Date(y, m - 1, day).toLocaleDateString(getLang(), { day: "numeric", month: "numeric" });
@@ -202,9 +189,11 @@ const soonClass = (sj) => { const d = daysTo(sj.exam); return d != null && d >= 
 // ===== Today
 
 // What an empty app shows: one sentence, the three steps and the button.
-function emptyState() {
+function emptyState(clickableArt = false) {
   const box = el("div", "empty big");
-  const art = el("span", "empty-art"); art.appendChild(icon("up"));
+  const art = clickableArt ? button("btn empty-art", null, () => openUpload()) : el("span", "empty-art");
+  if (clickableArt) art.setAttribute("aria-label", t("nav.addLong"));
+  art.appendChild(icon("up"));
   const steps = el("ol", "steps");
   ["home.stepUpload", "home.stepRead", "home.stepPractise"].forEach((k) => steps.appendChild(el("li", null, t(k))));
   box.append(art, el("h2", null, t("home.empty.title")), el("p", null, t("home.empty.text")), steps,
@@ -222,14 +211,18 @@ function countdown(sj) {
 function renderToday() {
   const box = $("todayBody"); box.innerHTML = ""; $("subjects").innerHTML = "";
   $("todayDate").textContent = new Date().toLocaleDateString(getLang(), { weekday: "long", day: "numeric", month: "long" });
-  if (!SUBJECTS.length) { box.appendChild(emptyState()); return; }
+  if (!SUBJECTS.length) { box.appendChild(emptyState(true)); return; }
   let last = ""; try { last = localStorage.getItem(LAST_KEY) || ""; } catch (e) {}
-  const rows = SUBJECTS.map((sj) => ({ sj, st: stats(sj.questions, readProgress(sj)), d: daysTo(sj.exam) }));
+  const rows = SUBJECTS.map((sj) => {
+    const log = readLog(sj);
+    return { sj, log, st: stats(sj.questions, log), d: daysTo(sj.exam) };
+  });
   const withQ = rows.filter((r) => r.st.total);
   // The big card is the subject with the nearest exam, or else the one opened last.
   const soon = withQ.filter((r) => r.d != null && r.d >= 0).sort((a, b) => a.d - b.d)[0];
   const hero = soon || withQ.find((r) => r.sj.id === last) || withQ[0];
   if (hero) {
+    const plan = dailyPlan(hero.sj.questions, hero.log, hero.sj.exam, { roundSize: ROUND });
     const c = el("div", "sheet hero");
     const open = button("hero-open", null, () => go(hero.sj.id));
     const names = el("span", "grow");
@@ -242,8 +235,19 @@ function renderToday() {
     else mid.appendChild(button("hero-chip", null, () => { enter(hero.sj); openExam(); }));
     if (!cd) mid.firstChild.append(icon("cal"), el("span", null, t("exam.add")));
     mid.appendChild(ring(hero.st.pct, pctLabel(hero.st), "on-hero"));
-    c.append(mid, el("p", "hint", t("today.round", { n: Math.min(ROUND, hero.st.total) })));
-    const start = button("btn wide", null, () => { enter(hero.sj); learn(); });
+    const topicOrder = examTopicOrder(hero.sj);
+    const basePlan = plan.hasExam
+      ? (plan.target > 0
+        ? (plan.reviewNow > 0 && plan.newToday > 0
+          ? t("today.planBoth", { n: plan.target, rev: plan.reviewNow, fresh: plan.newToday })
+          : t(plan.reviewNow > 0 ? "today.planReview" : "today.planNew", { n: plan.target }))
+        : (plan.nextReviewDays ? t("today.planDoneNext", { days: plan.nextReviewDays }) : t("today.planDone")))
+      : (plan.reviewNow > 0
+        ? t("today.roundDue", { n: plan.roundCount, rev: plan.reviewNow })
+        : hero.st.due === 0 ? t("today.roundAllOk", { n: plan.roundCount }) : t("today.round", { n: plan.roundCount }));
+    const planLine = plan.hasExam && plan.target > 0 && topicOrder.length ? basePlan + " " + t("today.examOrder") : basePlan;
+    c.append(mid, el("p", "hint", planLine));
+    const start = button("btn wide", null, () => { enter(hero.sj); learn(null, plan.roundCount); });
     start.append(icon("play"), el("span", null, t("today.start")));
     c.appendChild(start);
     box.appendChild(c);
@@ -271,7 +275,7 @@ function showToday() { CUR = null; renderToday(); show("today"); }
 // ===== Subjects
 
 function subjectRow(sj) {
-  const st = stats(sj.questions, readProgress(sj));
+  const st = stats(sj.questions, readLog(sj));
   const b = button("rowcard sj", null, () => go(sj.id));
   const g = el("span", "grow");
   g.appendChild(el("span", "rc-title", sj.name));
@@ -294,6 +298,7 @@ function showHome() {
 function enter(sj) {
   if (!CUR || CUR.id !== sj.id) { topic = "all"; mode = "all"; list = []; query = ""; tab = "overview"; openTopic = null; }
   CUR = sj; QUESTIONS = sj.questions; TOPICS = sj.topics;
+  LOG = readLog(sj);
   P = readProgress(sj);
   try { localStorage.setItem(LAST_KEY, sj.id); } catch (e) {}
 }
@@ -304,7 +309,7 @@ const topicKeys = () => Object.keys(TOPICS).filter((k) => {
 });
 
 function renderSubject() {
-  const st = stats(QUESTIONS, P), files = summaries().length;
+  const st = stats(QUESTIONS, LOG), files = summaries().length;
   $("sName").textContent = CUR.name;
   $("sMeta").textContent = [st.total ? t("today.count", { n: st.total }) : "", files ? t("subject.summaries", { n: files }) : ""].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
@@ -341,7 +346,7 @@ $("sEmptyAdd").onclick = () => openUpload(CUR.id);
 // Topics from the weakest. A topic opens to its summary, weak spots and a button that practises it.
 function renderOverview() {
   const info = CUR.topicInfo || {};
-  const rows = topicKeys().map((k) => ({ k, st: stats(QUESTIONS.filter((x) => x.t === k), P), it: info[k] || {} }))
+  const rows = topicKeys().map((k) => ({ k, st: stats(QUESTIONS.filter((x) => x.t === k), LOG), it: info[k] || {} }))
     .sort((a, b) => (a.st.total ? a.st.pct : 101) - (b.st.total ? b.st.pct : 101));
   $("tbars").replaceChildren(...rows.map(({ k, st, it }) => {
     const c = el("div", "tcard" + (openTopic === k ? " open" : ""));
@@ -376,7 +381,7 @@ function renderOverview() {
 function renderFiles() {
   const files = summaries();
   let rows = files.map((f) => ({ f, name: f.title || f.name, size: +f.pagesBefore || 0 }));
-  if (sortBy === "az") rows.sort((x, y) => x.name.localeCompare(y.name, "sk"));
+  if (sortBy === "az") rows.sort((x, y) => x.name.localeCompare(y.name, getLang()));
   if (sortBy === "long") rows.sort((x, y) => y.size - x.size);
   $("files").replaceChildren(...rows.map(({ f, name }) => {
     const b = button("rowcard file", null, () => go(CUR.id + "/read/" + CUR.files.indexOf(f)));
@@ -568,7 +573,7 @@ function showReader(f) {
   // Each question's source line ends with its file name, which is how a file finds its questions.
   const qs = QUESTIONS.filter((x) => x.s && x.s.includes("(" + f.name));
   $("rDock").hidden = !qs.length;
-  $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, P)); };
+  $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, LOG)); };
   $("rProg").style.width = "0";
   show("reader");
 }
@@ -582,15 +587,15 @@ window.addEventListener("scroll", () => {
 
 // ===== Rounds: "learn" and the custom round sheet
 
-function learn(topicKey = null) {
+function learn(topicKey = null, n = ROUND) {
   roundOf = topicKey;
   if (topicKey === RANKED) {
-    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), QUESTIONS, P, ROUND);
+    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), QUESTIONS, P, n);
     if (qs.length) start(qs);
     return;
   }
   const qs = topicKey ? QUESTIONS.filter((x) => x.t === topicKey) : QUESTIONS;
-  if (qs.length) start(smartRound(qs, P));
+  if (qs.length) start(smartRound(qs, LOG, n, topicKey ? [] : examTopicOrder(CUR)));
 }
 $("learn").onclick = () => learn();
 
@@ -666,9 +671,9 @@ $("examClear").onclick = () => { $("examDate").value = ""; setExam(""); closeShe
 
 $("sMore").onclick = () => {
   $("mName").textContent = CUR.name;
-  const st = stats(QUESTIONS, P), seen = st.ok + st.bad;
+  const st = stats(QUESTIONS, LOG), seen = st.total - st.fresh;
   const box = $("prog"); box.innerHTML = "";
-  [["setup.statSeen", seen + " / " + st.total], ["setup.statOk", st.ok], ["setup.statTodo", st.bad]].forEach(([k, v]) => {
+  [["setup.statSeen", seen + " / " + st.total], ["setup.statOk", st.ok], ["setup.statTodo", st.reviewDue]].forEach(([k, v]) => {
     const s = el("div", "tile"); s.append(el("b", null, v), el("span", null, t(k))); box.appendChild(s);
   });
   $("progWrap").hidden = !seen; $("confirm").hidden = true; $("reset").hidden = !seen;
@@ -678,7 +683,7 @@ $("sMore").onclick = () => {
 $("addFiles").onclick = () => openUpload(CUR.id);
 $("reset").onclick = () => { $("confirm").hidden = false; $("reset").hidden = true; };
 $("no").onclick = () => { $("confirm").hidden = true; $("reset").hidden = false; };
-$("yes").onclick = () => { resetProgress(CUR); P = {}; closeSheet($("moreSheet")); renderSubject(); toast(t("setup.resetDone")); };
+$("yes").onclick = () => { resetProgress(CUR); LOG = readLog(CUR); P = {}; closeSheet($("moreSheet")); renderSubject(); toast(t("setup.resetDone")); };
 $("delSubj").onclick = () => { $("delConfirm").hidden = false; $("delSubj").hidden = true; };
 $("delNo").onclick = () => { $("delConfirm").hidden = true; $("delSubj").hidden = false; };
 $("delYes").onclick = () => {
@@ -709,7 +714,7 @@ function render() {
   $("pg").style.width = (i / list.length) * 100 + "%";
   $("q").textContent = x.q;
   const multi = Array.isArray(x.a); picked = new Set();
-  $("multi").hidden = !multi; $("check").hidden = !multi; $("check").disabled = true;
+  $("multi").hidden = !multi; $("check").hidden = !multi; $("check").disabled = true; $("idk").hidden = false;
   order = x.o.map((_, k) => k);
   if (!x.o.some((o) => PIN.test(o))) order = shuffle(order);
   const box = $("opts"); box.innerHTML = "";
@@ -735,6 +740,7 @@ function answer(k) {
   }
   grade(new Set([k]));
 }
+const sourceFile = (x) => (x && x.s ? (CUR.files || []).findIndex((f) => f.summary && (x.s.includes("(" + f.name) || x.s === f.name)) : -1);
 function grade(sel) {
   answered = true;
   const x = list[i], C = new Set(corr(x).map((a) => order.indexOf(a)));
@@ -742,22 +748,27 @@ function grade(sel) {
   if (ok) score++; else wrong.push(x);
   const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
   logAnswer(CUR, x.id, ok);
+  LOG = readLog(CUR);
   buzz(ok ? 12 : [18, 60, 18]);
   [...$("opts").children].forEach((b, n) => {
     b.setAttribute("aria-disabled", "true"); b.removeAttribute("aria-pressed");
-    if (C.has(n)) { b.classList.add("ok"); if (!sel.has(n) && Array.isArray(x.a)) b.classList.add("missed"); }
+    if (C.has(n)) { b.classList.add("ok"); if (!sel.has(n) && sel.size && Array.isArray(x.a)) b.classList.add("missed"); }
     else if (sel.has(n)) b.classList.add("no"); else b.classList.add("dim");
   });
-  $("check").hidden = true;
+  $("check").hidden = true; $("idk").hidden = true;
   const fb = $("fb"); fb.className = "fb " + (ok ? "good" : "bad");
   const cl = [...C].sort().map((n) => L[n]);
+  const key = sel.size ? (cl.length > 1 ? "quiz.wrongMany" : "quiz.wrongOne") : (cl.length > 1 ? "quiz.idkMany" : "quiz.idkOne");
   $("verdict").textContent = ok ? t("quiz.correct")
-    : cl.length > 1 ? t("quiz.wrongMany", { list: cl.slice(0, -1).join(", "), last: cl[cl.length - 1] }) : t("quiz.wrongOne", { a: cl[0] });
+    : cl.length > 1 ? t(key, { list: cl.slice(0, -1).join(", "), last: cl[cl.length - 1] }) : t(key, { a: cl[0] });
   const m = $("more"); m.innerHTML = "";
   if (x.e) m.appendChild(el("p", null, x.e));
   if (x.x) { const p = el("p"); p.append(el("strong", null, t("quiz.example")), el("span", null, x.x)); m.appendChild(p); }
   if (x.s) m.appendChild(el("div", "src", t("quiz.source") + x.s));
   m.hidden = !m.childNodes.length;
+  const fi = ok ? -1 : sourceFile(x);
+  $("openSrc").hidden = fi < 0;
+  $("openSrc").onclick = fi >= 0 ? () => go(CUR.id + "/read/" + fi) : null;
   $("pg").style.width = ((i + 1) / list.length) * 100 + "%";
   $("next").textContent = t(i === list.length - 1 ? "quiz.toResult" : "quiz.next");
   fb.hidden = false;
@@ -766,6 +777,7 @@ function grade(sel) {
   $("next").focus({ preventScroll: true });
 }
 $("check").onclick = () => { if (!answered && picked.size) grade(new Set(picked)); };
+$("idk").onclick = () => { if (!answered) grade(new Set()); };
 $("next").onclick = () => { i++; i < list.length ? render() : finish(); };
 // ✕ ends the round: with answers it shows the result so far, without any it just leaves.
 $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.length ? finish() : leaveQuiz(); };
@@ -795,6 +807,7 @@ document.addEventListener("keydown", (e) => {
   if ($("quiz").hidden || e.metaKey || e.ctrlKey || e.altKey) return;
   const n = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());
   if (!answered && n >= 0 && n < order.length) { e.preventDefault(); answer(n); }
+  else if (!answered && e.key === "?") { e.preventDefault(); $("idk").click(); }
   else if (!answered && e.key === "Enter" && !$("check").hidden && picked.size) { e.preventDefault(); $("check").click(); }
   else if (answered && e.key === "Enter") { e.preventDefault(); $("next").click(); }
 });
@@ -825,11 +838,20 @@ function setTheme(th) {
   try { localStorage.setItem(THEME_KEY, th); } catch (e) {}
   paintChrome();
 }
+function setLangUI(l) {
+  setLang(l);
+  const all = [...$("langs").children];
+  all.forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === l));
+  $("langs").style.setProperty("--n", all.length);
+  $("langs").style.setProperty("--i", Math.max(0, all.findIndex((b) => b.dataset.lang === l)));
+}
 $("looks").onclick = (e) => { const b = e.target.closest("button"); if (b) setLook(b.dataset.l); };
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
+$("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); } };
 let look0 = null, theme0 = ""; try { look0 = localStorage.getItem(LOOK_KEY); theme0 = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
 setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
 setLook(look0 == null ? "kocky" : look0);
+setLangUI(getLang());
 
 // The account lives in Supabase, whose code loads only here and on the upload screen.
 async function renderAccount() {

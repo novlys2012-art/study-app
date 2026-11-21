@@ -260,5 +260,20 @@
   "exams.movedToast": "Otázka je presunutá do inej témy.",
   "exams.linkedToast": "Téma je prepojená.",
   "exams.yearToast": "Rok skúšky je uložený.",
-  "exams.deletedToast": "Skúška je odstránená."
+  "exams.deletedToast": "Skúška je odstránená.",
+  "lang.label": "Jazyk",
+  "lang.sk": "Slovenčina",
+  "lang.cs": "Čeština",
+  "today.roundDue": "Dnešné kolo · na zopakovanie: {rev} (spolu {n}).",
+  "today.roundAllOk": "Všetko máš zvládnuté. Opakovacie kolo ({n}).",
+  "today.planBoth": "Plán do skúšky na dnes · na zopakovanie: {rev}, nové: {fresh} (spolu {n}).",
+  "today.planReview": "Plán do skúšky na dnes · na zopakovanie: {n}.",
+  "today.planNew": "Plán do skúšky na dnes · nové otázky: {n}.",
+  "today.planDone": "Dnešný plán je splnený. Môžeš si dať opakovacie kolo.",
+  "today.planDoneNext": "Dnešný plán je splnený · ďalšie opakovanie o {days} d.",
+  "today.examOrder": "Najprv témy z minulých skúšok.",
+  "quiz.openSource": "Pozrieť v zhrnutí",
+  "quiz.idk": "Neviem",
+  "quiz.idkOne": "Správna odpoveď je {a}.",
+  "quiz.idkMany": "Správne odpovede sú {list} a {last}."
 }

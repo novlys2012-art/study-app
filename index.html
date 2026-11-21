@@ -8,9 +8,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6b58'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <title>Study App</title>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap"></noscript>
 </head>
 <body>
 <nav class="tabbar" id="tabbar" data-i18n-label="nav.main" hidden>
@@ -104,13 +105,19 @@
       <p class="q" id="q"></p>
       <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
       <div class="opts" id="opts"></div>
-      <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
+      <div class="qactions">
+        <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
+        <button class="btn plain" id="idk" type="button" data-i18n="quiz.idk">Neviem</button>
+      </div>
     </div>
     <div class="fb" id="fb" role="status" hidden>
       <div class="fb-in">
         <p class="verdict" id="verdict"></p>
         <div class="more" id="more"></div>
-        <button class="btn wide" id="next" type="button"></button>
+        <div class="fb-actions">
+          <button class="btn ghost" id="openSrc" type="button" hidden data-i18n="quiz.openSource">Pozrieť v zhrnutí</button>
+          <button class="btn wide" id="next" type="button"></button>
+        </div>
       </div>
     </div>
   </section>
@@ -251,6 +258,11 @@
         <button type="button" data-th="dark" aria-pressed="false" data-i18n="theme.dark">Tmavý</button>
       </div>
       <p class="hint" id="themeHint" hidden data-i18n="theme.fixed">Tento vzhľad má iba jeden režim.</p>
+      <p class="label" data-i18n="lang.label">Jazyk</p>
+      <div class="seg fill" id="langs">
+        <button type="button" data-lang="sk" aria-pressed="true" data-i18n="lang.sk">Slovenčina</button>
+        <button type="button" data-lang="cs" aria-pressed="false" data-i18n="lang.cs">Čeština</button>
+      </div>
     </div>
   </section>
 </main>
