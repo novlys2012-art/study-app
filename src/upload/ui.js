@@ -36,7 +36,22 @@ function panel(id) {
   dots(id === "upWork" ? 3 : id === "upForm" ? ($("upStep2").hidden ? 1 : 2) : 0);
 }
 function step(n) { $("upStep1").hidden = n !== 1; $("upStep2").hidden = n !== 2; dots(n); }
-function error(msg) { $("upErr").textContent = msg || ""; $("upErr").hidden = !msg; }
+function clearFieldInvalid(id) {
+  const f = $(id);
+  if (!f) return;
+  f.removeAttribute("aria-invalid");
+  f.removeAttribute("aria-describedby");
+}
+function error(msg, fieldId) {
+  $("upErr").textContent = msg || "";
+  $("upErr").hidden = !msg;
+  clearFieldInvalid("upEmail");
+  clearFieldInvalid("upCode");
+  if (msg && fieldId && $(fieldId)) {
+    $(fieldId).setAttribute("aria-invalid", "true");
+    $(fieldId).setAttribute("aria-describedby", "upErr");
+  }
+}
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function message(e) {
@@ -295,22 +310,24 @@ function wire() {
   const askCode = (on) => { $("upAsk").hidden = on; $("upCodeBox").hidden = !on; if (on) $("upCode").focus(); };
   $("upSend").onclick = async () => {
     const email = $("upEmail").value.trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { error(t("upload.err.email")); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { error(t("upload.err.email"), "upEmail"); $("upEmail").focus(); return; }
     error(""); $("upSend").disabled = true;
     try { await cloud.signIn(email); $("upSent").textContent = t("upload.sent", { email }); $("upCode").value = ""; askCode(true); }
-    catch (e) { error(message(e)); }
+    catch (e) { error(message(e), "upEmail"); }
     finally { $("upSend").disabled = false; }
   };
   $("upVerify").onclick = async () => {
     const code = $("upCode").value.replace(/\s/g, "");
-    if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat")); return; }
+    if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat"), "upCode"); $("upCode").focus(); return; }
     error(""); $("upVerify").disabled = true;
     try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await syncNow(true); await refresh(); }
-    catch (e) { error(message(e)); }
+    catch (e) { error(message(e), "upCode"); }
     finally { $("upVerify").disabled = false; }
   };
   $("upCode").onkeydown = (e) => { if (e.key === "Enter") $("upVerify").click(); };
   $("upEmail").onkeydown = (e) => { if (e.key === "Enter") $("upSend").click(); };
+  $("upEmail").oninput = () => clearFieldInvalid("upEmail");
+  $("upCode").oninput = () => clearFieldInvalid("upCode");
   $("upAgain").onclick = () => { error(""); askCode(false); };
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {

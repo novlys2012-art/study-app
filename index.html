@@ -33,7 +33,7 @@
         <a href="#wFeatures" data-jump="wFeatures" data-i18n="welcome.navFeatures">Čo dostaneš</a>
         <a href="#wFaq" data-jump="wFaq" data-i18n="welcome.navFaq">Otázky</a>
       </nav>
-      <button class="btn w-cta" id="wNavCta" type="button" data-i18n="welcome.navCta">Prihlásiť sa</button>
+      <button class="btn ghost w-cta" id="wNavCta" type="button" data-i18n="welcome.navCta">Prihlásiť sa</button>
     </header>
 
     <div class="w-hero">
@@ -46,7 +46,7 @@
           <li><b data-i18n="welcome.p2Title">Kvíz s presným zdrojom</b><span data-i18n="welcome.p2Text">Každá chyba má vysvetlenie a skok priamo na zvýraznené miesto v zhrnutí.</span></li>
           <li><b data-i18n="welcome.p3Title">Súkromné a v mobile aj na PC</b><span data-i18n="welcome.p3Text">Predmety a postup sa synchronizujú cez tvoj účet, nikto iný ich nevidí.</span></li>
         </ul>
-        <button class="link w-guest" id="wGuest" type="button" data-i18n="welcome.guest">Alebo vyskúšaj bez účtu</button>
+        <button class="btn ghost w-guest" id="wGuest" type="button" data-i18n="welcome.guest">Alebo vyskúšaj bez účtu</button>
       </div>
 
       <div class="sheet w-auth" id="wAuthCard">
@@ -62,6 +62,11 @@
           <button class="btn wide plain" id="wSignOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button>
         </div>
 
+        <div class="group" id="wOffBox" hidden>
+          <p class="tipbox" id="wOffNote" data-i18n="welcome.offNote">Prihlásenie účtu v tejto ukážke nie je pripojené k serveru. Aplikáciu si môžeš vyskúšať lokálne bez účtu.</p>
+          <button class="btn wide" id="wOffEnter" type="button" data-i18n="welcome.offEnter">Vyskúšať lokálne bez účtu</button>
+        </div>
+
         <div class="group" id="wAuthForms">
           <div class="seg fill" id="wModeTabs">
             <button type="button" data-auth="in" aria-pressed="true" data-i18n="welcome.tabIn">Prihlásiť sa</button>
@@ -71,7 +76,6 @@
             <h2 class="w-card-title" id="wCardTitle" data-i18n="welcome.inTitle">Vitaj späť</h2>
             <p class="hint" id="wCardSub" data-i18n="welcome.inSub">Zadaj svoj e-mail a pošleme ti jednorazový prihlasovací kód.</p>
           </div>
-          <p class="tipbox" id="wOffNote" hidden data-i18n="welcome.offNote">Prihlásenie účtu v tejto ukážke nie je pripojené k serveru. Aplikáciu si môžeš vyskúšať lokálne bez účtu.</p>
 
           <div class="group" id="wAsk">
             <label class="label" for="wEmail" data-i18n="welcome.emailLabel">E-mail</label>
@@ -264,6 +268,7 @@
         <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
         <button class="btn plain" id="idk" type="button" data-i18n="quiz.idk">Neviem</button>
       </div>
+      <p class="hint q-keys" id="qKeys" data-i18n="quiz.keys">Klávesy: 1–4 odpoveď · ? neviem · Enter ďalej · S zhrnutie · Esc koniec</p>
     </div>
     <div class="fb" id="fb" role="status" hidden>
       <div class="fb-in">
@@ -386,6 +391,7 @@
             <span id="upUsage" data-limit-usage></span>
             <span data-limit-reset data-i18n="upload.limitReset">Obnoví sa 1. v mesiaci</span>
           </div>
+          <p class="hint limit-note" data-i18n="upload.limitNote">100 kreditov vystačí približne na 20–30 prednášok a zhrnutí mesačne.</p>
         </div>
         <button class="btn wide" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
         <button class="btn wide plain" id="upPrev" type="button" data-i18n="nav.back">Späť</button>
@@ -422,6 +428,7 @@
           <span id="pUsage" data-limit-usage></span>
           <span data-limit-reset data-i18n="upload.limitReset">Obnoví sa 1. v mesiaci</span>
         </div>
+        <p class="hint limit-note" data-i18n="upload.limitNote">100 kreditov vystačí približne na 20–30 prednášok a zhrnutí mesačne.</p>
       </div>
       <button class="chiprow" id="pLanding" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 14h5"/></svg><span class="grow" data-i18n="welcome.openLanding">Úvodná stránka</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
@@ -525,6 +532,16 @@
   <div class="bsheet-in">
     <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 id="legalTitle"></h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="group" id="legalBody"></div>
+  </div>
+</dialog>
+<dialog class="bsheet" id="signOutSheet">
+  <div class="bsheet-in">
+    <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 data-i18n="profile.unsyncedTitle">Neuložené zmeny</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <p class="hint" data-i18n="profile.unsyncedBody">Niektoré odpovede alebo zmeny sa ešte nestihli uložiť do účtu (pravdepodobne si offline). Ak sa teraz odhlásiš, v tomto zariadení sa stratia.</p>
+    <div class="stack">
+      <button class="btn wide ghost danger" id="signOutForce" type="button" data-i18n="profile.signOutAnyway">Odhlásiť sa a zahodiť zmeny</button>
+      <button class="btn wide" type="button" data-close data-i18n="setup.no">Zrušiť</button>
+    </div>
   </div>
 </dialog>
 <script type="module" src="/src/main.js"></script>

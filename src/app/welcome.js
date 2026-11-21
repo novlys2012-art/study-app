@@ -9,10 +9,24 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 let wired = false, mode = "in", pendingEmail = "", resendLeft = 0, resendTimer = 0;
 let hooks = null;
 
-function err(msg) {
+const FIELDS = ["wEmail", "wCode", "wAgree"];
+
+function clearFieldInvalid(id) {
+  const f = $(id);
+  if (!f) return;
+  f.removeAttribute("aria-invalid");
+  f.removeAttribute("aria-describedby");
+}
+
+function err(msg, fieldId) {
   const box = $("wErr");
   box.textContent = msg || "";
   box.hidden = !msg;
+  FIELDS.forEach(clearFieldInvalid);
+  if (msg && fieldId && $(fieldId)) {
+    $(fieldId).setAttribute("aria-invalid", "true");
+    $(fieldId).setAttribute("aria-describedby", "wErr");
+  }
 }
 
 function stopTimer() {
@@ -78,14 +92,15 @@ function syncLangButtons() {
 async function refreshAuthState() {
   err("");
   const cloud = await import("../cloud/supabase.js");
-  $("wOffNote").hidden = cloud.configured;
   if (!cloud.configured) {
+    $("wOffBox").hidden = false;
     $("wSignedBox").hidden = true;
-    $("wAuthForms").hidden = false;
-    $("wNavCta").textContent = t("welcome.navCta");
-    $("wNavCta").dataset.action = "focus";
+    $("wAuthForms").hidden = true;
+    $("wNavCta").textContent = t("welcome.navOpen");
+    $("wNavCta").dataset.action = "app";
     return;
   }
+  $("wOffBox").hidden = true;
   let s = null;
   try { s = await cloud.session(); } catch (e) {}
   if (s && s.user) {
@@ -134,6 +149,7 @@ function wire() {
   };
 
   $("wGuest").onclick = () => hooks.enterApp();
+  $("wOffEnter").onclick = () => hooks.enterApp();
   $("wFootOpen").onclick = () => hooks.enterApp();
   $("wContinue").onclick = () => hooks.enterApp();
 
@@ -144,8 +160,8 @@ function wire() {
 
   $("wSend").onclick = async () => {
     const email = $("wEmail").value.trim();
-    if (!EMAIL_RE.test(email)) { err(t("upload.err.email")); $("wEmail").focus(); return; }
-    if (mode === "up" && !$("wAgree").checked) { err(t("welcome.agreeErr")); $("wAgree").focus(); return; }
+    if (!EMAIL_RE.test(email)) { err(t("upload.err.email"), "wEmail"); $("wEmail").focus(); return; }
+    if (mode === "up" && !$("wAgree").checked) { err(t("welcome.agreeErr"), "wAgree"); $("wAgree").focus(); return; }
     err("");
     const cloud = await import("../cloud/supabase.js");
     if (!cloud.configured) { err(t("welcome.offNote")); return; }
@@ -158,7 +174,7 @@ function wire() {
       showCodeStep(true);
       startResend(60);
     } catch (e) {
-      err(authMessage(e));
+      err(authMessage(e), "wEmail");
     } finally {
       $("wSend").disabled = false;
     }
@@ -166,7 +182,7 @@ function wire() {
 
   $("wVerify").onclick = async () => {
     const code = $("wCode").value.replace(/\s/g, "");
-    if (!/^\d{6,10}$/.test(code)) { err(t("upload.err.codeFormat")); $("wCode").focus(); return; }
+    if (!/^\d{6,10}$/.test(code)) { err(t("upload.err.codeFormat"), "wCode"); $("wCode").focus(); return; }
     err("");
     const cloud = await import("../cloud/supabase.js");
     if (!cloud.configured) { err(t("welcome.offNote")); return; }
@@ -179,7 +195,7 @@ function wire() {
       hooks.toast(t("profile.signedInToast"));
       hooks.enterApp();
     } catch (e) {
-      err(authMessage(e));
+      err(authMessage(e), "wCode");
     } finally {
       $("wVerify").disabled = false;
     }
@@ -210,6 +226,9 @@ function wire() {
 
   $("wEmail").onkeydown = (e) => { if (e.key === "Enter") $("wSend").click(); };
   $("wCode").onkeydown = (e) => { if (e.key === "Enter") $("wVerify").click(); };
+  $("wEmail").oninput = () => clearFieldInvalid("wEmail");
+  $("wCode").oninput = () => clearFieldInvalid("wCode");
+  $("wAgree").onchange = () => clearFieldInvalid("wAgree");
 
   $("welcome").addEventListener("click", (e) => {
     const leg = e.target.closest("[data-legal]");

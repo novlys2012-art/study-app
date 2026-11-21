@@ -1,7 +1,7 @@
 # Study App — Status & Handoff
 
 Last updated: 2026-11-21
-Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**63/63**).
+Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**65/65**).
 
 Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
 
@@ -67,6 +67,15 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
   - **Redesigned upload limit bar (credits, no USD)**: Extracted pure `limitInfo(u)` and DOM updater `renderLimit(box, u, t)` into `src/app/limit.js` (shared by `#upLimit` and `#pLimit`). Maps the server's USD monthly cap at `100 credits / $1` (`100 kreditov` on the free tier) with zero `$` signs in UI copy, showing label + explicit text status (`ok` / `warn` at >=80% / `full` at >=100%) + tabular percentage, segmented track with quarter markers and animated fill, and footer showing `{used} / {limit} kreditov` + `"Obnoví sa 1. v mesiaci"`.
   - **Landing + Sign-In / Sign-Up screen (`#welcome`) & clean sign-out**: Opens on first visit at `/` when no local subjects, entered flag, or active session token exist (bypassable with `?autostart=1`), and reachable anytime via `#welcome`, `#signin`, `#signup`, or the prominent `#pLanding` button row on Profile. Signing out from Profile, Upload, or Welcome runs shared `signOutAccount()`: flushes unsent sync changes best-effort, hardens `cloud.signOut()` with local-scope fallback and `sb-*-auth-token` cleanup, wipes synced account data (`clearLocal()` + `studyapp-entered`), and routes to `#welcome`. On boot, if `studyapp-sync-v1` holds a cloud `user` with no active session token, orphaned local account data is cleared automatically so already-signed-out browsers land cleanly on `#welcome`.
 
+### 1.9 Full-Project Impeccable Critique Remediation (Accessibility, Contrast, Layout & Hardening)
+- **Files**: `src/styles/app.css`, `index.html`, `src/app/app.js`, `src/app/welcome.js`, `src/app/subjects.js`, `src/upload/ui.js`, `src/i18n/{sk,cs}.json`, `test/polish.test.mjs`
+- **How it works**:
+  - **WCAG AA contrast & browser surfaces**: Darkened `kocky` light `--warn` (`#945800`) and `riso` light `--ledger` (`#c8165a` with `#ffffff` `--on-ledger`) and `--warn` (`#8c5500`) so all 10 look/theme pairings meet >= 4.5:1 AA contrast; boosted `#today` hero `0%` ring track to 36% opacity and added themed `::selection` and `caret-color`.
+  - **44px touch targets & keyboard focus**: Raised `.seg.fill button`, `.seg button`, `.chips button`, `.w-brand`, `.w-cta`, `.w-links a`, `.w-foot-links .link`, `.w-langs .tiny`, `.w-code-actions .link`, `.rev-open`, `.rev-jump`, `.miss-src`, and `.tip-trigger` to >= 44px; added `a:focus-visible`, `summary:focus-visible`, and `[tabindex]:focus-visible` outlines.
+  - **`#welcome` CTA hierarchy & offline state**: Made `#wNavCta` and `#wGuest` ghost buttons, neutralized `#wModeTabs` active indicator in `kocky`, and replaced the dead-end offline form with `#wOffBox` + `#wOffEnter` when `!cloud.configured`.
+  - **Form & offline sign-out hardening**: Bound `aria-invalid="true"` + `aria-describedby` on `#wEmail`/`#wCode`/`#wAgree`/`#upEmail`/`#upCode` errors (cleared on input/change), and added `#signOutSheet` confirmation via `hasUnsynced()` so offline sign-out warns before discarding unsynced local changes.
+  - **Core app clarity & keyboard polish**: Kept `"Vlastné kolo"` text visible on mobile `#subject` (`#sActions`), separated `zhrnutia` and `kontext` counts in `#sMeta` (`subjectFileCounts()`), aligned mobile `#fb` buttons full-width, refined desktop `#today` hero chevron optical alignment + single-card spanning, added inline 100-credit explainer note inside `#upLimit`/`#pLimit`, and added `S` (open summary), `Esc` (quit round), and a desktop-only `#qKeys` shortcut hint on `#quiz`.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)
@@ -92,7 +101,7 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
 
 ## 4. Verification & Local Container Notes
 
-- **Unit tests**: `npm test` (63 tests across `ai`, `exams`, `i18n`, `limit`, `md`, `plan`, `server`, `sync`).
+- **Unit tests**: `npm test` (65 tests across `ai`, `exams`, `i18n`, `limit`, `md`, `plan`, `polish`, `server`, `sync`).
 - **Lint & build**: `npm run lint` (`node --check` on all JS/MJS) and `npm run build` (`vite build`).
 - **Browser tests in this container**: `npm run smoke` and `npm run e2e` import the `playwright` npm package, whose bundled revision may not match the preinstalled container Chromium; use global `playwright-cli` (`http://localhost:3000`, seed `localStorage.setItem("studyapp-subjects-v1", ...)` then reload) for live headless Chromium verification here, and run `npm run smoke` / `npm run e2e` / `npm run test:db` in CI or local dev.
 - **HMR is disabled** in the AI Studio preview environment: restart the dev server after code edits before testing `http://localhost:3000`.

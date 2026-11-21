@@ -143,6 +143,19 @@ export function resetProgress(sj) {
 export function unsent() {
   return loadSubjects().flatMap((sj) => readLog(sj).filter((e) => e.u).map((e) => ({ sid: sj.id, e })));
 }
+export function hasUnsynced() {
+  if (unsent().length > 0) return true;
+  const marks = loadMeta().s;
+  return Object.keys(marks).some((id) => marks[id] && marks[id].dirty);
+}
+export function subjectFileCounts(files = []) {
+  let summaries = 0, context = 0;
+  for (const f of files || []) {
+    if (f && f.summary) summaries++;
+    else if (f && f.context && f.text) context++;
+  }
+  return { summaries, context };
+}
 export function markSent(sid, ids) {
   const set = new Set(ids);
   write(LOG + sid, readLog(sid).map((e) => (set.has(e.id) ? (({ u, ...rest }) => rest)(e) : e)));

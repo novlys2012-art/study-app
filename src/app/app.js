@@ -2,7 +2,7 @@
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
 import { t, getLang, setLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, loadMeta } from "./subjects.js";
+import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { icon, ring } from "./icons.js";
@@ -340,9 +340,13 @@ const topicKeys = () => Object.keys(TOPICS).filter((k) => {
 });
 
 function renderSubject() {
-  const st = stats(QUESTIONS, LOG), files = summaries().length;
+  const st = stats(QUESTIONS, LOG), files = summaries().length, fc = subjectFileCounts(CUR.files);
   $("sName").textContent = CUR.name;
-  $("sMeta").textContent = [st.total ? plural("exams.q", st.total) : "", files ? t("subject.summaries", { n: files }) : ""].filter(Boolean).join(" · ");
+  $("sMeta").textContent = [
+    st.total ? plural("exams.q", st.total) : "",
+    fc.summaries ? t("subject.summaries", { n: fc.summaries }) : "",
+    fc.context ? t("subject.contextCount", { n: fc.context }) : "",
+  ].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
   const exams = CUR.exams || [];
   const has = { overview: topicKeys().length > 0, files: files > 0, exams: st.total > 0 || exams.length > 0 };
@@ -943,12 +947,14 @@ $("again").onclick = () => learn(roundOf);
 $("endBack").onclick = leaveQuiz;
 $("endTopBack").onclick = leaveQuiz;
 document.addEventListener("keydown", (e) => {
-  if ($("quiz").hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+  if ($("quiz").hidden || e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
   const n = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());
   if (!answered && n >= 0 && n < order.length) { e.preventDefault(); answer(n); }
   else if (!answered && e.key === "?") { e.preventDefault(); $("idk").click(); }
   else if (!answered && e.key === "Enter" && !$("check").hidden && picked.size) { e.preventDefault(); $("check").click(); }
   else if (answered && e.key === "Enter") { e.preventDefault(); $("next").click(); }
+  else if (answered && e.key.toLowerCase() === "s" && !$("openSrc").hidden) { e.preventDefault(); $("openSrc").click(); }
+  else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
 });
 
 // ===== Profile: account, monthly limit, look (Kocky is the default; a saved choice, even the empty Účtovná kniha, wins)
@@ -992,9 +998,17 @@ setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
 setLook(look0 == null ? "kocky" : look0);
 setLangUI(getLang());
 
-async function signOutAccount({ stayOnWelcome = false } = {}) {
+let pendingSignOutOpts = null;
+async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
   // Flush pending local answers before wiping the device copy so nothing is lost on sign-out.
-  try { await syncNow(true); } catch (e) {}
+  if (!force) {
+    try { await syncNow(true); } catch (e) {}
+    if (hasUnsynced()) {
+      pendingSignOutOpts = { stayOnWelcome };
+      openSheet($("signOutSheet"));
+      return;
+    }
+  }
   cancelSync();
   const cloud = await import("../cloud/supabase.js");
   if (cloud.configured) await cloud.signOut();
@@ -1007,6 +1021,15 @@ async function signOutAccount({ stayOnWelcome = false } = {}) {
   if (stayOnWelcome) showWelcome("in");
   else go("welcome", true);
 }
+$("signOutForce").onclick = async () => {
+  const opts = pendingSignOutOpts || {};
+  pendingSignOutOpts = null;
+  if ($("signOutSheet").open) {
+    if (history.state && history.state.sheet) { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+    $("signOutSheet").close();
+  }
+  await signOutAccount({ ...opts, force: true });
+};
 
 // The account lives in Supabase, whose code loads only here and on the upload screen.
 async function renderAccount() {
