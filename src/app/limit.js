@@ -1,14 +1,17 @@
 // Monthly quota calculation and shared renderer for the Upload and Profile limit meters.
-
-const usd = (n) => "$" + (Math.round(n * 100) / 100).toFixed(2);
+// shortcut: maps server USD budget at 100 credits/$1 (free tier $1 = 100 credits); switch to server-side credit/page counters when paid tiers launch.
+export const CREDITS_PER_USD = 100;
 
 export function limitInfo(u) {
   if (!u || typeof u !== "object") return null;
-  const limit = Math.max(0, Number(u.limitUsd) || 0);
-  const spent = Math.max(0, Number(u.monthUsd) || 0);
-  const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+  const limitUsd = Math.max(0, Number(u.limitUsd) || 0);
+  const spentUsd = Math.max(0, Number(u.monthUsd) || 0);
+  const limit = Math.round(limitUsd * CREDITS_PER_USD);
+  const used = spentUsd <= 0 || limit <= 0 ? 0 : Math.min(limit, Math.max(1, Math.round(spentUsd * CREDITS_PER_USD)));
+  const remaining = Math.max(0, limit - used);
+  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   const state = pct >= 100 ? "full" : pct >= 80 ? "warn" : "ok";
-  return { pct, state, spent: usd(spent), limit: usd(limit), remaining: usd(Math.max(0, limit - spent)) };
+  return { pct, state, used, limit, remaining };
 }
 
 export function renderLimit(box, u, t) {
@@ -29,7 +32,7 @@ export function renderLimit(box, u, t) {
     stateEl.hidden = !key;
   }
   const usageEl = box.querySelector("[data-limit-usage]");
-  if (usageEl) usageEl.textContent = t("upload.usage", { spent: info.spent, limit: info.limit });
+  if (usageEl) usageEl.textContent = t("upload.usage", { used: info.used, limit: info.limit });
   const resetEl = box.querySelector("[data-limit-reset]");
   if (resetEl) resetEl.textContent = t("upload.limitReset");
   box.hidden = false;

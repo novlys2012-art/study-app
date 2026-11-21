@@ -138,10 +138,8 @@ function wire() {
   $("wContinue").onclick = () => hooks.enterApp();
 
   $("wSignOut").onclick = async () => {
-    const cloud = await import("../cloud/supabase.js");
-    if (cloud.configured) await cloud.signOut();
-    hooks.toast(t("profile.signedOutToast"));
-    await refreshAuthState();
+    $("wSignOut").disabled = true;
+    try { await hooks.signOut(); } finally { $("wSignOut").disabled = false; }
   };
 
   $("wSend").onclick = async () => {

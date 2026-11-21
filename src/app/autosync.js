@@ -6,15 +6,17 @@ import { onLocalChange } from "./subjects.js";
 let onPulled = () => {}, timer = 0;
 
 // Supabase keeps the session in localStorage under "sb-<project>-auth-token".
-function signedIn() {
+export function hasSessionToken() {
   try { for (let k = 0; k < localStorage.length; k++) if (/^sb-.+-auth-token$/.test(localStorage.key(k))) return true; } catch (e) {}
   return false;
 }
 
+export function cancelSync() { clearTimeout(timer); timer = 0; }
+
 // force: sync even when no session was seen yet (right after signing in).
 export async function syncNow(force) {
-  clearTimeout(timer);
-  if (!force && !signedIn()) return;
+  cancelSync();
+  if (!force && !hasSessionToken()) return;
   try {
     const { sync } = await import("../cloud/sync.js");
     if (await sync()) onPulled();

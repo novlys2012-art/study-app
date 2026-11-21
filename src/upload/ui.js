@@ -348,7 +348,10 @@ function wire() {
     make.amount = +b.dataset.a; renderMake();
   };
   $("upGo").onclick = run;
-  $("upOut").onclick = async () => { await cloud.signOut(); refresh(); };
+  $("upOut").onclick = async () => {
+    if (ctx && ctx.onSignOut) await ctx.onSignOut();
+    else { await cloud.signOut(); refresh(); }
+  };
   const setTip = (on) => { $("upCtxWrap").classList.toggle("open", on); $("upCtxTip").setAttribute("aria-expanded", on ? "true" : "false"); };
   $("upCtxTip").onclick = () => setTip(!$("upCtxWrap").classList.contains("open"));
   document.addEventListener("click", (e) => { if ($("upCtxWrap").classList.contains("open") && !$("upCtxWrap").contains(e.target)) setTip(false); });

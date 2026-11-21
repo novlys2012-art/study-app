@@ -194,6 +194,7 @@ const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("‚ú
 
 try {
   await page.goto(base);
+  if (await page.locator("#welcome").isVisible()) await page.click("#wGuest");
   await page.click(".sj.add");
   await page.locator("#upLogin").waitFor();
   check(page.url().endsWith("#upload"), "the add card opens the upload screen");
@@ -217,7 +218,7 @@ try {
   check((await page.textContent("#upConsent")).includes("Anthropic"), "consent screen names the AI provider");
   await page.click("#upAgree");
   await page.locator("#upForm").waitFor();
-  await page.waitForFunction(() => document.getElementById("upUsage").textContent.includes("$1.00"));
+  await page.waitForFunction(() => document.getElementById("upUsage").textContent.includes("100"));
   check(true, "usage shows the monthly limit");
 
   await page.fill("#upName", "Mikroekon√≥mia");

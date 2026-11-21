@@ -2,8 +2,8 @@
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
 import { t, getLang, setLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress } from "./subjects.js";
-import { startSync } from "./autosync.js";
+import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, loadMeta } from "./subjects.js";
+import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { icon, ring } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
@@ -58,6 +58,7 @@ const hasEntered = () => {
   try { return localStorage.getItem(ENTERED_KEY) === "1"; } catch (e) { return false; }
 };
 const markEntered = () => { try { localStorage.setItem(ENTERED_KEY, "1"); } catch (e) {} };
+const clearEntered = () => { try { localStorage.removeItem(ENTERED_KEY); } catch (e) {} };
 try { history.scrollRestoration = "manual"; } catch (e) {}
 // After a reload the sheet that was open is closed, so its entry is an ordinary one again.
 if (history.state && history.state.sheet) history.replaceState({ d: history.state.d || 0 }, "");
@@ -94,12 +95,17 @@ function show(id) {
 
 function route() {
   if (shown != null) scrolls.set(shown, window.scrollY);
+  // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
+  const code = !booted && /[?&]code=/.test(location.search);
+  // If local storage holds synced account data with no active session token, clear it so sign-out is clean.
+  if (!code && !hasSessionToken() && loadMeta().user) {
+    clearLocal(); clearEntered();
+    try { localStorage.removeItem(LAST_KEY); } catch (e) {}
+  }
   SUBJECTS = loadSubjects();
   const h = here();
   const y = dir === "none" ? window.scrollY : dir === "back" ? scrolls.get(h) || 0 : 0;
   const sj = SUBJECTS.find((x) => h === x.id || h.startsWith(x.id + "/"));
-  // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
-  const code = !booted && /[?&]code=/.test(location.search);
   booted = true;
   if (h === "welcome" || h === "signin") showWelcome("in");
   else if (h === "signup") showWelcome("up");
@@ -119,7 +125,7 @@ function route() {
     else if (sub === "review") showWrongReview();
     else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
-  } else if (!SUBJECTS.length && !hasEntered()) showWelcome("in");
+  } else if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome("in");
   else showToday();
   shown = h; dir = "fade";
   window.scrollTo(0, y);
@@ -986,6 +992,22 @@ setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
 setLook(look0 == null ? "kocky" : look0);
 setLangUI(getLang());
 
+async function signOutAccount({ stayOnWelcome = false } = {}) {
+  // Flush pending local answers before wiping the device copy so nothing is lost on sign-out.
+  try { await syncNow(true); } catch (e) {}
+  cancelSync();
+  const cloud = await import("../cloud/supabase.js");
+  if (cloud.configured) await cloud.signOut();
+  clearLocal();
+  clearEntered();
+  try { localStorage.removeItem(LAST_KEY); } catch (e) {}
+  SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
+  list = []; wrong = []; stage = "quiz"; readerHint = null;
+  toast(t("profile.signedOutToast"));
+  if (stayOnWelcome) showWelcome("in");
+  else go("welcome", true);
+}
+
 // The account lives in Supabase, whose code loads only here and on the upload screen.
 async function renderAccount() {
   $("pSign").hidden = true; $("pLimit").hidden = true; $("pWho").textContent = ""; $("pEmail").textContent = ""; $("pAvatar").textContent = "";
@@ -1007,7 +1029,11 @@ async function renderAccount() {
   $("pEmail").textContent = email;
   $("pWho").textContent = t("profile.saved");
   $("pSign").className = "btn wide ghost";
-  $("pSign").textContent = t("upload.signOut"); $("pSign").onclick = async () => { await cloud.signOut(); renderAccount(); toast(t("profile.signedOutToast")); };
+  $("pSign").textContent = t("upload.signOut");
+  $("pSign").onclick = async () => {
+    $("pSign").disabled = true;
+    try { await signOutAccount(); } finally { $("pSign").disabled = false; }
+  };
   try {
     const u = (await cloud.call("usage", {}, getLang())).usage;
     renderLimit($("pLimit"), u, t);
@@ -1033,6 +1059,7 @@ function showWelcome(initialMode = "in") {
     enterApp: () => { markEntered(); go(""); },
     openLegal,
     setLangUI,
+    signOut: () => signOutAccount({ stayOnWelcome: true }),
     toast,
   }, initialMode);
 }
@@ -1057,6 +1084,7 @@ function showUpload(target, signIn, mode) {
     // tabName: the subject tab to open on ("exams" after reading old exams).
     opened: (id, tabName) => { CUR = null; go(id, true); if (tabName) { tab = tabName; refresh(); } },
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
+    onSignOut: () => signOutAccount(),
   }));
 }
 

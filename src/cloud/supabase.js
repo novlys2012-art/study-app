@@ -40,7 +40,22 @@ export async function verifyCode(email, code) {
   return data.session;
 }
 
-export const signOut = () => client().auth.signOut();
+export async function signOut() {
+  if (!configured) return;
+  const c = client();
+  try {
+    const { error } = await c.auth.signOut();
+    if (error) await c.auth.signOut({ scope: "local" });
+  } catch (e) {
+    try { await c.auth.signOut({ scope: "local" }); } catch (e2) {}
+  }
+  try {
+    for (let k = localStorage.length - 1; k >= 0; k--) {
+      const key = localStorage.key(k);
+      if (key && /^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
+    }
+  } catch (e) {}
+}
 
 // One server task. Returns { result, usage: { monthUsd, limitUsd } }.
 export async function call(task, input, lang) {
