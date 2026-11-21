@@ -275,8 +275,10 @@ select:focus-visible,.rowcard:focus-visible,.tbar:focus-visible,.drop:focus-visi
 .btn:disabled,.seg button:disabled{opacity:.45;cursor:not-allowed}
 .btn:disabled:active,.seg button:disabled:active{transform:none}
 @media (hover:hover){
-  .btn:hover:not(:disabled),.fab:hover,.play:hover{filter:brightness(1.07)}
+  .btn:hover:not(:disabled),.fab:hover,.play:hover{filter:brightness(1.06)}
   .rowcard:hover,.iconbtn:hover,.tcard:hover,.chiprow:hover,.look:hover{border-color:var(--ledger)}
+  .rowcard:not(.split):hover,.tcard:hover{transform:translateY(-1px)}
+  .tab:hover:not([aria-current="page"]){color:var(--ink);background:color-mix(in srgb,var(--ledger-soft) 55%,transparent)}
   .menu-row:hover{background:var(--ledger-soft)}
 }
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:var(--r-ctl)}
@@ -348,7 +350,7 @@ body.has-fab main{padding-bottom:calc(168px + env(safe-area-inset-bottom,0px))}
 .ring circle{fill:none;stroke-width:6}
 .ring-bg{stroke:var(--ledger-soft)}
 .ring-fg{stroke:var(--ledger);stroke-linecap:round;transition:stroke-dasharray .7s var(--ease)}
-.ring text{font:700 13px var(--f-body);fill:var(--ink)}
+.ring text{font:700 13px var(--f-body);fill:var(--ink);font-variant-numeric:tabular-nums}
 .ring.lg{flex-basis:72px;width:72px;height:72px}
 .ring.xl{flex-basis:104px;width:104px;height:104px}
 .ring.good .ring-fg{stroke:var(--ok)}
@@ -374,7 +376,8 @@ body.has-fab main{padding-bottom:calc(168px + env(safe-area-inset-bottom,0px))}
 .steps li::before{content:counter(step);flex:0 0 28px;height:28px;border-radius:min(50%,calc(var(--r-ctl)*99));background:var(--ledger);color:var(--on-ledger);display:grid;place-items:center;font:700 14px var(--f-body)}
 
 /* --- Today */
-.sheet.hero{background:var(--ledger);border-color:var(--ledger);color:var(--on-ledger);gap:16px}
+.sheet.hero{background:var(--ledger);background-image:linear-gradient(135deg,color-mix(in srgb,#fff 11%,transparent),transparent 58%);border-color:var(--ledger);color:var(--on-ledger);gap:16px}
+body[data-look="riso"] .sheet.hero,body[data-look="cisty"] .sheet.hero{background-image:none}
 .sheet.hero .eyebrow,.sheet.hero .hint{color:var(--on-ledger);opacity:.9}
 .sheet.hero .btn{background:var(--on-ledger);color:var(--ledger);border-color:var(--on-ledger)}
 .hero-open{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-radius:var(--r-ctl);padding:0;cursor:pointer}
@@ -394,7 +397,7 @@ body.has-fab main{padding-bottom:calc(168px + env(safe-area-inset-bottom,0px))}
 .sheet.summary{gap:14px}
 .sum-top{display:flex;align-items:center;gap:14px}
 .sum-top .grow{display:grid;gap:2px}
-.sum-pct{font:700 22px/1.2 var(--f-display)}
+.sum-pct{font:700 22px/1.2 var(--f-display);font-variant-numeric:tabular-nums}
 .chiprow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:600 15px var(--f-body);color:var(--ink);background:none;border:var(--bw) solid var(--rule);border-radius:var(--r-ctl);padding:10px 12px;min-height:46px;cursor:pointer}
 .chiprow svg{width:18px;height:18px;flex:0 0 auto;color:var(--muted)}
 .chiprow.unset{color:var(--ledger);border-style:dashed;border-color:var(--ledger)}
@@ -438,6 +441,22 @@ body .seg.fill button[aria-pressed="true"]{background:transparent;border-color:t
 #rBody .md ul{padding-left:1.2em;display:grid;gap:6px}
 #rBody .md h3{scroll-margin-top:84px;font-size:19px;margin-top:14px}
 #rBody .md h3:first-child{margin-top:0}
+.rev-note{margin:0}
+.rev-sec{display:grid;gap:0;padding-top:14px;border-top:1px solid var(--rule)}
+.rev-sec:first-of-type{padding-top:4px;border-top:0}
+.rev-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:10px}
+.rev-head h3{font:700 19px/1.25 var(--f-display);margin:0;scroll-margin-top:84px;min-width:0}
+.rev-open{flex:0 0 auto;min-height:36px;padding:6px 12px;font-size:13.5px}
+.rev-card{display:grid;gap:7px;padding:14px 0;border-top:1px solid var(--rule)}
+.rev-card:last-child{padding-bottom:4px}
+.rev-q{margin:0;font-weight:700;line-height:1.4}
+.rev-a{margin:0;color:var(--ok);font-size:15.5px;line-height:1.45}
+.rev-e{margin:0;font-size:15px;line-height:1.5;color:var(--muted)}
+.rev-excerpt{display:grid;gap:4px;padding:10px 12px;border-radius:calc(var(--r-ctl) - 2px);background:var(--warn-soft);font-size:15.5px;line-height:1.5}
+.rev-excerpt p{margin:0}
+.rev-excerpt p.hl-block{background:none;box-shadow:none;padding:0;border-radius:0}
+.rev-cap{font:600 11.5px/1.2 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--warn)}
+.rev-jump{margin-top:2px;font-size:13.5px;color:var(--ledger)}
 .dock{position:sticky;bottom:0;z-index:5;margin:0 -16px;padding:16px 16px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--paper) 68%,transparent)}
 .dock.in-sheet{display:grid;gap:10px;padding-top:18px;background:linear-gradient(to top,var(--sheet) 78%,transparent)}
 .bsheet-in:has(.dock){padding-bottom:0}
@@ -479,7 +498,9 @@ body .seg.fill button[aria-pressed="true"]{background:transparent;border-color:t
 .result-top{display:flex;align-items:center;gap:18px}
 .result-top .grow{display:grid;gap:6px}
 #final{font-size:clamp(34px,9vw,46px)}
-.miss li{animation:q-in .3s var(--ease) backwards}
+.miss li{padding:14px 0;gap:6px;animation:q-in .3s var(--ease) backwards}
+.miss-q{font-weight:700;line-height:1.4}
+.miss-src{font-size:13.5px;color:var(--ledger)}
 
 /* --- Bottom sheets (centred dialogs on wide screens), menus, tiles */
 .bsheet{border:0;padding:0;margin:auto auto 0;width:100%;max-width:min(720px,100%);max-height:88vh;max-height:88dvh;overflow:auto;overscroll-behavior:contain;background:var(--sheet);color:var(--ink);border-radius:calc(var(--r-card) + 4px) calc(var(--r-card) + 4px) 0 0}
@@ -682,7 +703,8 @@ body[data-look="zosit"] .tcard,body[data-look="zosit"] .rowcard{border-left:3px 
   #quiz .fb-in .btn.wide{flex:0 0 auto;width:auto;min-width:220px;padding-inline:28px}
 
   #end{max-width:840px;width:100%;justify-self:center;gap:20px}
-  #end>.stack{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  #end>.end-actions{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  #end>.end-actions>#endBack{grid-column:1 / -1;width:auto;justify-self:center;min-width:140px}
 
   #upload{max-width:820px;width:100%;justify-self:center}
   #upload .sheet .btn.wide{width:auto;min-width:240px;justify-self:start;padding-inline:28px}

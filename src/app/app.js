@@ -4,7 +4,7 @@
 import { t, getLang, setLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress } from "./subjects.js";
 import { startSync } from "./autosync.js";
-import { renderMarkdown, matchSummaryBlock, highlightMatch } from "./md.js";
+import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { icon, ring } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
@@ -103,7 +103,9 @@ function route() {
     enter(sj);
     const file = sub === "read" ? (sj.files || [])[+arg] : null;
     if (sub === "quiz" && !list.length) { go(sj.id, true); return; }
+    if (sub === "review" && !wrong.length) { go(sj.id, true); return; }
     if (sub === "quiz") { if (stage === "end") showEnd(); else showQuiz(); }
+    else if (sub === "review") showWrongReview();
     else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
   } else showToday();
@@ -316,7 +318,7 @@ const topicKeys = () => Object.keys(TOPICS).filter((k) => {
 function renderSubject() {
   const st = stats(QUESTIONS, LOG), files = summaries().length;
   $("sName").textContent = CUR.name;
-  $("sMeta").textContent = [st.total ? t("today.count", { n: st.total }) : "", files ? t("subject.summaries", { n: files }) : ""].filter(Boolean).join(" · ");
+  $("sMeta").textContent = [st.total ? plural("exams.q", st.total) : "", files ? t("subject.summaries", { n: files }) : ""].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
   const exams = CUR.exams || [];
   const has = { overview: topicKeys().length > 0, files: files > 0, exams: st.total > 0 || exams.length > 0 };
@@ -364,7 +366,7 @@ function renderOverview() {
     if (st.total) top.append(el("span", "pct", st.pct + " %"));
     top.append(icon("down", "chev"));
     head.appendChild(top);
-    if (st.total) head.append(bar(st.pct), el("span", "hint", t("today.count", { n: st.total }) + " · " + dueText(st)));
+    if (st.total) head.append(bar(st.pct), el("span", "hint", plural("exams.q", st.total) + " · " + dueText(st)));
     const body = el("div", "tbody"), inner = el("div", "tbody-in");
     if (it.summary) inner.appendChild(el("p", null, it.summary));
     const weak = it.weakSpots || [];
@@ -591,7 +593,78 @@ function showReader(f, fileIndex = -1) {
   // Each question's source line ends with its file name, which is how a file finds its questions.
   const qs = QUESTIONS.filter((x) => x.s && x.s.includes("(" + f.name));
   $("rDock").hidden = !qs.length;
+  $("rPractise").lastElementChild.textContent = t("reader.practise");
   $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, LOG)); };
+  $("rProg").style.width = "0";
+  show("reader");
+}
+// Ephemeral, zero-AI study summary assembled from the current round's wrong answers and matching summary excerpts.
+function showWrongReview() {
+  const pack = buildWrongStudyPack(wrong, CUR.files || [], TOPICS);
+  const mistakes = plural("review.mistakes", wrong.length);
+  $("rTitle").textContent = t("review.title");
+  const singleFile = pack.fileCount === 1 ? pack.sections.find((s) => s.fi >= 0) : null;
+  $("rMeta").textContent = singleFile
+    ? t("review.metaOneFile", { mistakes, name: singleFile.title })
+    : pack.fileCount > 1
+      ? t("review.metaFiles", { mistakes, files: pack.fileCount })
+      : mistakes;
+  const body = $("rBody"); body.innerHTML = "";
+  body.appendChild(el("p", "hint rev-note", t("review.ephemeral")));
+  const heads = [];
+  pack.sections.forEach((sec) => {
+    const wrap = el("section", "rev-sec");
+    const head = el("div", "rev-head");
+    const h = el("h3", null, sec.title || CUR.name);
+    heads.push(h);
+    head.appendChild(h);
+    if (sec.fi >= 0) {
+      const first = sec.items[0];
+      head.appendChild(button("tiny rev-open", t("review.openFull"), () => {
+        readerHint = first ? { fi: sec.fi, quote: first.quote, extras: first.extras } : null;
+        go(CUR.id + "/read/" + sec.fi);
+      }));
+    }
+    wrap.appendChild(head);
+    sec.items.forEach((it) => {
+      const card = el("div", "rev-card");
+      if (it.topicName && sec.fi >= 0) card.appendChild(el("span", "eyebrow", it.topicName));
+      card.appendChild(el("p", "rev-q", it.q));
+      const ans = el("p", "rev-a");
+      ans.append(el("strong", null, t("end.rightAnswer")), document.createTextNode(it.correct.join(" · ")));
+      card.appendChild(ans);
+      if (it.explanation) card.appendChild(el("p", "rev-e", it.explanation));
+      if (it.example) {
+        const ex = el("p", "rev-e");
+        ex.append(el("strong", null, t("quiz.example")), document.createTextNode(it.example));
+        card.appendChild(ex);
+      }
+      if (it.excerpt) {
+        const box = el("div", "rev-excerpt");
+        box.appendChild(el("span", "rev-cap", t("review.fromSummary")));
+        const p = el("p", null, it.excerpt);
+        if (it.phrase) highlightMatch(p, it.phrase);
+        box.appendChild(p);
+        card.appendChild(box);
+      }
+      if (it.fi >= 0) {
+        card.appendChild(button("link rev-jump", t("quiz.openSource"), () => {
+          readerHint = { fi: it.fi, quote: it.quote, extras: it.extras };
+          go(CUR.id + "/read/" + it.fi);
+        }));
+      }
+      wrap.appendChild(card);
+    });
+    body.appendChild(wrap);
+  });
+  readerFocus = null;
+  $("rToc").replaceChildren(...heads.map((h) => button(null, h.textContent, () => h.scrollIntoView({ behavior: "smooth", block: "start" }))));
+  $("rToc").hidden = heads.length < 3;
+  $("rTerms").replaceChildren(...pack.keyTerms.flatMap((k) => [el("dt", null, k.term), el("dd", null, k.meaning)]));
+  $("rTermsWrap").hidden = !pack.keyTerms.length;
+  $("rDock").hidden = !wrong.length;
+  $("rPractise").lastElementChild.textContent = t("review.practise");
+  $("rPractise").onclick = () => start(shuffle(wrong));
   $("rProg").style.width = "0";
   show("reader");
 }
@@ -758,7 +831,13 @@ function answer(k) {
   }
   grade(new Set([k]));
 }
-const sourceFile = (x) => (x && x.s ? (CUR.files || []).findIndex((f) => f.summary && (x.s.includes("(" + f.name) || x.s === f.name)) : -1);
+const sourceFile = (x) => sourceFileIndex(x, CUR ? CUR.files : []);
+function openQuestionSource(x) {
+  const fi = sourceFile(x);
+  if (fi < 0) return;
+  readerHint = { fi, quote: stripSourceMeta(x.s), extras: [x.e, x.q, ...corr(x).map((k) => x.o[k])].filter(Boolean) };
+  go(CUR.id + "/read/" + fi);
+}
 function grade(sel) {
   answered = true;
   const x = list[i], C = new Set(corr(x).map((a) => order.indexOf(a)));
@@ -786,11 +865,7 @@ function grade(sel) {
   m.hidden = !m.childNodes.length;
   const fi = ok ? -1 : sourceFile(x);
   $("openSrc").hidden = fi < 0;
-  $("openSrc").onclick = fi >= 0 ? () => {
-    const quote = String(x.s || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
-    readerHint = { fi, quote, extras: [x.e, x.q, ...corr(x).map((k) => x.o[k])].filter(Boolean) };
-    go(CUR.id + "/read/" + fi);
-  } : null;
+  $("openSrc").onclick = fi >= 0 ? () => openQuestionSource(x) : null;
   $("pg").style.width = ((i + 1) / list.length) * 100 + "%";
   $("next").textContent = t(i === list.length - 1 ? "quiz.toResult" : "quiz.next");
   fb.hidden = false;
@@ -807,6 +882,7 @@ $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.len
 function finish() { stage = "end"; dir = "fwd"; showEnd(); dir = "fade"; window.scrollTo(0, 0); }
 function showEnd() {
   show("end");
+  $("endSubj").textContent = CUR ? CUR.name : "";
   const n = list.length, pct = Math.round((score / n) * 100);
   $("endRing").replaceChildren(ring(pct, pct + " %", "xl " + (pct >= 70 ? "good" : "low")));
   $("final").textContent = score + " / " + n;
@@ -814,17 +890,35 @@ function showEnd() {
   const ul = $("miss"); ul.innerHTML = "";
   wrong.forEach((x) => {
     const li = el("li");
-    li.append(el("div", null, x.q), el("div", "a", t("end.rightAnswer") + corr(x).map((k) => x.o[k]).join(" · ")));
+    if (TOPICS[x.t]) li.appendChild(el("span", "eyebrow", TOPICS[x.t]));
+    li.append(el("div", "miss-q", x.q), el("div", "a", t("end.rightAnswer") + corr(x).map((k) => x.o[k]).join(" · ")));
+    if (x.e) li.appendChild(el("p", "hint", x.e));
+    if (sourceFile(x) >= 0) li.appendChild(button("link miss-src", t("quiz.openSource"), () => openQuestionSource(x)));
     ul.appendChild(li);
   });
   $("missLabel").textContent = t("end.reviewN", { n: wrong.length });
   $("missWrap").hidden = !wrong.length; $("retry").hidden = !wrong.length;
+  const hasFiles = summaries().length > 0;
+  const studyBtn = $("studyWrong");
+  if (wrong.length > 0) {
+    studyBtn.hidden = false;
+    studyBtn.textContent = t("end.studyWrong");
+    studyBtn.onclick = () => go(CUR.id + "/review");
+  } else if (hasFiles) {
+    studyBtn.hidden = false;
+    studyBtn.textContent = t("end.openSummaries");
+    studyBtn.onclick = () => { tab = "files"; list = []; go(CUR.id); };
+  } else {
+    studyBtn.hidden = true;
+    studyBtn.onclick = null;
+  }
   // One filled button: repeating the mistakes when there are any, the next round otherwise.
   $("again").classList.toggle("ghost", wrong.length > 0);
 }
 $("retry").onclick = () => start(shuffle(wrong));
 $("again").onclick = () => learn(roundOf);
 $("endBack").onclick = leaveQuiz;
+$("endTopBack").onclick = leaveQuiz;
 document.addEventListener("keydown", (e) => {
   if ($("quiz").hidden || e.metaKey || e.ctrlKey || e.altKey) return;
   const n = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());

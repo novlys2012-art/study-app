@@ -123,17 +123,21 @@
   </section>
 
   <section class="screen" id="end" hidden>
+    <div class="topbar">
+      <button class="iconbtn" id="endTopBack" type="button" data-i18n-label="nav.back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="grow"><h1 class="title" data-i18n="end.result">Výsledok kola</h1><p class="hint" id="endSubj"></p></div>
+    </div>
     <div class="sheet result">
-      <p class="label" data-i18n="end.result">Výsledok kola</p>
       <div class="result-top">
         <span id="endRing"></span>
         <div class="grow"><div class="score" id="final"></div><p class="lede" id="note"></p></div>
       </div>
     </div>
-    <div class="stack">
+    <div class="stack end-actions">
       <button class="btn wide" id="retry" type="button" data-i18n="end.retry">Zopakovať chyby</button>
+      <button class="btn wide ghost" id="studyWrong" type="button" hidden data-i18n="end.studyWrong">Zhrnutie chýb</button>
       <button class="btn wide ghost" id="again" type="button" data-i18n="end.again">Ďalšie kolo</button>
-      <button class="btn wide plain" id="endBack" type="button" data-i18n="end.back">Späť na predmet</button>
+      <button class="btn wide plain" id="endBack" type="button" data-i18n="end.back">Hotovo</button>
     </div>
     <div class="sheet" id="missWrap">
       <p class="label" id="missLabel"></p>
@@ -168,7 +172,7 @@
       </div>
     </div>
     <div class="group" id="upConsent" hidden>
-      <p class="label" data-i18n="upload.consentLabel">Spracovanie umelou inteligenciou</p>
+      <p class="label" data-i18n="upload.consentLabel">Spracovanie súborov</p>
       <p data-i18n="upload.consent1">Text tvojich súborov pošleme na spracovanie službe Claude od spoločnosti Anthropic. Z neho vzniknú zhrnutia, otázky a témy.</p>
       <p class="hint" data-i18n="upload.consent2">Samotný súbor zostáva v tvojom zariadení. Posiela sa iba jeho text a obrázky strán, na ktorých text nie je. Anthropic tieto údaje nepoužíva na trénovanie modelov.</p>
       <button class="btn wide" id="upAgree" type="button" data-i18n="upload.agree">Súhlasím a pokračovať</button>
@@ -190,7 +194,7 @@
           <ul class="up-list" id="upList" hidden></ul>
           <div class="tip-wrap" id="upCtxWrap" hidden>
             <button class="tip-trigger" id="upCtxTip" type="button" aria-expanded="false" aria-controls="upCtxPop"><span class="tip-q" aria-hidden="true">?</span><span data-i18n="upload.contextWhat">Čo znamená Kontext?</span></button>
-            <div class="tip-pop" id="upCtxPop" role="tooltip" data-i18n="upload.contextHint">Kontext (napr. vzorce či príklady) sa nezhrnie ani netestuje, ale AI ho použije pri ostatných súboroch.</div>
+            <div class="tip-pop" id="upCtxPop" role="tooltip" data-i18n="upload.contextHint">Kontext (napr. vzorce či príklady) sa nezhrnie ani netestuje, ale pomôže pri spracovaní ostatných súborov.</div>
           </div>
         </div>
         <button class="btn wide" id="upNext" type="button" data-i18n="upload.next">Ďalej</button>

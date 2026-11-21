@@ -52,6 +52,81 @@ export function matchSummaryBlock(blocks, { quote = "", extras = [] } = {}) {
   return top >= 3 ? { index: best, phrase: "" } : null;
 }
 
+export const stripSourceMeta = (s) => String(s || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+
+export function sourceFileIndex(x, files = []) {
+  if (!x || !x.s) return -1;
+  return files.findIndex((f) => f && f.summary && (x.s.includes("(" + f.name) || x.s === f.name));
+}
+
+export function summaryBlocks(src) {
+  const out = [];
+  for (const raw of String(src || "").split("\n")) {
+    const line = raw.trim();
+    if (!line || /^#{1,6}\s+/.test(line)) continue;
+    const li = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+    const plain = (li ? li[1] : line).replace(/\*\*([^*]+)\*\*/g, "$1");
+    if (plain) out.push(plain);
+  }
+  return out;
+}
+
+// Builds an ephemeral, zero-AI study summary referencing missed quiz questions and their matching summary excerpts.
+export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
+  const corrOf = (x) => (Array.isArray(x.a) ? x.a : [x.a]);
+  const sectionsMap = new Map();
+  const blockCache = new Map();
+  const matchedFiles = new Set();
+
+  for (const x of wrong) {
+    if (!x) continue;
+    const fi = sourceFileIndex(x, files);
+    const f = fi >= 0 ? files[fi] : null;
+    const key = fi >= 0 ? "f:" + fi : "t:" + (x.t || "");
+    let sec = sectionsMap.get(key);
+    if (!sec) {
+      sec = { fi, title: f ? (f.title || f.name) : (topics[x.t] || ""), fileName: f ? f.name : "", items: [] };
+      sectionsMap.set(key, sec);
+    }
+    const correct = corrOf(x).map((k) => x.o?.[k]).filter(Boolean);
+    const quote = stripSourceMeta(x.s);
+    const extras = [x.e, x.q, ...correct].filter(Boolean);
+    let excerpt = "", phrase = "";
+    if (f) {
+      matchedFiles.add(fi);
+      let blocks = blockCache.get(fi);
+      if (!blocks) { blocks = summaryBlocks(f.summary); blockCache.set(fi, blocks); }
+      const hit = matchSummaryBlock(blocks, { quote, extras });
+      if (hit) { excerpt = blocks[hit.index]; phrase = hit.phrase; }
+    }
+    sec.items.push({
+      q: x.q || "",
+      correct,
+      explanation: x.e || "",
+      example: x.x || "",
+      topicName: topics[x.t] || "",
+      fi, quote, extras, excerpt, phrase,
+    });
+  }
+
+  const sections = [...sectionsMap.values()];
+  const corpusRaw = sections.flatMap((s) => s.items.flatMap((it) => [it.q, ...it.correct, it.explanation, it.excerpt])).join(" ");
+  const corpus = norm(corpusRaw);
+  const corpusStems = new Set(words(corpusRaw).map(stem));
+  const seenTerm = new Set();
+  const keyTerms = [];
+  for (const fi of matchedFiles) {
+    for (const kt of files[fi]?.keyTerms || []) {
+      const k = norm(kt?.term).trim();
+      if (!k || k.length < 2 || seenTerm.has(k)) continue;
+      const tWords = words(kt.term);
+      const hit = corpus.includes(k) || (tWords.length > 0 && tWords.every((w) => corpusStems.has(stem(w))));
+      if (hit) { seenTerm.add(k); keyTerms.push(kt); }
+    }
+  }
+  return { sections, keyTerms, fileCount: matchedFiles.size };
+}
+
 export function highlightMatch(el, phrase) {
   el.classList.add("hl-block");
   const target = norm(phrase).replace(/\s+/g, " ").trim();

@@ -36,6 +36,7 @@ export function ring(pct, label, cls) {
   const circle = (c) => { const e = document.createElementNS(NS, "circle"); e.setAttribute("cx", 28); e.setAttribute("cy", 28); e.setAttribute("r", R); e.setAttribute("class", c); return e; };
   const fg = circle("ring-fg");
   fg.setAttribute("transform", "rotate(-90 28 28)");
+  if (pct <= 0) fg.style.opacity = "0";
   fg.style.strokeDasharray = "0 " + LEN.toFixed(1);
   const full = ((pct / 100) * LEN).toFixed(1) + " " + LEN.toFixed(1);
   requestAnimationFrame(() => requestAnimationFrame(() => (fg.style.strokeDasharray = full)));
