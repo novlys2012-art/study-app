@@ -1,4 +1,4 @@
-# Study App
+# Lekto
 
 Turns your own course files and past exams into summaries, quizzes and an exam plan, in Slovak and Czech. Uses the design of the [kviz-final](https://github.com/novlys2012-art/kviz-final) quiz site, without its content.
 

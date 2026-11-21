@@ -3,20 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Študijná aplikácia: z tvojich materiálov zhrnutia, kvízy a plán do skúšky.">
-<meta name="theme-color" content="#1f6b58">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6b58'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>Study App</title>
+<meta name="description" content="Lekto – nahraj skriptá, slajdy alebo poznámky a získaj zhrnutia, kvízy s presným zdrojom a denný plán do skúšky.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lekto">
+<meta property="og:title" content="Lekto – Z prednášok rovno k skúške">
+<meta property="og:description" content="Nahraj PDF, PPTX alebo DOCX. Dostaneš čisté zhrnutia, kvíz so skokom na presný zdroj, témy zo starých skúšok a denný plán.">
+<meta property="og:image" content="./og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lekto – Z prednášok rovno k skúške">
+<meta name="twitter:description" content="Zhrnutia bez balastu, kvíz s presným zdrojom a témy zo starých skúšok z tvojich vlastných materiálov.">
+<meta name="twitter:image" content="./og.png">
+<meta name="apple-mobile-web-app-title" content="Lekto">
+<meta name="theme-color" content="#eef2fb">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235a5ff0'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23ffd86b'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
+<title>Lekto – Z prednášok rovno k skúške</title>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@500&family=Source+Sans+3:wght@400;600&family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap"></noscript>
+<noscript><link rel="stylesheet" href="./fonts/kocky.css"></noscript>
 </head>
 <body>
 <nav class="tabbar" id="tabbar" data-i18n-label="nav.main" hidden>
   <div class="tabbar-in">
-    <button class="brand" type="button" data-go="today"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>Study App</button>
+    <button class="brand" type="button" data-go="today"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="2.4" height="16" rx="1.2" fill="currentColor" opacity=".55"/><rect x="9" y="5.5" width="8.5" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/><rect x="8.5" y="10.2" width="11.5" height="4" rx="1.6" fill="currentColor"/><rect x="9" y="16.5" width="7" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/></svg></span>Lekto</button>
     <button class="btn rail-add" type="button" data-go="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="nav.addLong">Nahrať materiály</span></button>
     <button class="tab" type="button" data-go="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span data-i18n="today.title">Dnes</span></button>
     <button class="tab" type="button" data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4v16H5zM10 4h4v16h-4z"/><path d="M15.5 5.2l3.4-.9 3.6 14.5-3.4.9z"/></svg><span data-i18n="home.title">Predmety</span></button>
@@ -27,156 +36,122 @@
 <main>
   <section class="screen" id="welcome" hidden>
     <header class="w-nav">
-      <button class="w-brand" id="wBrand" type="button"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span><span>Study App</span></button>
+      <button class="w-brand" id="wBrand" type="button"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="2.4" height="16" rx="1.2" fill="currentColor" opacity=".55"/><rect x="9" y="5.5" width="8.5" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/><rect x="8.5" y="10.2" width="11.5" height="4" rx="1.6" fill="currentColor"/><rect x="9" y="16.5" width="7" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/></svg></span><span>Lekto</span></button>
       <nav class="w-links" id="wNavLinks" data-i18n-label="nav.main">
         <a href="#wHow" data-jump="wHow" data-i18n="welcome.navHow">Ako to funguje</a>
         <a href="#wFeatures" data-jump="wFeatures" data-i18n="welcome.navFeatures">Čo dostaneš</a>
         <a href="#wFaq" data-jump="wFaq" data-i18n="welcome.navFaq">Otázky</a>
       </nav>
-      <button class="btn ghost w-cta" id="wNavCta" type="button" data-i18n="welcome.navCta">Prihlásiť sa</button>
+      <div class="w-nav-actions">
+        <div class="w-langs" id="wLangs" role="group" data-i18n-label="lang.label">
+          <button class="tiny" type="button" data-lang="sk" aria-pressed="true">SK</button>
+          <button class="tiny" type="button" data-lang="cs" aria-pressed="false">CS</button>
+        </div>
+        <button class="btn ghost w-cta" id="wNavCta" type="button" data-i18n="welcome.navCta">Prihlásiť sa</button>
+      </div>
     </header>
 
     <div class="w-hero">
       <div class="w-copy">
-        <p class="eyebrow" data-i18n="welcome.kicker">Pre vysokoškolákov · PDF, PPTX, DOCX</p>
         <h1 class="w-h1" data-i18n="welcome.title">Z prednášok rovno k skúške.</h1>
         <p class="lede w-lede" data-i18n="welcome.lede">Nahraj skriptá, slajdy alebo vlastné poznámky. Dostaneš čisté zhrnutia, kvíz podľa slabých miest a denný plán do dátumu skúšky.</p>
+        <p class="w-formats" data-i18n="welcome.formats">Podporuje PDF, prezentácie (PPTX), dokumenty Word (DOCX) aj obyčajný text.</p>
+        <div class="w-hero-cta">
+          <button class="btn w-guest" id="wGuest" type="button" data-i18n="welcome.guest">Vyskúšaj na ukážkovom predmete</button>
+        </div>
         <ul class="w-points">
           <li><b data-i18n="welcome.p1Title">Zhrnutia bez balastu</b><span data-i18n="welcome.p1Text">Definície, vzorce, výnimky a kľúčové pojmy zoradené na čítanie aj tlač.</span></li>
           <li><b data-i18n="welcome.p2Title">Kvíz s presným zdrojom</b><span data-i18n="welcome.p2Text">Každá chyba má vysvetlenie a skok priamo na zvýraznené miesto v zhrnutí.</span></li>
-          <li><b data-i18n="welcome.p3Title">Súkromné a v mobile aj na PC</b><span data-i18n="welcome.p3Text">Predmety a postup sa synchronizujú cez tvoj účet, nikto iný ich nevidí.</span></li>
+          <li><b data-i18n="welcome.p3Title">V mobile aj na počítači</b><span data-i18n="welcome.p3Text">Predmety, zhrnutia a história odpovedí sa po prihlásení synchronizujú medzi zariadeniami.</span></li>
+          <li><b data-i18n="welcome.p4Title">Pôvodné súbory ostávajú u teba</b><span data-i18n="welcome.p4Text">Na server ide len extrahovaný text a skeny strán bez textu na spracovanie cez Claude (Anthropic). Rovnaké pasáže sa môžu znova použiť v zdieľanej cache bez tvojho účtu.</span></li>
         </ul>
-        <button class="btn ghost w-guest" id="wGuest" type="button" data-i18n="welcome.guest">Alebo vyskúšaj bez účtu</button>
       </div>
 
-      <div class="sheet w-auth" id="wAuthCard">
-        <div class="group" id="wSignedBox" hidden>
-          <div class="acct-row">
-            <span class="avatar" id="wAvatar" aria-hidden="true"></span>
-            <div class="grow">
-              <b id="wSignedEmail"></b>
-              <p class="hint" data-i18n="welcome.signedInTitle">Si prihlásený</p>
-            </div>
+      <figure class="w-proof" id="wProof">
+        <figcaption class="w-proof-cap" data-i18n="welcome.proofCaption">Chyba v kvíze → presný zdroj v zhrnutí</figcaption>
+        <div class="rev-card w-demo">
+          <p class="rev-q" data-i18n="welcome.demoQ">Ktorý enzým je hlavným regulačným bodom glykolýzy?</p>
+          <p class="rev-a" data-i18n="welcome.demoA">Správne: Fosfofruktokináza-1 (PFK-1)</p>
+          <div class="rev-excerpt w-demo-excerpt">
+            <span class="rev-cap" data-i18n="review.fromSummary">Zo zhrnutia</span>
+            <p class="hl-block"><span data-i18n="welcome.demoExcerptBefore">Glykolýza prebieha v cytozole. </span><mark class="hl" data-i18n="welcome.demoHighlight">Hlavným regulačným enzýmom glykolýzy je fosfofruktokináza-1 (PFK-1), aktivovaná AMP a inhibovaná ATP a citrátom.</mark><span data-i18n="welcome.demoExcerptAfter"> Z jednej molekuly glukózy vznikajú 2 ATP.</span></p>
           </div>
-          <button class="btn wide" id="wContinue" type="button" data-i18n="welcome.continueApp">Pokračovať do aplikácie</button>
-          <button class="btn wide plain" id="wSignOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button>
         </div>
-
-        <div class="group" id="wOffBox" hidden>
-          <p class="tipbox" id="wOffNote" data-i18n="welcome.offNote">Prihlásenie účtu v tejto ukážke nie je pripojené k serveru. Aplikáciu si môžeš vyskúšať lokálne bez účtu.</p>
-          <button class="btn wide" id="wOffEnter" type="button" data-i18n="welcome.offEnter">Vyskúšať lokálne bez účtu</button>
-        </div>
-
-        <div class="group" id="wAuthForms">
-          <div class="seg fill" id="wModeTabs">
-            <button type="button" data-auth="in" aria-pressed="true" data-i18n="welcome.tabIn">Prihlásiť sa</button>
-            <button type="button" data-auth="up" aria-pressed="false" data-i18n="welcome.tabUp">Vytvoriť účet</button>
-          </div>
-          <div class="group w-card-head">
-            <h2 class="w-card-title" id="wCardTitle" data-i18n="welcome.inTitle">Vitaj späť</h2>
-            <p class="hint" id="wCardSub" data-i18n="welcome.inSub">Zadaj svoj e-mail a pošleme ti jednorazový prihlasovací kód.</p>
-          </div>
-
-          <div class="group" id="wAsk">
-            <label class="label" for="wEmail" data-i18n="welcome.emailLabel">E-mail</label>
-            <input class="search" id="wEmail" type="email" autocomplete="email" inputmode="email" enterkeyhint="send" data-i18n-placeholder="upload.emailPlaceholder">
-            <label class="w-check" id="wAgreeWrap" hidden>
-              <input id="wAgree" type="checkbox">
-              <span><span data-i18n="welcome.agreePrefix">Mám aspoň 16 rokov a súhlasím s </span><button class="link w-inline" type="button" data-legal="terms" data-i18n="welcome.termsLink">podmienkami používania</button><span data-i18n="welcome.agreeAnd"> a </span><button class="link w-inline" type="button" data-legal="privacy" data-i18n="welcome.privacyLink">ochranou súkromia</button>.</span>
-            </label>
-            <button class="btn wide" id="wSend" type="button" data-i18n="welcome.sendIn">Poslať prihlasovací kód</button>
-            <p class="hint" data-i18n="welcome.passwordless">Bez hesla — kód z e-mailu funguje na mobile aj počítači.</p>
-          </div>
-
-          <div class="group" id="wCodeBox" hidden>
-            <p class="tipbox" id="wSent"></p>
-            <label class="label" for="wCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
-            <input class="search code-input" id="wCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="12345678">
-            <button class="btn wide" id="wVerify" type="button" data-i18n="welcome.verifyBtn">Overiť a vstúpiť</button>
-            <div class="w-code-actions">
-              <button class="link" id="wResend" type="button" data-i18n="welcome.resendNow">Poslať kód znova</button>
-              <button class="link" id="wChangeEmail" type="button" data-i18n="welcome.changeEmail">Zmeniť e-mail</button>
-            </div>
-          </div>
-
-          <p class="err" id="wErr" role="alert" hidden></p>
-        </div>
-      </div>
+      </figure>
     </div>
 
     <div class="w-sec" id="wHow">
       <div class="w-sec-head">
-        <p class="eyebrow" data-i18n="welcome.howEyebrow">Ako to funguje</p>
         <h2 class="w-h2" data-i18n="welcome.howTitle">Tri kroky od chaosu v súboroch k istote na skúške</h2>
       </div>
       <ol class="w-steps">
-        <li class="sheet"><h3 data-i18n="welcome.s1Title">01. Nahraj materiály</h3><p class="hint" data-i18n="welcome.s1Text">Pridaj PDF, prezentácie alebo poznámky. Doplnkové vzorce či príklady môžeš označiť ako kontext.</p></li>
-        <li class="sheet"><h3 data-i18n="welcome.s2Title">02. Prejdi si zhrnutie</h3><p class="hint" data-i18n="welcome.s2Text">Dlhé prednášky sa skrátia na štruktúrované body a kľúčové pojmy bez zbytočnej vaty.</p></li>
-        <li class="sheet"><h3 data-i18n="welcome.s3Title">03. Precvičuj slabé miesta</h3><p class="hint" data-i18n="welcome.s3Text">Kvíz vyberá chyby a staršie otázky. Po každom kole dostaneš prehľad chýb s úryvkami zo zhrnutia.</p></li>
+        <li><span class="w-step-num" aria-hidden="true">01</span><h3 data-i18n="welcome.s1Title">Nahraj materiály</h3><p class="hint" data-i18n="welcome.s1Text">Pridaj PDF, prezentácie alebo poznámky. Doplnkové vzorce či príklady môžeš označiť ako kontext.</p></li>
+        <li><span class="w-step-num" aria-hidden="true">02</span><h3 data-i18n="welcome.s2Title">Prejdi si zhrnutie</h3><p class="hint" data-i18n="welcome.s2Text">Dlhé prednášky sa skrátia na štruktúrované body a kľúčové pojmy bez zbytočnej vaty.</p></li>
+        <li><span class="w-step-num" aria-hidden="true">03</span><h3 data-i18n="welcome.s3Title">Precvičuj slabé miesta</h3><p class="hint" data-i18n="welcome.s3Text">Kvíz vyberá chyby a staršie otázky. Po každom kole dostaneš prehľad chýb s úryvkami zo zhrnutia.</p></li>
       </ol>
     </div>
 
     <div class="w-sec" id="wFeatures">
       <div class="w-sec-head">
-        <p class="eyebrow" data-i18n="welcome.featEyebrow">Čo dostaneš</p>
-        <h2 class="w-h2" data-i18n="welcome.featTitle">Navrhnuté pre reálne skúškové obdobie</h2>
+        <h2 class="w-h2" data-i18n="welcome.featTitle">Čo ti ušetrí čas pred termínom</h2>
       </div>
-      <div class="w-bento">
-        <article class="sheet w-feat-main">
-          <div class="group">
-            <h3 data-i18n="welcome.f1Title">Skok z chyby priamo na miesto v zhrnutí</h3>
-            <p class="hint" data-i18n="welcome.f1Text">Keď spravíš chybu, neostaneš pri suchom „nesprávne“. Jedným klikom otvoríš presný odsek v zhrnutí alebo zhrnutie chýb z celého kola.</p>
-          </div>
-          <div class="w-demo" aria-hidden="true">
-            <p class="rev-q" data-i18n="welcome.demoQ">Ktorý enzým je hlavným regulačným bodom glykolýzy?</p>
-            <p class="rev-a" data-i18n="welcome.demoA">Správne: Fosfofruktokináza-1 (PFK-1)</p>
-            <div class="rev-excerpt">
-              <span class="rev-cap" data-i18n="review.fromSummary">Zo zhrnutia</span>
-              <p data-i18n="welcome.demoExcerpt">Hlavným regulačným enzýmom glykolýzy je fosfofruktokináza-1 (PFK-1), aktivovaná AMP a inhibovaná ATP.</p>
+
+      <div class="w-exams-block">
+        <div class="group w-exams-copy">
+          <h3 data-i18n="welcome.f3Title">Témy zo starých skúšok</h3>
+          <p class="hint" data-i18n="welcome.f3Text">Nahraj zadania z minulých rokov a uvidíš, ktoré okruhy sa v skúškach opakujú najčastejšie. Novšie termíny majú väčšiu váhu a témy si precvičíš priamo v tomto poradí.</p>
+          <p class="hint w-exams-note" data-i18n="welcome.examsPreviewNote">Ukážka rebríčka tém z 5 starých skúšok (2021–2025).</p>
+        </div>
+        <div class="stack w-exams-preview">
+          <div class="tcard">
+            <div class="tbar w-rank-row">
+              <div class="tbar-top"><span data-i18n="welcome.examsRow1">1. Glykolýza a regulácia</span><span class="pct" data-i18n="welcome.examsRow1Count">v 4 z 5 skúšok</span></div>
+              <span class="bar"><i style="width:80%"></i></span>
             </div>
           </div>
-        </article>
-        <article class="sheet w-feat">
-          <h3 data-i18n="welcome.f2Title">Denný plán do dátumu skúšky</h3>
-          <p class="hint" data-i18n="welcome.f2Text">Zadáš dátum skúšky a aplikácia rozpočíta, koľko opakovaní a nových otázok stihnúť každý deň.</p>
-        </article>
-        <article class="sheet w-feat">
-          <h3 data-i18n="welcome.f3Title">Témy zo starých skúšok</h3>
-          <p class="hint" data-i18n="welcome.f3Text">Nahraj staré zadania a uvidíš, ktoré okruhy sa v skúškach opakujú najčastejšie.</p>
-        </article>
-        <article class="sheet w-feat">
-          <h3 data-i18n="welcome.f4Title">6 vzhľadov a tmavý režim</h3>
-          <p class="hint" data-i18n="welcome.f4Text">Prepínaj medzi Kockami, Risom, Účtovnou knihou, Zošitom, Tabuľou či Čistým vzhľadom.</p>
-        </article>
+          <div class="tcard">
+            <div class="tbar w-rank-row">
+              <div class="tbar-top"><span data-i18n="welcome.examsRow2">2. Oxidačná fosforylácia</span><span class="pct" data-i18n="welcome.examsRow2Count">v 3 z 5 skúšok</span></div>
+              <span class="bar"><i style="width:60%"></i></span>
+            </div>
+          </div>
+          <div class="tcard">
+            <div class="tbar w-rank-row">
+              <div class="tbar-top"><span data-i18n="welcome.examsRow3">3. Citrátový cyklus</span><span class="pct" data-i18n="welcome.examsRow3Count">v 2 z 5 skúšok</span></div>
+              <span class="bar"><i style="width:40%"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-plan-block">
+        <h3 data-i18n="welcome.f2Title">Denný plán do dátumu skúšky</h3>
+        <p class="hint" data-i18n="welcome.f2Text">Zadáš dátum skúšky a Lekto rozpočíta, koľko opakovaní a nových otázok stihnúť každý deň, aby si stihol celú látku.</p>
       </div>
     </div>
 
     <div class="w-sec" id="wFaq">
       <div class="w-sec-head">
-        <p class="eyebrow" data-i18n="welcome.faqEyebrow">Časté otázky</p>
-        <h2 class="w-h2" data-i18n="welcome.faqTitle">Všetko podstatné pred štartom</h2>
+        <h2 class="w-h2" data-i18n="welcome.faqTitle">Otázky o účte, súkromí a limite</h2>
       </div>
+      <!-- TODO(pricing): confirm typical lecture count per 100 credits once real usage/paid tiers are finalized -->
       <div class="cards w-faq">
         <details class="card"><summary><span data-i18n="welcome.q1">Ako funguje prihlásenie bez hesla?</span></summary><div class="card-body"><p data-i18n="welcome.a1">Po zadaní e-mailu dostaneš jednorazový kód a odkaz. Nemusíš si pamätať žiadne heslo a účet otvoríš na mobile aj notebooku.</p></div></details>
-        <details class="card"><summary><span data-i18n="welcome.q2">Čo sa deje s mojimi súbormi?</span></summary><div class="card-body"><p data-i18n="welcome.a2">Pôvodné súbory ostávajú v tvojom zariadení. Na spracovanie sa posiela iba text (prípadne skeny strán bez textu) a hotové materiály patria len tvojmu účtu.</p></div></details>
-        <details class="card"><summary><span data-i18n="welcome.q3">Koľko stojí používanie?</span></summary><div class="card-body"><p data-i18n="welcome.a3">Testovacia verzia má bezplatný mesačný limit spracovania, ktorý vidíš priamo v Profile aj pri nahrávaní. Obnovuje sa 1. dňa v mesiaci.</p></div></details>
-        <details class="card"><summary><span data-i18n="welcome.q4">Môžem aplikáciu používať aj bez účtu?</span></summary><div class="card-body"><p data-i18n="welcome.a4">Áno — precvičovať a prezerať uložené predmety môžeš lokálne. Účet potrebuješ na spracovanie nových súborov a synchronizáciu medzi zariadeniami.</p></div></details>
+        <details class="card"><summary><span data-i18n="welcome.q2">Čo sa deje s mojimi súbormi?</span></summary><div class="card-body"><p data-i18n="welcome.a2">Pôvodné súbory ostávajú v tvojom zariadení. Na spracovanie sa posiela iba extrahovaný text (prípadne obrázky strán bez textu) službe Claude od spoločnosti Anthropic, ktorá údaje nepoužíva na trénovanie modelov. Tvoje predmety a postup patria len tvojmu účtu; na urýchlenie sa môžu zhodné časti textu opätovne načítať zo zdieľanej cache bez tvojho mena.</p></div></details>
+        <details class="card"><summary><span data-i18n="welcome.q3">Koľko stojí používanie a aký je bezplatný limit?</span></summary><div class="card-body"><p data-i18n="welcome.a3">Bezplatný účet zahŕňa 100 kreditov mesačne (reálny počet prednášok závisí od dĺžky súborov a počtu skenov – orientačný údaj ešte spresňujeme). Zostatok vidíš v Profile aj pri nahrávaní a obnovuje sa 1. dňa v mesiaci. Keď klesne na nulu, spracovanie nových súborov sa do ďalšieho mesiaca pozastaví, no uložené predmety, zhrnutia a kvízy zostávajú plne dostupné.</p></div></details>
+        <details class="card"><summary><span data-i18n="welcome.q4">Môžem Lekto používať aj bez účtu?</span></summary><div class="card-body"><p data-i18n="welcome.a4">Áno – hneď na úvod si môžeš otvoriť ukážkový predmet, prečítať zhrnutie aj prejsť kvíz lokálne. Účet potrebuješ na spracovanie vlastných súborov a synchronizáciu medzi zariadeniami.</p></div></details>
       </div>
     </div>
 
     <footer class="w-foot">
       <div class="w-foot-brand">
-        <b>Study App</b>
-        <span class="hint" data-i18n="welcome.footerCopy">Súkromný študijný priestor pre vysokoškolákov.</span>
+        <b>Lekto</b>
+        <span class="hint" data-i18n="welcome.footerCopy">Študijný priestor pre vysokoškolákov.</span>
       </div>
       <div class="w-foot-links">
-        <button class="link" type="button" data-legal="terms" data-i18n="welcome.termsLink">Podmienky používania</button>
-        <button class="link" type="button" data-legal="privacy" data-i18n="welcome.privacyLink">Ochrana súkromia</button>
+        <a class="link" href="./terms.html" data-legal="terms" data-i18n="legal.termsTitle">Podmienky používania</a>
+        <a class="link" href="./privacy.html" data-legal="privacy" data-i18n="legal.privacyTitle">Ochrana súkromia</a>
         <button class="link" id="wFootOpen" type="button" data-i18n="welcome.navOpen">Otvoriť aplikáciu</button>
-        <div class="w-langs" id="wLangs" data-i18n-label="lang.label">
-          <button class="tiny" type="button" data-lang="sk" aria-pressed="true">SK</button>
-          <button class="tiny" type="button" data-lang="cs" aria-pressed="false">CS</button>
-        </div>
       </div>
     </footer>
   </section>
@@ -187,7 +162,7 @@
   </section>
 
   <section class="screen" id="home" hidden>
-    <header class="top top-row"><div class="grow"><div class="eyebrow" data-i18n="home.eyebrow">Študijná aplikácia</div><h1 data-i18n="home.title">Predmety</h1></div><button class="iconbtn homebtn" type="button" data-home data-i18n-label="nav.home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg></button></header>
+    <header class="top top-row"><div class="grow"><div class="eyebrow" data-i18n="home.eyebrow">Lekto</div><h1 data-i18n="home.title">Predmety</h1></div><button class="iconbtn homebtn" type="button" data-home data-i18n-label="nav.home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg></button></header>
     <div class="stack" id="subjects"></div>
   </section>
 
@@ -525,6 +500,60 @@
       <div class="confirm" id="confirm" hidden><span data-i18n="setup.confirm">Naozaj vymazať celý postup?</span><button class="tiny danger" id="yes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="no" type="button" data-i18n="setup.no">Zrušiť</button></div>
       <button class="menu-row danger" id="delSubj" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg><span data-i18n="setup.delete">Odstrániť predmet</span></button>
       <div class="confirm" id="delConfirm" hidden><span data-i18n="setup.deleteConfirm">Odstrániť predmet aj s otázkami a postupom?</span><button class="tiny danger" id="delYes" type="button" data-i18n="setup.yes">Vymazať</button><button class="tiny" id="delNo" type="button" data-i18n="setup.no">Zrušiť</button></div>
+    </div>
+  </div>
+</dialog>
+<dialog class="bsheet" id="authSheet">
+  <div class="bsheet-in w-auth" id="wAuthCard">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="bsheet-head">
+      <h2 id="wCardTitle" data-i18n="welcome.authTitle">Prihlásiť sa e-mailom</h2>
+      <button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <div class="group" id="wSignedBox" hidden>
+      <div class="acct-row">
+        <span class="avatar" id="wAvatar" aria-hidden="true"></span>
+        <div class="grow">
+          <b id="wSignedEmail"></b>
+          <p class="hint" data-i18n="welcome.signedInTitle">Si prihlásený</p>
+        </div>
+      </div>
+      <button class="btn wide" id="wContinue" type="button" data-i18n="welcome.continueApp">Pokračovať do aplikácie</button>
+      <button class="btn wide plain" id="wSignOut" type="button" data-i18n="upload.signOut">Odhlásiť sa</button>
+    </div>
+
+    <div class="group" id="wOffBox" hidden>
+      <p class="tipbox" id="wOffNote" data-i18n="welcome.offNote">Prihlásenie účtu v tejto ukážke nie je pripojené k serveru. Lekto si môžeš vyskúšať lokálne na ukážkovom predmete.</p>
+      <button class="btn wide" id="wOffEnter" type="button" data-i18n="welcome.offEnter">Otvoriť ukážkový predmet</button>
+    </div>
+
+    <div class="group" id="wAuthForms">
+      <p class="hint" id="wCardSub" data-i18n="welcome.authSub">Zadaj e-mail a pošleme ti jednorazový kód. Ak účet ešte nemáš, vytvorí sa automaticky.</p>
+
+      <div class="group" id="wAsk">
+        <label class="label" for="wEmail" data-i18n="welcome.emailLabel">E-mail</label>
+        <input class="search" id="wEmail" type="email" autocomplete="email" inputmode="email" enterkeyhint="send" data-i18n-placeholder="upload.emailPlaceholder">
+        <label class="w-check" id="wAgreeWrap">
+          <input id="wAgree" type="checkbox">
+          <span><span data-i18n="welcome.agreePrefix">Mám aspoň 16 rokov a súhlasím s </span><a class="link w-inline" href="./terms.html" data-legal="terms" data-i18n="welcome.termsLink">podmienkami používania</a><span data-i18n="welcome.agreeAnd"> a </span><a class="link w-inline" href="./privacy.html" data-legal="privacy" data-i18n="welcome.privacyLink">ochranou súkromia</a>.</span>
+        </label>
+        <button class="btn wide" id="wSend" type="button" data-i18n="welcome.sendEmail">Pokračovať s e-mailom</button>
+        <p class="hint" data-i18n="welcome.passwordless">Bez hesla – kód z e-mailu funguje na mobile aj počítači.</p>
+      </div>
+
+      <div class="group" id="wCodeBox" hidden>
+        <p class="tipbox" id="wSent"></p>
+        <label class="label" for="wCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
+        <input class="search code-input" id="wCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12345678">
+        <button class="btn wide" id="wVerify" type="button" data-i18n="welcome.verifyBtn">Overiť a vstúpiť</button>
+        <div class="w-code-actions">
+          <button class="link" id="wResend" type="button" data-i18n="welcome.resendNow">Poslať kód znova</button>
+          <button class="link" id="wChangeEmail" type="button" data-i18n="welcome.changeEmail">Zmeniť e-mail</button>
+        </div>
+      </div>
+
+      <p class="err" id="wErr" role="alert" hidden></p>
     </div>
   </div>
 </dialog>

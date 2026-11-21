@@ -10,6 +10,8 @@ import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
 import { renderLimit } from "./limit.js";
 import { openWelcome } from "./welcome.js";
+import { ensureSampleSubject } from "./sample.js";
+import { loadLookFonts } from "./fonts.js";
 
 const LOOK_KEY = "studyapp-look";
 const THEME_KEY = "studyapp-theme";
@@ -107,8 +109,8 @@ function route() {
   const y = dir === "none" ? window.scrollY : dir === "back" ? scrolls.get(h) || 0 : 0;
   const sj = SUBJECTS.find((x) => h === x.id || h.startsWith(x.id + "/"));
   booted = true;
-  if (h === "welcome" || h === "signin") showWelcome("in");
-  else if (h === "signup") showWelcome("up");
+  if (h === "welcome") showWelcome(false);
+  else if (h === "signin" || h === "signup") showWelcome(true);
   else if (h.startsWith("upload/")) showUpload(h.slice(7));
   else if (h.startsWith("exams/")) showUpload(h.slice(6), false, "exams");
   else if (h === "upload" || code) { markEntered(); showUpload(); }
@@ -125,7 +127,7 @@ function route() {
     else if (sub === "review") showWrongReview();
     else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
-  } else if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome("in");
+  } else if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome(false);
   else showToday();
   shown = h; dir = "fade";
   window.scrollTo(0, y);
@@ -966,6 +968,7 @@ function paintChrome() {
 }
 function setLook(l) {
   if (l) document.body.dataset.look = l; else delete document.body.dataset.look;
+  loadLookFonts(l);
   [...$("looks").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", b.dataset.l === l));
   try { localStorage.setItem(LOOK_KEY, l); } catch (e) {}
   // Zošit is light only and Tabuľa dark only.
@@ -1018,7 +1021,7 @@ async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
   SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
   list = []; wrong = []; stage = "quiz"; readerHint = null;
   toast(t("profile.signedOutToast"));
-  if (stayOnWelcome) showWelcome("in");
+  if (stayOnWelcome) showWelcome(false);
   else go("welcome", true);
 }
 $("signOutForce").onclick = async () => {
@@ -1075,16 +1078,23 @@ function openLegal(kind) {
   openSheet($("legalSheet"));
 }
 
-function showWelcome(initialMode = "in") {
+function showWelcome(openAuth = false) {
   CUR = null;
   show("welcome");
   openWelcome({
     enterApp: () => { markEntered(); go(""); },
+    trySample: () => {
+      const id = ensureSampleSubject(getLang());
+      markEntered();
+      go(id);
+    },
+    openAuthSheet: () => { if (!$("authSheet").open) openSheet($("authSheet")); },
+    closeAuthSheet: () => { if ($("authSheet").open) closeSheet($("authSheet")); },
     openLegal,
     setLangUI,
     signOut: () => signOutAccount({ stayOnWelcome: true }),
     toast,
-  }, initialMode);
+  }, openAuth);
 }
 
 // ===== Upload

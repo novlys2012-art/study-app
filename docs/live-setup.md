@@ -12,14 +12,14 @@ All keys go into the Supabase or GitHub settings pages below. Never paste a key 
 
 ## 1. Claude key (Anthropic console)
 
-1. Open https://console.anthropic.com/settings/keys and create a key named `study-app-live`. A separate key from the trial one lets you switch it off on its own.
+1. Open https://console.anthropic.com/settings/keys and create a key named `lekto-live`. A separate key from the trial one lets you switch it off on its own.
 2. Open https://console.anthropic.com/settings/limits and set a monthly spend limit (for example $10). This is the last safety net under the app's own caps.
 
 Keep the key open in that tab for step 4.
 
 ## 2. Supabase project
 
-1. Open https://supabase.com/dashboard/new and create a project: name `study-app`, region **Central EU (Frankfurt)**, Free plan. Let it generate a database password and save that password in your password manager.
+1. Open https://supabase.com/dashboard/new and create a project: name `lekto`, region **Central EU (Frankfurt)**, Free plan. Let it generate a database password and save that password in your password manager.
 2. When it is ready, copy two public values (you will paste them into GitHub in step 5):
    - **Project ref**: Project Settings → General → Project ID (20 lowercase letters).
    - **Publishable key**: Project Settings → API Keys → `sb_publishable_...` (the legacy `anon` key works too).
@@ -35,12 +35,12 @@ Students sign in with a 6-digit code from an email, so they can read the email o
 
 **The email.** Authentication → Emails → Templates. Do this for both **Magic link** and **Confirm signup**, because a first sign-in uses the second one:
 
-- **Subject:** `Kód na prihlásenie: {{ .Token }}`
+- **Subject:** `Kód na prihlásenie do Lekto: {{ .Token }}`
 - **Body:** switch the editor to source and paste the whole of [`supabase/templates/sign-in.html`](../supabase/templates/sign-in.html) (open it on GitHub, press the copy button).
 
 **Your own mail sender.** Supabase's built-in sender only sends about 2 emails an hour for the whole project, and only to members of your Supabase organisation. Connect your own sender to lift both limits. Authentication → Emails → SMTP Settings → enable custom SMTP:
 
-- **Without your own domain: Gmail.** Turn on 2-Step Verification for your Google account, then create an app password at https://myaccount.google.com/apppasswords (name it `study-app`). Fill in host `smtp.gmail.com`, port `465`, username = your Gmail address, password = the 16-letter app password, sender email = your Gmail address, sender name `Study App`. Gmail allows about 500 emails a day, plenty for testing.
+- **Without your own domain: Gmail.** Turn on 2-Step Verification for your Google account, then create an app password at https://myaccount.google.com/apppasswords (name it `lekto`). Fill in host `smtp.gmail.com`, port `465`, username = your Gmail address, password = the 16-letter app password, sender email = your Gmail address, sender name `Lekto`. Gmail allows about 500 emails a day, plenty for testing.
 - **With your own domain (later): Resend.** Sign up at https://resend.com, add and verify your domain, create an API key, then fill in host `smtp.resend.com`, port `465`, username `resend`, password = the API key, sender email `prihlasenie@<your domain>`. The free plan sends 100 emails a day. Without a verified domain Resend only delivers to your own address.
 
 After that, raise the cap under Authentication → Rate Limits → "Rate limit for sending emails" (for example 30 an hour). Type the password or key only into the Supabase page, never into a chat.

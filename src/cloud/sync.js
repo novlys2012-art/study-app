@@ -47,16 +47,16 @@ async function once() {
   if (meta.user && meta.user !== s.user.id) { clearLocal(); meta = loadMeta(); any = true; }
   if (!meta.user) {
     // First sync on this device: everything made before signing in goes to the account
-    // (the answer log's entries are all still unsent).
+    // (the answer log's entries are all still unsent). Built-in sample subjects stay local-only.
     const now = Date.now();
-    loadSubjects().forEach((sj) => { if (!meta.s[sj.id]) meta.s[sj.id] = { at: now, dirty: true }; });
+    loadSubjects().forEach((sj) => { if (!sj.sample && !meta.s[sj.id]) meta.s[sj.id] = { at: now, dirty: true }; });
     meta.user = s.user.id; saveMeta(meta);
   }
   const user_id = s.user.id;
 
   // ----- Subjects
   const remote = new Map((await cloud.rows("subjects", "id,updated_at,deleted")).map((r) => [r.id, { at: ms(r.updated_at), deleted: r.deleted }]));
-  const local = new Map(loadSubjects().map((sj) => [sj.id, sj]));
+  const local = new Map(loadSubjects().filter((sj) => !sj.sample).map((sj) => [sj.id, sj]));
   const push = [], pull = [];
   new Set([...Object.keys(meta.s), ...remote.keys()]).forEach((id) => {
     const l = meta.s[id], r = remote.get(id);

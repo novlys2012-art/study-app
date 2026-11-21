@@ -1,4 +1,4 @@
-# Study App
+# Lekto
 
 A study app for Slovak and Czech university students. A student uploads their own course files and past exams and gets clean summaries, quizzes, topics and a day-by-day plan up to the exam date. It is a new app that reuses only the design and the quiz mechanics of the quiz site in `novlys2012-art/kviz-final`. **None of that site's content (subjects, questions, notes, accounts, Spanish or math material) belongs in this app**; every subject and question comes from the student's own uploads.
 
@@ -92,7 +92,7 @@ npm run e2e            # builds against a fake Supabase and fake AI, signs in, u
 npm run fn:prepare     # copy ai/ and server/ into supabase/functions/_shared before `supabase functions serve` or deploy
 npm run cap:sync       # build and copy into android/ and ios/
 npm run trial -- --dry-run files...   # phase 0: extract and count tokens without AI calls
-npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or STUDY_APP_ANTHROPIC_KEY in a cloud environment) in .env
+npm run trial -- files...             # phase 0: needs ANTHROPIC_API_KEY (or LEKTO_ANTHROPIC_KEY in a cloud environment) in .env
 npm run trial -- --mode exam exams... # phase 0: tag old exam questions with topics and rank them (Sonnet, reads scans)
 ```
 

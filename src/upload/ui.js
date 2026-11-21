@@ -9,6 +9,7 @@ import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { icon } from "../app/icons.js";
 import { renderLimit } from "../app/limit.js";
+import { authMessage } from "../app/welcome.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
 const MAKE_KEY = "studyapp-make";
@@ -313,7 +314,7 @@ function wire() {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { error(t("upload.err.email"), "upEmail"); $("upEmail").focus(); return; }
     error(""); $("upSend").disabled = true;
     try { await cloud.signIn(email); $("upSent").textContent = t("upload.sent", { email }); $("upCode").value = ""; askCode(true); }
-    catch (e) { error(message(e), "upEmail"); }
+    catch (e) { error(authMessage(e), "upEmail"); }
     finally { $("upSend").disabled = false; }
   };
   $("upVerify").onclick = async () => {
@@ -321,7 +322,7 @@ function wire() {
     if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat"), "upCode"); $("upCode").focus(); return; }
     error(""); $("upVerify").disabled = true;
     try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await syncNow(true); await refresh(); }
-    catch (e) { error(message(e), "upCode"); }
+    catch (e) { error(authMessage(e), "upCode"); }
     finally { $("upVerify").disabled = false; }
   };
   $("upCode").onkeydown = (e) => { if (e.key === "Enter") $("upVerify").click(); };

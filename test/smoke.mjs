@@ -7,7 +7,7 @@ import { extname, join } from "node:path";
 import { chromium } from "playwright";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".woff2": "font/woff2", ".png": "image/png" };
 const server = createServer(async (req, res) => {
   const path = join(DIST, decodeURIComponent(req.url.split("?")[0]).replace(/\/$/, "/index.html"));
   try {
@@ -43,7 +43,7 @@ const SUBJECT = {
   ],
 };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : undefined);
 const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -52,10 +52,15 @@ const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("�
 
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base);
-check(await page.locator("#welcome").isVisible() && await page.locator("#tabbar").isHidden(), "first visit opens the landing and sign-in screen");
+check(await page.locator("#welcome").isVisible() && await page.locator("#tabbar").isHidden(), "first visit opens the landing screen");
 await page.click("#wGuest");
-check(await page.locator("#today").isVisible() && await page.locator("#tabbar").isVisible(), "continuing without account opens Today with the tab bar");
-check((await page.locator(".sj").count()) === 1, "no subjects, only the empty-state card");
+check(await page.locator("#subject").isVisible() && await page.locator("#tabbar").isVisible(), "trying without an account opens the built-in sample subject");
+await page.click('#sTabs [data-tab="exams"]');
+check((await page.textContent("#tabExams")).includes("v 4 z 5 skúšok"), "sample subject includes ranked past-exam topics");
+await page.evaluate(() => localStorage.removeItem("studyapp-subjects-v1"));
+await page.goto(base + "#welcome");
+await page.click("#wFootOpen");
+check(await page.locator("#today").isVisible() && (await page.locator(".sj").count()) === 1, "opening the app directly lands on the empty Today state");
 
 await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.stringify([s])), SUBJECT);
 await page.goto(base + "#test");
@@ -125,7 +130,7 @@ await page.locator("#moreSheet").waitFor({ state: "hidden" });
 check(await page.locator("#subject").isVisible(), "the back button closes a sheet and stays on the screen");
 await page.click('#tabbar [data-go="home"]');
 check((await page.locator("#subjects .sj").count()) === 1 && await page.locator("#fab").isVisible(), "subjects screen lists the subject and shows the add button");
-await page.click('#tabbar [data-go="today"]');
+await page.click('#tabbar .tab[data-go="today"]');
 check((await page.textContent("#todayBody .hero")).includes("Testovací predmet"), "today leads with the subject whose exam is nearest");
 await page.click("#todayBody .hero .btn");
 check(await page.locator("#quiz").isVisible(), "today's button starts a round");

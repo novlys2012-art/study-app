@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://localhost:3000/fonts/kocky.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    background: #F4F5F7; color: #16181F;
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px;
+    padding: 58px 66px; align-items: center;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 24px; letter-spacing: -.02em; margin-bottom: 26px; }
+  h1 { font-size: 56px; line-height: 1.06; letter-spacing: -.025em; font-weight: 800; margin-bottom: 18px; }
+  p.lede { font-size: 22px; line-height: 1.48; color: #545B6B; max-width: 28ch; margin-bottom: 26px; }
+  .meta { font-size: 16px; color: #545B6B; font-weight: 600; }
+  .card {
+    background: #FFFFFF; border: 2px solid #E2E4EB; border-radius: 20px;
+    padding: 28px 30px; box-shadow: 0 18px 40px -24px rgba(22,24,31,.22);
+  }
+  .tag { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #545B6B; margin-bottom: 12px; }
+  .q { font-size: 18px; font-weight: 700; line-height: 1.38; margin-bottom: 16px; }
+  .ans { display: grid; gap: 8px; margin-bottom: 18px; }
+  .a { font-size: 15px; padding: 10px 14px; border-radius: 10px; border: 1.5px solid #E2E4EB; font-weight: 600; }
+  .a.bad { background: rgba(217,45,32,.07); border-color: rgba(217,45,32,.35); color: #B42318; text-decoration: line-through; }
+  .a.ok { background: rgba(16,133,72,.08); border-color: rgba(16,133,72,.35); color: #0B6E3A; }
+  .src {
+    border-left: 4px solid #3D5AFE; background: #F8F9FC; border-radius: 0 12px 12px 0;
+    padding: 14px 16px;
+  }
+  .src-k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #3D5AFE; margin-bottom: 6px; }
+  .src-t { font-size: 15px; line-height: 1.52; color: #16181F; }
+  mark { background: #FEF08A; color: #16181F; padding: 1px 4px; border-radius: 4px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="38" height="38" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#3D5AFE"/>
+        <rect x="7" y="6" width="2.5" height="20" rx="1.25" fill="#fff" opacity=".95"/>
+        <rect x="12.5" y="9" width="11" height="2.4" rx="1.2" fill="#fff" opacity=".48"/>
+        <rect x="11.5" y="14.2" width="14.5" height="4.4" rx="2" fill="#FEF08A"/>
+        <rect x="12.5" y="21.4" width="9" height="2.4" rx="1.2" fill="#fff" opacity=".48"/>
+      </svg>
+      <span>Lekto</span>
+    </div>
+    <h1>Z prednášok rovno k skúške.</h1>
+    <p class="lede">Zhrnutia, kvízy s odkazom na zdroj a témy, ktoré sa opakujú na starých skúškach.</p>
+    <p class="meta">PDF · PPTX · DOCX · zadarmo na vyskúšanie</p>
+  </div>
+  <div class="card">
+    <div class="tag"><span>Bunková biochémia</span><span>Zo zhrnutia</span></div>
+    <div class="q">Ktorý enzým katalyzuje nevratný regulačný krok glykolýzy?</div>
+    <div class="ans">
+      <div class="a bad">Hexokináza I – nezávislá od citrátu</div>
+      <div class="a ok">Fosfofruktokináza-1 (PFK-1)</div>
+    </div>
+    <div class="src">
+      <div class="src-k">Prednáška 3 · Glykolýza</div>
+      <div class="src-t">Hlavným regulačným uzlom je <mark>PFK-1, ktorú aktivuje AMP a fruktóza-2,6-bisfosfát</mark>, zatiaľ čo vysoké ATP a citrát ju tlmia.</div>
+    </div>
+  </div>
+</body>
+</html>

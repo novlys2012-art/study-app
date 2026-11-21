@@ -128,7 +128,7 @@ const api = createServer(async (req, res) => {
 execFileSync("npx", ["vite", "build", "--outDir", OUT, "--emptyOutDir", "--logLevel", "warn"], {
   cwd: ROOT, stdio: "inherit", env: { ...process.env, VITE_SUPABASE_URL: API, VITE_SUPABASE_KEY: "fake-publishable-key" },
 });
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".woff2": "font/woff2", ".png": "image/png" };
 const web = createServer(async (req, res) => {
   const path = join(OUT, decodeURIComponent(req.url.split("?")[0]).replace(/\/$/, "/index.html"));
   try { res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream" }); res.end(await readFile(path)); }
@@ -175,7 +175,7 @@ async function makePptx() {
 }
 
 // ----- The run.
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : undefined);
 const page = await browser.newPage();
 // Behave like a browser a year or two old (Safari on older iPhones): hide the newest built-ins
 // that pdf.js's modern build relies on, so a build that needs them fails here too.
@@ -194,7 +194,7 @@ const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("âœ
 
 try {
   await page.goto(base);
-  if (await page.locator("#welcome").isVisible()) await page.click("#wGuest");
+  if (await page.locator("#welcome").isVisible()) await page.click("#wFootOpen");
   await page.click(".sj.add");
   await page.locator("#upLogin").waitFor();
   check(page.url().endsWith("#upload"), "the add card opens the upload screen");

@@ -25,18 +25,39 @@ export async function session() {
   return data.session;
 }
 
+const isNetworkErr = (e) => {
+  const m = String((e && e.message) || e || "");
+  return (e && e.name === "AuthRetryableFetchError") || /failed to fetch|networkerror|load failed|fetch|offline|timeout/i.test(m);
+};
+
 // Sends the sign-in email: a code to type on any device, plus a link that works in this browser.
 export async function signIn(email) {
-  const { error } = await client().auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  let error;
+  try {
+    ({ error } = await client().auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } }));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "signIn", e && e.message);
+  }
   if (!error) return;
+  if (isNetworkErr(error)) throw new CloudError("network", error.message);
   // 429 is either the project's hourly email cap or the one-minute wait between codes for one address.
   if (error.status === 429) throw new CloudError(/seconds/i.test(error.message) ? "wait" : "rate", error.message);
   throw new CloudError("signIn", error.message);
 }
 
 export async function verifyCode(email, code) {
-  const { data, error } = await client().auth.verifyOtp({ email, token: code, type: "email" });
-  if (error) throw new CloudError(error.status === 429 ? "rate" : "code", error.message);
+  let data, error;
+  try {
+    ({ data, error } = await client().auth.verifyOtp({ email, token: code, type: "email" }));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
+  }
+  if (error) {
+    if (isNetworkErr(error)) throw new CloudError("network", error.message);
+    if (error.status === 429) throw new CloudError("rate", error.message);
+    if (/expired/i.test(error.message || "") && !/invalid/i.test(error.message || "")) throw new CloudError("expired", error.message);
+    throw new CloudError("code", error.message);
+  }
   return data.session;
 }
 

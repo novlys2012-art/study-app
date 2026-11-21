@@ -1,4 +1,4 @@
-# Study App — Status & Handoff
+# Lekto — Status & Handoff
 
 Last updated: 2026-11-21
 Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**65/65**).
@@ -75,6 +75,12 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
   - **`#welcome` CTA hierarchy & offline state**: Made `#wNavCta` and `#wGuest` ghost buttons, neutralized `#wModeTabs` active indicator in `kocky`, and replaced the dead-end offline form with `#wOffBox` + `#wOffEnter` when `!cloud.configured`.
   - **Form & offline sign-out hardening**: Bound `aria-invalid="true"` + `aria-describedby` on `#wEmail`/`#wCode`/`#wAgree`/`#upEmail`/`#upCode` errors (cleared on input/change), and added `#signOutSheet` confirmation via `hasUnsynced()` so offline sign-out warns before discarding unsynced local changes.
   - **Core app clarity & keyboard polish**: Kept `"Vlastné kolo"` text visible on mobile `#subject` (`#sActions`), separated `zhrnutia` and `kontext` counts in `#sMeta` (`subjectFileCounts()`), aligned mobile `#fb` buttons full-width, refined desktop `#today` hero chevron optical alignment + single-card spanning, added inline 100-credit explainer note inside `#upLimit`/`#pLimit`, and added `S` (open summary), `Esc` (quit round), and a desktop-only `#qKeys` shortcut hint on `#quiz`.
+
+### 1.10 Rebrand to Lekto
+- **Files**: `index.html`, `src/i18n/{sk,cs}.json`, `package.json`, `capacitor.config.json`, `android/app/{build.gradle,src/main/res/values/strings.xml,src/main/java/sk/lekto/app/MainActivity.java}`, `ios/App/{App/Info.plist,App.xcodeproj/project.pbxproj}`, `supabase/{config.toml,templates/sign-in.html}`, `ai/providers/anthropic.js`, `.env.example`, `README.md`, `CLAUDE.md`, `docs/live-setup.md`
+- **How it works**:
+  - Updated all user-facing brand strings (`<title>`, meta/OG/iOS web-app tags, rail/landing/footer brand marks, `home.eyebrow`, SK/CS copy & legal terms, Supabase OTP email template/subject) and native Capacitor/Android/iOS app names (`Lekto`) and bundle IDs (`sk.lekto.app`).
+  - Intentionally kept `localStorage` keys (`studyapp-*`), existing GitHub repo URLs (`novlys2012-art/study-app`), and the legacy `STUDY_APP_ANTHROPIC_KEY` fallback (after `LEKTO_ANTHROPIC_KEY`) so existing browsers and configs suffer zero data loss.
 
 ---
 

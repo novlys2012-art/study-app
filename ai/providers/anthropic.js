@@ -6,9 +6,9 @@ let client;
 
 // images: [{ mediaType: "image/png", data: <base64> }], sent before the prompt text.
 // env: where the key comes from (process.env in scripts, the Edge Function's secrets on the server).
-// Cloud sessions reserve ANTHROPIC_API_KEY, so the key can also be saved as STUDY_APP_ANTHROPIC_KEY.
+// Cloud sessions reserve ANTHROPIC_API_KEY, so the key can also be saved as LEKTO_ANTHROPIC_KEY (or legacy STUDY_APP_ANTHROPIC_KEY).
 export async function complete({ model, system, prompt, images = [], maxTokens, effort, env }) {
-  const apiKey = env.ANTHROPIC_API_KEY || env.STUDY_APP_ANTHROPIC_KEY;
+  const apiKey = env.ANTHROPIC_API_KEY || env.LEKTO_ANTHROPIC_KEY || env.STUDY_APP_ANTHROPIC_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set.");
   if (client?.apiKey !== apiKey) client = new Anthropic({ apiKey });
   // Streaming keeps long answers (a whole deck's summary) clear of HTTP timeouts.

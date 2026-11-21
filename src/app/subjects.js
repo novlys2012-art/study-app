@@ -60,18 +60,29 @@ export function onLocalChange(fn) { listener = fn; }
 const changed = () => { if (listener) listener(); };
 const touch = (marks, id, extra) => { marks[id] = { ...marks[id], at: Date.now(), dirty: true, ...extra }; };
 const sidOf = (sj) => (sj && sj.id) || sj;
+const isSample = (sj) => !!(sj && sj.sample);
+const isSampleId = (id) => rawSubjects().some((sj) => sj.id === id && sj.sample);
 
 // Saves the list and notes which subjects changed or went away, so only those are sent to the account.
+// Local-only sample subjects (sample: true) are never marked for sync.
 export function saveSubjects(list) {
-  const before = new Map(rawSubjects().map((sj) => [sj.id, JSON.stringify(tidy(sj))]));
+  const prevRaw = rawSubjects();
+  const prevSample = new Set(prevRaw.filter(isSample).map((sj) => sj.id));
+  const before = new Map(prevRaw.map((sj) => [sj.id, JSON.stringify(tidy(sj))]));
   const meta = loadMeta();
   let any = false;
   list.forEach((sj) => {
+    if (isSample(sj)) {
+      if (meta.s[sj.id]) { delete meta.s[sj.id]; any = true; }
+      before.delete(sj.id);
+      return;
+    }
     if (before.get(sj.id) !== JSON.stringify(tidy(sj))) { touch(meta.s, sj.id, { del: false }); any = true; }
     before.delete(sj.id);
   });
   before.forEach((_, id) => {
-    touch(meta.s, id, { del: true }); any = true;
+    if (!prevSample.has(id)) { touch(meta.s, id, { del: true }); any = true; }
+    else if (meta.s[id]) { delete meta.s[id]; any = true; }
     remove(LOG + id); remove(LEGACY + id);
   });
   write(STORE, list);
@@ -127,8 +138,10 @@ export const readProgress = (sj) => progressFrom(readLog(sj));
 
 function append(sj, entry) {
   const sid = sidOf(sj);
-  write(LOG + sid, readLog(sid).concat({ id: newId(), at: Date.now(), u: 1, ...entry }));
-  changed();
+  const localOnly = isSample(sj) || isSampleId(sid);
+  const next = localOnly ? { id: newId(), at: Date.now(), ...entry } : { id: newId(), at: Date.now(), u: 1, ...entry };
+  write(LOG + sid, readLog(sid).concat(next));
+  if (!localOnly) changed();
 }
 export function logAnswer(sj, qid, ok) { append(sj, { k: "a", q: qid, ok: ok ? 1 : 0 }); }
 // Starts the subject's counts again. The entries before it are dropped here to keep the device copy small;
@@ -136,17 +149,18 @@ export function logAnswer(sj, qid, ok) { append(sj, { k: "a", q: qid, ok: ok ? 1
 export function resetProgress(sj) {
   const sid = sidOf(sj);
   readLog(sid); write(LOG + sid, []);
-  append(sid, { k: "r" });
+  append(sj, { k: "r" });
 }
 
 // For sync: every entry not yet in the account, and marking entries as sent.
 export function unsent() {
-  return loadSubjects().flatMap((sj) => readLog(sj).filter((e) => e.u).map((e) => ({ sid: sj.id, e })));
+  return loadSubjects().filter((sj) => !isSample(sj)).flatMap((sj) => readLog(sj).filter((e) => e.u).map((e) => ({ sid: sj.id, e })));
 }
 export function hasUnsynced() {
   if (unsent().length > 0) return true;
   const marks = loadMeta().s;
-  return Object.keys(marks).some((id) => marks[id] && marks[id].dirty);
+  const samples = new Set(rawSubjects().filter(isSample).map((sj) => sj.id));
+  return Object.keys(marks).some((id) => !samples.has(id) && marks[id] && marks[id].dirty);
 }
 export function subjectFileCounts(files = []) {
   let summaries = 0, context = 0;

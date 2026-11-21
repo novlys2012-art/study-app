@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Study App</string>
-    <string name="title_activity_main">Study App</string>
-    <string name="package_name">sk.studyapp.app</string>
-    <string name="custom_url_scheme">sk.studyapp.app</string>
+    <string name="app_name">Lekto</string>
+    <string name="title_activity_main">Lekto</string>
+    <string name="package_name">sk.lekto.app</string>
+    <string name="custom_url_scheme">sk.lekto.app</string>
 </resources>

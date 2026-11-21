@@ -1,4 +1,4 @@
-package sk.studyapp.app;
+package sk.lekto.app;
 
 import com.getcapacitor.BridgeActivity;
 
