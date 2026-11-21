@@ -15,6 +15,7 @@ const MAX_TEXT = 60_000;          // characters per request, about 15k tokens
 const MAX_IMAGES = 6;             // pages per vision request
 const MAX_IMAGE_CHARS = 1_500_000; // base64 per page, about 1.1 MB
 const MAX_QUESTIONS = 40;
+const MAX_CONTEXT = 30_000;
 
 export class HttpError extends Error {
   constructor(status, code, message) { super(message || code); this.status = status; this.code = code; }
@@ -35,6 +36,12 @@ const text = (v, max = MAX_TEXT) => {
   if (typeof v !== "string" || !v.trim()) throw new HttpError(400, "bad_input", "Missing text.");
   if (v.length > max) throw new HttpError(413, "too_large", `Text over ${max} characters.`);
   return v;
+};
+const ctxText = (v) => {
+  if (v == null || v === "") return "";
+  if (typeof v !== "string") throw new HttpError(400, "bad_input", "Bad context.");
+  if (v.length > MAX_CONTEXT) throw new HttpError(413, "too_large", `Context over ${MAX_CONTEXT} characters.`);
+  return v.trim();
 };
 const title = (v) => String(v || "").slice(0, 200);
 
@@ -74,20 +81,20 @@ const TASKS = {
       if (!body.trim() && !images.length) throw new HttpError(400, "bad_input", "No exam text or pages.");
       return {
         system: T.pastExamSystem(lang),
-        prompt: T.pastExamPrompt({ title: title(input.title), text: body, knownTopics: names(input.knownTopics), pages: images.length && body.trim() ? images.map((im) => im.page) : [] }),
+        prompt: T.pastExamPrompt({ title: title(input.title), text: body, knownTopics: names(input.knownTopics), pages: images.length && body.trim() ? images.map((im) => im.page) : [], context: ctxText(input.context) }),
         images: images.map((im) => ({ mediaType: im.mediaType, data: im.data })),
       };
     },
   },
   summary: {
     tier: "fast", maxTokens: 8000, parse: T.parseDebloat,
-    build: (input, lang) => ({ system: T.debloatSystem(lang), prompt: T.debloatPrompt({ title: title(input.title), text: text(input.text) }) }),
+    build: (input, lang) => ({ system: T.debloatSystem(lang), prompt: T.debloatPrompt({ title: title(input.title), text: text(input.text), context: ctxText(input.context) }) }),
   },
   quiz: {
     tier: "fast", maxTokens: 10000, parse: T.parseQuiz,
     build: (input, lang) => ({
       system: T.quizSystem(lang),
-      prompt: T.quizPrompt({ title: title(input.title), text: text(input.text), count: Math.min(15, Math.max(1, input.count | 0 || 10)) }),
+      prompt: T.quizPrompt({ title: title(input.title), text: text(input.text), count: Math.min(15, Math.max(1, input.count | 0 || 10)), context: ctxText(input.context) }),
     }),
   },
   check: {
@@ -95,7 +102,7 @@ const TASKS = {
     build(input, lang) {
       const qs = input.questions;
       if (!Array.isArray(qs) || !qs.length || qs.length > MAX_QUESTIONS) throw new HttpError(400, "bad_input", "Bad questions.");
-      return { system: T.checkSystem(lang), prompt: text(T.checkPrompt({ text: text(input.text), questions: qs }), MAX_TEXT + 20_000) };
+      return { system: T.checkSystem(lang), prompt: text(T.checkPrompt({ text: text(input.text), questions: qs, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000) };
     },
   },
   topics: {

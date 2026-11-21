@@ -47,7 +47,7 @@ export async function groupExams({ exams, knownTopics = [], call }) {
 // earlier: the subject's exams so far, sorted again together with the new ones.
 // Returns { exams: earlier and new exams, sorted into topics, added: how many are new, failed: [{ index, name, code, error }] };
 // throws when no exam could be read. An exam in which no question was found counts as failed ("no_questions").
-export async function readExams({ items, knownTopics = [], earlier = [], call, onStep = () => {}, onFile = () => {}, onRetry = () => {}, retry = {} }) {
+export async function readExams({ items, knownTopics = [], earlier = [], context = "", call, onStep = () => {}, onFile = () => {}, onRetry = () => {}, retry = {} }) {
   call = retrying(call, { onRetry, ...retry });
   const total = examSteps(items) + 1;
   let done = 0;
@@ -74,7 +74,7 @@ export async function readExams({ items, knownTopics = [], earlier = [], call, o
       }
       const pictured = new Set(images.map((im) => im.page));
       const text = pages.map((p, n) => (pictured.has(n + 1) || !p.trim() ? "" : `[${n + 1}]\n${p.trim()}`)).filter(Boolean).join("\n\n").slice(0, MAX_TEXT);
-      const r = await call("exam", { title: it.name, text, knownTopics: known.slice(), images });
+      const r = await call("exam", { title: it.name, text, knownTopics: known.slice(), images, ...(context ? { context } : {}) });
       step();
       if (!r.questions.length) throw Object.assign(new Error("No questions found."), { code: "no_questions" });
       r.questions.forEach((q) => { if (!known.some((t) => t.toLowerCase() === q.topic.toLowerCase())) known.push(q.topic); });

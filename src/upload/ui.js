@@ -5,7 +5,7 @@ import { loadSubjects, saveSubjects } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ext } from "./extract.js";
-import { buildSubject, DEFAULT_MAKE } from "./pipeline.js";
+import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { icon } from "../app/icons.js";
 
@@ -15,10 +15,11 @@ const MAX_FILES = 10;
 const $ = (id) => document.getElementById(id);
 const PANELS = ["upOff", "upLogin", "upConsent", "upForm", "upWork"];
 
+// Picked course files: [{ file: File, context: boolean }]. Past exam mode: [{ files: [File], photos: bool, name, year }].
 let ctx, picked = [], busy = false, make = { ...DEFAULT_MAKE };
-// Past exam mode: the exams to read, each { files: [File], photos: bool, name, year }.
 let exams = [];
 const examMode = () => !!(ctx && ctx.mode === "exams");
+const onlyContext = () => !examMode() && picked.length > 0 && picked.every((x) => x.context);
 try { make = { ...make, ...JSON.parse(localStorage.getItem(MAKE_KEY)) }; } catch (e) {}
 
 // The subject the files go into, when adding to one that exists.
@@ -59,10 +60,12 @@ function showUsage(u) {
 }
 
 function renderMake() {
+  const onlyCtx = onlyContext();
   [...$("upMake").children].forEach((b) => b.setAttribute("aria-pressed", !!make[b.dataset.k]));
   [...$("upAmount").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", +b.dataset.a === make.amount));
+  $("upMakeBox").hidden = examMode() || onlyCtx;
   $("upAmount").hidden = !make.quiz;
-  $("upMakeHint").hidden = make.summary || make.quiz;
+  $("upMakeHint").hidden = make.summary || make.quiz || onlyCtx;
   try { localStorage.setItem(MAKE_KEY, JSON.stringify(make)); } catch (e) {}
 }
 
@@ -113,6 +116,7 @@ function renderExams() {
     li.append(art, el("span", "grow", name), year, rm);
     ul.appendChild(li);
   });
+  $("upCtxHint").hidden = true;
   ul.hidden = !exams.length;
   const ready = exams.length > 0 && !!target();
   $("upNext").disabled = !ready;
@@ -122,18 +126,25 @@ function renderExams() {
 function renderPicked() {
   if (examMode()) { renderExams(); return; }
   const ul = $("upList"); ul.innerHTML = "";
-  picked.forEach((f, k) => {
+  picked.forEach((item, k) => {
     const li = el("li", "up-file");
+    const ctxBtn = el("button", "tiny up-ctx", t("upload.context"));
+    ctxBtn.type = "button";
+    ctxBtn.setAttribute("aria-pressed", item.context ? "true" : "false");
+    ctxBtn.onclick = () => { item.context = !item.context; renderMake(); renderPicked(); };
     const rm = el("button", "iconbtn small"); rm.type = "button";
-    rm.setAttribute("aria-label", t("upload.remove") + ": " + f.name); rm.appendChild(icon("x"));
-    rm.onclick = () => { picked.splice(k, 1); renderPicked(); };
+    rm.setAttribute("aria-label", t("upload.remove") + ": " + item.file.name); rm.appendChild(icon("x"));
+    rm.onclick = () => { picked.splice(k, 1); renderMake(); renderPicked(); };
     const art = el("span", "file-art"); art.appendChild(icon("doc"));
-    li.append(art, el("span", "grow", f.name), el("span", "qid", Math.max(1, Math.round(f.size / 1024)) + " kB"), rm);
+    li.append(art, el("span", "grow", item.file.name), el("span", "qid", Math.max(1, Math.round(item.file.size / 1024)) + " kB"), ctxBtn, rm);
     ul.appendChild(li);
   });
   ul.hidden = !picked.length;
+  $("upCtxHint").hidden = !picked.length;
+  const onlyCtx = onlyContext();
+  $("upGo").textContent = t(ctx?.target ? "upload.goAdd" : onlyCtx ? "upload.goContext" : "upload.go");
   const ready = picked.length && (ctx.target || $("upName").value.trim());
-  const ok = ready && (make.summary || make.quiz);
+  const ok = ready && (make.summary || make.quiz || onlyCtx);
   $("upNext").disabled = !ready;
   $("upGo").disabled = !ok;
 }
@@ -181,7 +192,7 @@ async function runExams() {
     };
     const knownTopics = Object.keys(into.topics || {}).filter((k) => k !== "t0").map((k) => into.topics[k]);
     const { exams: all, added, failed } = await readExams({
-      items, knownTopics, earlier: into.exams || [], call,
+      items, knownTopics, earlier: into.exams || [], context: contextOf(into.files), call,
       onFile: (k, phase) => setFile(k, phase),
       onRetry: () => { $("upStep").textContent = t("upload.retrying"); },
       onStep: (done, total) => progress(10 + (done / total) * 90, t(done === total ? "upload.finishing" : "upload.examsWorking", { done, total })),
@@ -211,9 +222,10 @@ async function run() {
   if (busy) return;
   const into = target();
   const name = into ? into.name : $("upName").value.trim();
-  if (!name || !picked.length || !(make.summary || make.quiz)) return;
+  const onlyCtx = onlyContext();
+  if (!name || !picked.length || !(make.summary || make.quiz || onlyCtx)) return;
   busy = true; error(""); panel("upWork");
-  const setFile = fileList(picked.map((f) => f.name));
+  const setFile = fileList(picked.map((x) => x.file.name));
   picked.forEach((_, k) => setFile(k, "wait"));
   // Reading the files on the device is the first tenth of the bar, the AI work the rest.
   const progress = (pct, label) => {
@@ -224,11 +236,11 @@ async function run() {
   $("upEta").textContent = "";
   try {
     const docs = [];
-    for (const [k, f] of picked.entries()) {
-      progress((k / picked.length) * 10, t("upload.reading", { name: f.name }));
+    for (const [k, item] of picked.entries()) {
+      progress((k / picked.length) * 10, t("upload.reading", { name: item.file.name }));
       setFile(k, "reading");
-      try { docs.push(await extractFile(f)); }
-      catch (e) { setFile(k, "failed"); throw new Error(f.name + ": " + message(e)); }
+      try { docs.push({ ...(await extractFile(item.file)), context: !!item.context }); }
+      catch (e) { setFile(k, "failed"); throw new Error(item.file.name + ": " + message(e)); }
       setFile(k, "read");
     }
     let usage = null;
@@ -250,7 +262,7 @@ async function run() {
         } else $("upEta").textContent = "";
       },
     });
-    if (!subject.questions.length && !subject.files.some((f) => f.summary)) throw new Error(t("upload.err.nothing"));
+    if (!subject.questions.length && !subject.files.some((f) => f.summary || (f.context && f.text))) throw new Error(t("upload.err.nothing"));
     const { failed = [], ...saved } = subject;
     if (into) saveSubjects(loadSubjects().map((x) => (x.id === into.id ? saved : x)));
     else saveSubjects([...loadSubjects(), saved]);
@@ -317,10 +329,10 @@ function wire() {
       renderPicked();
       return;
     }
-    for (const f of $("upFiles").files) if (!picked.some((p) => p.name === f.name && p.size === f.size)) picked.push(f);
+    for (const f of $("upFiles").files) if (!picked.some((p) => p.file.name === f.name && p.file.size === f.size)) picked.push({ file: f, context: false });
     if (picked.length > MAX_FILES) { picked = picked.slice(0, MAX_FILES); error(t("upload.err.tooMany", { max: MAX_FILES })); }
     $("upFiles").value = "";
-    renderPicked();
+    renderMake(); renderPicked();
   };
   $("upName").oninput = renderPicked;
   $("upSubject").onchange = () => { ctx.target = $("upSubject").value || null; renderSubjects(); renderPicked(); };

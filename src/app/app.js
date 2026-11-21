@@ -302,7 +302,7 @@ function enter(sj) {
   P = readProgress(sj);
   try { localStorage.setItem(LAST_KEY, sj.id); } catch (e) {}
 }
-const summaries = () => (CUR.files || []).filter((f) => f.summary);
+const summaries = () => (CUR.files || []).filter((f) => f.summary || (f.context && f.text));
 const topicKeys = () => Object.keys(TOPICS).filter((k) => {
   const it = (CUR.topicInfo || {})[k];
   return QUESTIONS.some((x) => x.t === k) || (it && (it.summary || (it.weakSpots || []).length));
@@ -387,9 +387,10 @@ function renderFiles() {
     const b = button("rowcard file", null, () => go(CUR.id + "/read/" + CUR.files.indexOf(f)));
     const g = el("span", "grow"), art = el("span", "file-art");
     art.appendChild(icon("doc"));
-    g.append(el("span", "rc-title", name), el("span", "hint", t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") })));
+    const pageHint = f.context ? t("study.contextPages", { before: f.pagesBefore }) : t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") });
+    g.append(el("span", "rc-title", name), el("span", "hint", pageHint));
     b.append(art, g, icon("chev", "chev"));
-    b.dataset.text = norm([f.title, f.name, f.summary, ...(f.keyTerms || []).map((k) => k.term + " " + k.meaning)].join(" "));
+    b.dataset.text = norm([f.title, f.name, f.summary || f.text, ...(f.keyTerms || []).map((k) => k.term + " " + k.meaning)].join(" "));
     return b;
   }));
   $("studyTools").hidden = files.length < 2;
@@ -557,14 +558,20 @@ function openPastExam(id) {
 
 function showReader(f) {
   $("rTitle").textContent = f.title || f.name;
-  $("rMeta").textContent = [f.title && f.title !== f.name ? f.name : "", t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") })].filter(Boolean).join(" · ");
-  const md = renderMarkdown(f.summary);
+  const pagesLabel = f.context ? t("study.contextPages", { before: f.pagesBefore }) : t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") });
+  $("rMeta").textContent = [f.title && f.title !== f.name ? f.name : "", pagesLabel].filter(Boolean).join(" · ");
   const body = $("rBody"); body.innerHTML = "";
   if (f.picturePages) body.appendChild(el("p", "hint", t("study.pictures", { n: f.picturePages })));
   if (f.skippedPictures) body.appendChild(el("p", "hint", t("study.skipped", { n: f.skippedPictures })));
-  body.appendChild(md);
+  let heads = [];
+  if (f.summary) {
+    const md = renderMarkdown(f.summary);
+    body.appendChild(md);
+    heads = [...md.querySelectorAll("h3")];
+  } else if (f.text) {
+    f.text.split(/\n{2,}/).forEach((p) => body.appendChild(el("p", null, p)));
+  }
   // A row of the summary's headings, to jump around a long one.
-  const heads = [...md.querySelectorAll("h3")];
   $("rToc").replaceChildren(...heads.map((h) => button(null, h.textContent, () => h.scrollIntoView({ behavior: "smooth", block: "start" }))));
   $("rToc").hidden = heads.length < 3;
   const terms = f.keyTerms || [];

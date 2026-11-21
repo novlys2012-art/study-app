@@ -58,8 +58,9 @@ Reply with one JSON object and nothing else:
 }
 
 // pages: the page numbers of the attached images, when the exam is part text and part pictures.
-export function pastExamPrompt({ title, text = "", knownTopics = [], pages = [] }) {
+export function pastExamPrompt({ title, text = "", knownTopics = [], pages = [], context = "" }) {
   let out = `Exam: ${title}\nKnown topics: ${knownTopics.length ? knownTopics.join("; ") : "none yet"}\n`;
+  if (context && context.trim()) out += `\n<context>\n${context.trim()}\n</context>\n`;
   if (text.trim()) out += `\n<exam_text>\n${text}\n</exam_text>\n`;
   if (pages.length) out += `\nPages ${pages.join(", ")} of the exam are in the attached images, in this order.\n`;
   else if (!text.trim()) out += "\nThe exam is in the attached page images.\n";
@@ -146,7 +147,9 @@ Keep every definition, rule, formula, number, step and worked example result tha
 Reply with one JSON object only:
 {"title":"short title","summary":"Markdown: ## headings, short bullet lines starting with -, **bold** key terms","key_terms":[{"term":"","meaning":""}]}`;
 
-export const debloatPrompt = ({ title, text }) => `Source: ${title}\nPage markers like [3] give the page number.\n\n<source>\n${text}\n</source>`;
+export const debloatPrompt = ({ title, text, context = "" }) =>
+  `Source: ${title}\nPage markers like [3] give the page number.\n\n<source>\n${text}\n</source>` +
+  (context && context.trim() ? `\n\n<context>\n${context.trim()}\n</context>\nUse the reference context (formulas, examples, definitions) only to clarify or verify concepts in the source; do not summarize the context itself.` : "");
 
 export function parseDebloat(reply) {
   const data = parseJson(reply);
@@ -165,7 +168,10 @@ Write in ${langName(lang)}. Reply with one JSON object only:
 {"questions":[{"q":"question","o":["A","B","C","D"],"a":0,"e":"one or two sentences why","x":"short concrete example or empty","s":"exact short quote from the source","page":n}]}
 "a" is the index of the one correct option. Wrong options must be plausible but clearly wrong given the source. "page" is the number of the page marker like [3] where the quote is.`;
 
-export const quizPrompt = ({ title, text, count = 10 }) => `Source: ${title}\n\n<source>\n${text}\n</source>\n\nWrite ${count} questions.`;
+export const quizPrompt = ({ title, text, count = 10, context = "" }) =>
+  `Source: ${title}\n\n<source>\n${text}\n</source>` +
+  (context && context.trim() ? `\n\n<context>\n${context.trim()}\n</context>\nYou may use formulas or examples from the context when writing questions or explanations about the source.` : "") +
+  `\n\nWrite ${count} questions.`;
 
 export function parseQuiz(reply) {
   const data = parseJson(reply);
@@ -181,8 +187,10 @@ export function parseQuiz(reply) {
 export const checkSystem = (lang = "sk") => `You check exam practice questions against the source. For each question decide if the marked answer ("a", an option index) is correct per the source and is the only correct option.
 Reply with one JSON object only: {"checks":[{"i":0,"verdict":"ok|wrong|ambiguous|unsupported","note":"short reason in ${langName(lang)}"}]}`;
 
-export const checkPrompt = ({ text, questions }) =>
-  `<source>\n${text}\n</source>\n\n<questions>\n${JSON.stringify(questions.map(({ q, o, a }, i) => ({ i, q, o, a })))}\n</questions>`;
+export const checkPrompt = ({ text, questions, context = "" }) =>
+  `<source>\n${text}\n</source>` +
+  (context && context.trim() ? `\n\n<context>\n${context.trim()}\n</context>` : "") +
+  `\n\n<questions>\n${JSON.stringify(questions.map(({ q, o, a }, i) => ({ i, q, o, a })))}\n</questions>`;
 
 export function parseChecks(reply) {
   const data = parseJson(reply);

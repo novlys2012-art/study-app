@@ -65,13 +65,24 @@ function citedText(sec, pages, qs) {
   return nums.sort((a, b) => a - b).map((n) => `[${n}]\n${pages[n - 1]}`).join("\n\n");
 }
 
+export const CONTEXT_MAX = 24_000;
+const docText = (pages) => pages.map((p, i) => (p.trim() ? `[${i + 1}]\n${p.trim()}` : "")).filter(Boolean).join("\n\n");
+export function contextOf(files = [], max = CONTEXT_MAX) {
+  return files
+    .filter((f) => f && f.context && typeof f.text === "string" && f.text.trim())
+    .map((f) => `### ${f.name}\n${f.text.trim()}`)
+    .join("\n\n")
+    .slice(0, max);
+}
+
 // What the student chose to make. Questions are checked whenever they are made.
 export const DEFAULT_MAKE = { summary: true, quiz: true, topics: true, amount: 1 };
 const AMOUNT = { 0.5: 0.5, 1: 1, 1.5: 1.5 };
 
 export function stepsFor(docs, make = DEFAULT_MAKE) {
   const perSection = (make.summary ? 1 : 0) + (make.quiz ? 2 : 0);
-  return docs.reduce((s, d) => s + Math.ceil(d.images.length / VISION_BATCH) + toSections(d.pages).length * perSection, 0) + (make.topics ? 1 : 0);
+  const hasMain = docs.some((d) => !d.context);
+  return docs.reduce((s, d) => s + Math.ceil(d.images.length / VISION_BATCH) + (d.context ? 0 : toSections(d.pages).length * perSection), 0) + (make.topics && hasMain ? 1 : 0);
 }
 
 // docs: [{ name, pages, images }] from extractFile(). Returns the subject to save, plus "failed":
@@ -90,25 +101,41 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
   let checkedOut = 0, stopped = null, firstError = null;
   const factor = AMOUNT[make.amount] || 1;
 
-  // One file: picture pages, then per section a summary and checked questions.
-  async function makeFile(fi, d) {
+  // Read context files first (no summary/quiz AI work; vision only for image-only pages) so they are ready for all other files.
+  let context = "";
+  async function readPages(d) {
     const pages = d.pages.slice();
     await each(chunks(d.images, VISION_BATCH), PARALLEL, async (batch) => {
       const read = await call("vision", { images: batch });
       for (const p of read) if (p.page >= 1 && p.page <= pages.length && p.text.trim()) pages[p.page - 1] = p.text;
       step();
     });
+    return pages;
+  }
 
+  // One file: picture pages, then per section a summary and checked questions (with any context).
+  async function makeFile(fi, d) {
+    const pages = await readPages(d);
+    if (d.context) {
+      files.push({
+        name: d.name, title: d.name, context: true, text: docText(pages).slice(0, CONTEXT_MAX),
+        pagesBefore: d.pages.length, pagesAfter: 0, picturePages: d.images.length, skippedPictures: d.skipped || 0,
+        summary: "", keyTerms: [],
+      });
+      return;
+    }
+
+    const ctxArg = context ? { context } : {};
     const sections = toSections(pages);
     const parts = await each(sections, PARALLEL, async (sec) => {
       const label = sections.length > 1 ? `${d.name} (${sec.from}–${sec.to})` : d.name;
       const [sum, quiz] = await settled([
-        make.summary ? call("summary", { title: label, text: sec.text }).finally(step) : null,
-        make.quiz ? call("quiz", { title: label, text: sec.text, count: Math.max(2, Math.round(questionCount(sec.text) * factor)) }).finally(step) : { questions: [] },
+        make.summary ? call("summary", { title: label, text: sec.text, ...ctxArg }).finally(step) : null,
+        make.quiz ? call("quiz", { title: label, text: sec.text, count: Math.max(2, Math.round(questionCount(sec.text) * factor)), ...ctxArg }).finally(step) : { questions: [] },
       ]);
       let qs = quiz.questions, out = 0;
       if (qs.length) {
-        const checks = await call("check", { text: citedText(sec, pages, qs), questions: qs });
+        const checks = await call("check", { text: citedText(sec, pages, qs), questions: qs, ...ctxArg });
         const bad = new Set(checks.filter((c) => c.verdict !== "ok").map((c) => c.i));
         out = qs.filter((_, i) => bad.has(i)).length;
         qs = qs.filter((_, i) => !bad.has(i));
@@ -135,7 +162,9 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
     }));
   }
 
-  for (const [fi, d] of docs.entries()) {
+  const order = [...docs.entries()].sort(([, a], [, b]) => (b.context ? 1 : 0) - (a.context ? 1 : 0));
+  for (const [fi, d] of order) {
+    if (!d.context && !context) context = contextOf([...(existing?.files || []), ...files]);
     if (stopped) { failed.push({ index: fi, name: d.name, code: codeOf(stopped), error: stopped }); onFile(fi, "failed"); continue; }
     onFile(fi, "ai");
     const until = done + stepsFor([d], { ...make, topics: false });
@@ -156,26 +185,28 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
   // Questions already in the subject take part in the new topic sort under their own refs.
   const prev = (existing?.questions || []).map((x, k) => ({ ...x, ref: "p" + (k + 1) }));
   const allFiles = [...(existing?.files || []), ...files];
+  const mainFiles = allFiles.filter((f) => !f.context);
+  const hasNewMain = files.some((f) => !f.context);
   const both = [...prev, ...all];
   let topics = [];
-  if (make.topics && !stopped && (both.length || allFiles.some((f) => f.summary))) {
+  if (make.topics && !stopped && hasNewMain && (both.length || mainFiles.some((f) => f.summary))) {
     // Without the topic sort the subject is still usable (below), so a failure here does not lose the files.
     try {
       const r = await call("topics", {
-        files: allFiles.map((f) => ({ name: f.name, summary: f.summary.slice(0, 8000) })),
+        files: mainFiles.map((f) => ({ name: f.name, summary: f.summary.slice(0, 8000) })),
         questions: both.map((x) => ({ id: x.ref, q: x.q })),
       });
       topics = r.topics;
     } catch (e) { topics = []; }
   }
-  if (make.topics) step();
+  if (make.topics && docs.some((d) => !d.context)) step();
   if (!topics.length) {
-    // Without topics from the model, old questions keep their topics and each new file is its own topic.
+    // Without topics from the model, old questions keep their topics and each new non-context file is its own topic.
     const kept = existing ? Object.keys(existing.topics).map((k) => ({
       name: existing.topics[k], ...(existing.topicInfo?.[k] || { summary: "", weakSpots: [], files: [] }),
       questions: prev.filter((x) => x.t === k).map((x) => x.ref),
     })) : [];
-    topics = kept.concat(files.map((f) => ({ name: f.title || f.name, files: [f.name], summary: "", questions: all.filter((x) => x.file === f.name).map((x) => x.ref), weakSpots: [] })));
+    topics = kept.concat(files.filter((f) => !f.context).map((f) => ({ name: f.title || f.name, files: [f.name], summary: "", questions: all.filter((x) => x.file === f.name).map((x) => x.ref), weakSpots: [] })));
   }
 
   const topicNames = {}, topicInfo = {}, of = new Map();

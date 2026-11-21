@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handle, HttpError, limitsFrom, cacheKey } from "../server/generate.js";
-import { buildSubject, stepsFor, retrying, backoff } from "../src/upload/pipeline.js";
+import { buildSubject, stepsFor, retrying, backoff, contextOf } from "../src/upload/pipeline.js";
 import { parseQuiz, parseTopics, parseVision, parseChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
@@ -274,3 +274,46 @@ test("pipeline: a spending limit stops the upload but keeps what finished", asyn
   // Nothing finished at all: the error itself comes back.
   await assert.rejects(buildSubject({ name: "M", docs: docs.slice(1, 2), call: capped, retry: { base: 0 } }), (e) => e === limit);
 });
+
+test("pipeline: context files skip summary/quiz/topics and feed context into other files", async () => {
+  const seen = [];
+  const { call } = fakeCall();
+  const spy = async (task, input) => { seen.push({ task, input }); return call(task, input); };
+  const docs = [
+    { name: "Prednaska.pdf", pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] },
+    { name: "Vzorce.pdf", pages: ["E = (dQ/dP) * (P/Q)"], images: [], context: true },
+  ];
+  assert.equal(stepsFor(docs), 4, "context file adds no summary/quiz/check steps");
+  const sj = await buildSubject({ name: "Mikro", docs, call: spy });
+  const ctxFile = sj.files.find((f) => f.name === "Vzorce.pdf");
+  assert.equal(ctxFile.context, true);
+  assert.equal(ctxFile.summary, "");
+  assert.match(ctxFile.text, /E = \(dQ\/dP\)/);
+  assert.equal(sj.files.find((f) => f.name === "Prednaska.pdf").summary.length > 0, true);
+  for (const t of ["summary", "quiz", "check"]) {
+    const callInput = seen.find((x) => x.task === t).input;
+    assert.match(callInput.context, /Vzorce\.pdf/);
+    assert.match(callInput.context, /E = \(dQ\/dP\)/);
+  }
+  const topicsInput = seen.find((x) => x.task === "topics").input;
+  assert.deepEqual(topicsInput.files.map((f) => f.name), ["Prednaska.pdf"], "context file is excluded from topic files");
+  assert.match(contextOf(sj.files), /E = \(dQ\/dP\)/);
+
+  // Uploading only a context file makes zero AI calls and keeps context text for future uploads.
+  const onlySeen = [];
+  const onlyCtxDocs = [{ name: "Tabulka.pdf", pages: ["Tabuľka hodnôt"], images: [], context: true }];
+  assert.equal(stepsFor(onlyCtxDocs), 0);
+  const onlySj = await buildSubject({ name: "LenKontext", docs: onlyCtxDocs, call: async (t, i) => { onlySeen.push(t); return call(t, i); } });
+  assert.deepEqual(onlySeen, []);
+  assert.equal(onlySj.files[0].context, true);
+  assert.match(onlySj.files[0].text, /Tabuľka hodnôt/);
+});
+
+test("server: optional context is included in prompts and validated", async () => {
+  const d = deps();
+  await handle({ task: "summary", input: { title: "L1", text: "Obsah", context: "Vzorec: F = m*a" } }, d);
+  assert.match(d.calls[0].prompt, /<context>\nVzorec: F = m\*a\n<\/context>/);
+  await rejects(handle({ task: "summary", input: { title: "L1", text: "Obsah", context: 123 } }, d), "bad_input");
+  await rejects(handle({ task: "summary", input: { title: "L1", text: "Obsah", context: "x".repeat(30_001) } }, d), "too_large");
+});
+
