@@ -8,10 +8,13 @@ import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack,
 import { icon, ring } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
+import { renderLimit } from "./limit.js";
+import { openWelcome } from "./welcome.js";
 
 const LOOK_KEY = "studyapp-look";
 const THEME_KEY = "studyapp-theme";
 const LAST_KEY = "studyapp-last-subject";
+const ENTERED_KEY = "studyapp-entered";
 const ROUND = 20;      // questions in a "learn" round
 const SEARCH_FROM = 4; // summaries before the search box shows
 const L = "ABCD";
@@ -46,10 +49,15 @@ function buzz(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern)
 // "<subject>/read/<file number>", "<subject>/quiz". history.state.d counts the steps taken inside the app,
 // so back() knows whether there is somewhere to go back to. An open bottom sheet is an entry too.
 
-const SCREENS = ["today", "home", "subject", "reader", "quiz", "end", "upload", "profile"];
+const SCREENS = ["welcome", "today", "home", "subject", "reader", "quiz", "end", "upload", "profile"];
 const TAB_OF = { today: "today", home: "home", subject: "home", profile: "profile" };
 const scrolls = new Map();
 let dir = "fade", shown = null, screen = null, skipPop = false, booted = false, readerHint = null, readerFocus = null;
+const hasEntered = () => {
+  if (/[?&]autostart=1\b/.test(location.search)) return true;
+  try { return localStorage.getItem(ENTERED_KEY) === "1"; } catch (e) { return false; }
+};
+const markEntered = () => { try { localStorage.setItem(ENTERED_KEY, "1"); } catch (e) {} };
 try { history.scrollRestoration = "manual"; } catch (e) {}
 // After a reload the sheet that was open is closed, so its entry is an ordinary one again.
 if (history.state && history.state.sheet) history.replaceState({ d: history.state.d || 0 }, "");
@@ -71,6 +79,7 @@ function show(id) {
   const on = TAB_OF[id];
   $("tabbar").hidden = !on;
   document.body.classList.toggle("has-tabbar", !!on);
+  document.body.classList.toggle("is-welcome", id === "welcome");
   $("tabbar").querySelectorAll(".tab").forEach((b) => { if (b.dataset.go === on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   const fab = (id === "today" || id === "home") && SUBJECTS.length > 0;
   $("fab").hidden = !fab;
@@ -92,13 +101,15 @@ function route() {
   // The sign-in link comes back with ?code=..., which the upload screen turns into a session.
   const code = !booted && /[?&]code=/.test(location.search);
   booted = true;
-  if (h.startsWith("upload/")) showUpload(h.slice(7));
+  if (h === "welcome" || h === "signin") showWelcome("in");
+  else if (h === "signup") showWelcome("up");
+  else if (h.startsWith("upload/")) showUpload(h.slice(7));
   else if (h.startsWith("exams/")) showUpload(h.slice(6), false, "exams");
-  else if (h === "upload" || code) showUpload();
-  else if (h === "signin") showUpload(null, true);
-  else if (h === "subjects") showHome();
-  else if (h === "profile") showProfile();
+  else if (h === "upload" || code) { markEntered(); showUpload(); }
+  else if (h === "subjects") { markEntered(); showHome(); }
+  else if (h === "profile") { markEntered(); showProfile(); }
   else if (sj) {
+    markEntered();
     const [, sub, arg] = h.slice(sj.id.length).split("/");
     enter(sj);
     const file = sub === "read" ? (sj.files || [])[+arg] : null;
@@ -108,7 +119,8 @@ function route() {
     else if (sub === "review") showWrongReview();
     else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
-  } else showToday();
+  } else if (!SUBJECTS.length && !hasEntered()) showWelcome("in");
+  else showToday();
   shown = h; dir = "fade";
   window.scrollTo(0, y);
   if (readerFocus) {
@@ -132,9 +144,15 @@ window.addEventListener("hashchange", () => { if (here() !== shown) route(); });
 $("tabbar").onclick = (e) => {
   const b = e.target.closest("[data-go]"); if (!b) return;
   if (b.dataset.go === "upload") openUpload();
-  else go({ today: "", home: "subjects", profile: "profile" }[b.dataset.go], true);
+  else { markEntered(); go({ today: "", home: "subjects", profile: "profile" }[b.dataset.go], true); }
 };
 $("fab").onclick = () => openUpload();
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-home]")) return;
+  list = []; stage = "quiz"; readerHint = null;
+  markEntered();
+  go("");
+});
 
 // ===== Bottom sheets and the toast
 
@@ -992,13 +1010,32 @@ async function renderAccount() {
   $("pSign").textContent = t("upload.signOut"); $("pSign").onclick = async () => { await cloud.signOut(); renderAccount(); toast(t("profile.signedOutToast")); };
   try {
     const u = (await cloud.call("usage", {}, getLang())).usage;
-    const pct = u.limitUsd > 0 ? Math.min(100, Math.round((u.monthUsd / u.limitUsd) * 100)) : 0;
-    $("pLimitBar").style.width = pct + "%"; $("pLimit").classList.toggle("warn", pct >= 80);
-    $("pUsage").textContent = t("upload.usage", { pct, spent: "$" + u.monthUsd.toFixed(2), limit: "$" + u.limitUsd.toFixed(2) });
-    $("pLimit").hidden = false;
+    renderLimit($("pLimit"), u, t);
   } catch (e) {}
 }
 function showProfile() { CUR = null; show("profile"); if (dir !== "none") renderAccount(); }
+$("pLanding").onclick = () => go("welcome");
+
+function openLegal(kind) {
+  const isPrivacy = kind === "privacy";
+  $("legalTitle").textContent = isPrivacy ? t("legal.privacyTitle") : t("legal.termsTitle");
+  $("legalBody").replaceChildren(
+    el("p", null, isPrivacy ? t("legal.privacyBody1") : t("legal.termsBody1")),
+    el("p", "hint", isPrivacy ? t("legal.privacyBody2") : t("legal.termsBody2")),
+  );
+  openSheet($("legalSheet"));
+}
+
+function showWelcome(initialMode = "in") {
+  CUR = null;
+  show("welcome");
+  openWelcome({
+    enterApp: () => { markEntered(); go(""); },
+    openLegal,
+    setLangUI,
+    toast,
+  }, initialMode);
+}
 
 // ===== Upload
 

@@ -8,6 +8,7 @@ import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ext } fro
 import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { icon } from "../app/icons.js";
+import { renderLimit } from "../app/limit.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
 const MAKE_KEY = "studyapp-make";
@@ -36,7 +37,6 @@ function panel(id) {
 }
 function step(n) { $("upStep1").hidden = n !== 1; $("upStep2").hidden = n !== 2; dots(n); }
 function error(msg) { $("upErr").textContent = msg || ""; $("upErr").hidden = !msg; }
-function usd(n) { return "$" + (Math.round(n * 100) / 100).toFixed(2); }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function message(e) {
@@ -49,15 +49,8 @@ function message(e) {
   return t("upload.err.server", { msg: e.message || String(e) });
 }
 
-// The monthly limit as a bar. The plan counts pages later; for now the cap is in dollars.
-function showUsage(u) {
-  if (!u) return;
-  const pct = u.limitUsd > 0 ? Math.min(100, Math.round((u.monthUsd / u.limitUsd) * 100)) : 0;
-  $("upLimitBar").style.width = pct + "%";
-  $("upLimit").classList.toggle("warn", pct >= 80);
-  $("upUsage").textContent = t("upload.usage", { pct, spent: usd(u.monthUsd), limit: usd(u.limitUsd) });
-  $("upLimit").hidden = false;
-}
+// The monthly limit as a structured quota meter. The plan counts pages later; for now the cap is in dollars.
+function showUsage(u) { renderLimit($("upLimit"), u, t); }
 
 function renderMake() {
   const onlyCtx = onlyContext();

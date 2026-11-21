@@ -1,7 +1,7 @@
 # Study App — Status & Handoff
 
 Last updated: 2026-11-21
-Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**62/62**).
+Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**63/63**).
 
 Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
 
@@ -60,6 +60,13 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
   - Upgraded `debloatSystem` and `quizSystem` with concise subject-adaptive guidance (~60 tokens each, zero extra API calls, preserves `ai_cache` sharing across students): notes variable meanings & validity assumptions for formulas/stats, causal direction/exceptions/thresholds/contrasts for econ/law/sciences, trade-offs/complexity for technical/CS material, realistic student-mistake distractors in quizzes, and plain Unicode math symbols instead of raw LaTeX.
   - Because `server/generate.js` hashes `req.system` into `cacheKey`, `summary` and `quiz` automatically get fresh cache keys without invalidating other tasks. Requires `npm run fn:prepare` + Supabase Edge Function redeploy to take effect on live uploads.
 
+### 1.8 Global Home Button, Redesigned Monthly Limit Meter & Landing / Sign-In / Sign-Up Screen
+- **Files**: `index.html`, `src/app/limit.js`, `src/app/welcome.js`, `src/app/app.js`, `src/upload/ui.js`, `src/styles/app.css`, `src/i18n/{sk,cs}.json`, `test/limit.test.mjs`, `test/smoke.mjs`
+- **How it works**:
+  - **Global Home button**: Added `<button class="iconbtn homebtn" type="button" data-home>` (house icon) to `#home`, `#subject`, `#reader`, `#quiz`, `#end`, `#upload`, and `#profile`, and made the desktop rail `.brand` a clickable button to `#today`. A single delegated `[data-home]` click listener clears transient `list`, `stage`, and `readerHint`, marks the app entered, and routes to `""` (`#today`).
+  - **Redesigned upload limit bar**: Extracted pure `limitInfo(u)` and DOM updater `renderLimit(box, u, t)` into `src/app/limit.js` (shared by `#upLimit` and `#pLimit`). Renders a structured quota card with label + explicit text status (`ok` / `warn` at >=80% / `full` at >=100%) + tabular percentage, segmented track with quarter markers and animated fill, and footer showing formatted usage (`Využité X z Y`) + `"Obnoví sa 1. v mesiaci"`, styled across all 6 looks and dark mode.
+  - **Landing + Sign-In / Sign-Up screen (`#welcome`)**: Opens on first visit at `/` when no local subjects exist and `studyapp-entered` is unset (bypassable with `?autostart=1`), and explicitly via `#welcome`, `#signin`, `#signup`, or `#pLanding` on Profile. Features a 3-zone topbar, hero split with concrete product value props + passwordless Supabase OTP auth card (`in`/`up` segmented tabs, email validation, 16+ age & Terms/Privacy checkbox on Sign Up, 8-digit code step, 60s resend cooldown, signed-in state, offline preview note, and `"Alebo vyskúšaj bez účtu"`), 3-step How It Works, asymmetric Capabilities Bento with live CSS-token UI excerpt preview, 4-item FAQ accordion, footer with SK/CS switch, and `#legalSheet` modal for Terms & Privacy.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)
@@ -85,7 +92,7 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
 
 ## 4. Verification & Local Container Notes
 
-- **Unit tests**: `npm test` (61 tests across `ai`, `exams`, `i18n`, `md`, `plan`, `server`, `sync`).
+- **Unit tests**: `npm test` (63 tests across `ai`, `exams`, `i18n`, `limit`, `md`, `plan`, `server`, `sync`).
 - **Lint & build**: `npm run lint` (`node --check` on all JS/MJS) and `npm run build` (`vite build`).
 - **Browser tests in this container**: `npm run smoke` and `npm run e2e` import the `playwright` npm package, whose bundled revision may not match the preinstalled container Chromium; use global `playwright-cli` (`http://localhost:3000`, seed `localStorage.setItem("studyapp-subjects-v1", ...)` then reload) for live headless Chromium verification here, and run `npm run smoke` / `npm run e2e` / `npm run test:db` in CI or local dev.
 - **HMR is disabled** in the AI Studio preview environment: restart the dev server after code edits before testing `http://localhost:3000`.

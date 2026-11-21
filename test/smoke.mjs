@@ -52,7 +52,9 @@ const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("âœ
 
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base);
-check(await page.locator("#today").isVisible() && await page.locator("#tabbar").isVisible(), "start screen shows with the tab bar");
+check(await page.locator("#welcome").isVisible() && await page.locator("#tabbar").isHidden(), "first visit opens the landing and sign-in screen");
+await page.click("#wGuest");
+check(await page.locator("#today").isVisible() && await page.locator("#tabbar").isVisible(), "continuing without account opens Today with the tab bar");
 check((await page.locator(".sj").count()) === 1, "no subjects, only the empty-state card");
 
 await page.evaluate((s) => localStorage.setItem("studyapp-subjects-v1", JSON.stringify([s])), SUBJECT);
