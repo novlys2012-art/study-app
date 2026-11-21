@@ -494,7 +494,7 @@ function renderExams() {
     // Empty state: one sentence and the button that fixes it.
     const c = el("div", "empty");
     const art = el("span", "empty-art"); art.appendChild(icon("doc"));
-    c.append(art, el("p", null, t("exams.emptyText")), addExamsButton("exams.add", "btn"));
+    c.append(art, el("p", null, t("exams.emptyText")), addExamsButton("exams.add", "btn"), el("p", "hint", t("exams.honest")));
     box.replaceChildren(c);
     return;
   }
