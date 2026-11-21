@@ -12,7 +12,7 @@ const SHEET_FOR = {
 const loaded = new Set();
 
 export function fontSheetForLook(look) {
-  return SHEET_FOR[look || ""] || "kocky";
+  return SHEET_FOR[look || ""] || "kniha";
 }
 
 export function loadLookFonts(look) {

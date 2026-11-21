@@ -29,6 +29,7 @@ test("sample subject has valid SK and CS content, 8 questions, summary matches, 
     assert.equal(sj.sample, true);
     assert.equal(sj.questions.length, 8);
     assert.equal(sj.files.length, 1);
+    assert.ok(sj.files[0].keyTerms.length > 0 && sj.files[0].keyTerms.every((k) => k.term && k.meaning), "sample keyTerms have term and meaning");
     const blocks = summaryBlocks(sj.files[0].summary);
     for (const q of sj.questions) {
       assert.ok(q.id && q.t && q.q && Array.isArray(q.o) && q.o.length === 4 && q.s);
@@ -143,6 +144,7 @@ test("extractOtpDigits handles pasted spaced codes and fontSheetForLook maps eve
   assert.equal(fontSheetForLook("tabula"), "zosit");
   assert.equal(fontSheetForLook("cisty"), "cisty");
   assert.equal(fontSheetForLook("riso"), "riso");
+  assert.equal(fontSheetForLook("unknown"), "kniha");
 });
 
 test("public static legal pages exist for SK and CS and stay synced with i18n text", async () => {

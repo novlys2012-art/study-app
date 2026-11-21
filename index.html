@@ -16,11 +16,11 @@
 <meta name="twitter:description" content="Zhrnutia bez balastu, kvíz s presným zdrojom a témy zo starých skúšok z tvojich vlastných materiálov.">
 <meta name="twitter:image" content="./og.png">
 <meta name="apple-mobile-web-app-title" content="Lekto">
-<meta name="theme-color" content="#eef2fb">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235a5ff0'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23ffd86b'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f5f2eb">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23195d4b'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23ffd86b'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
 <title>Lekto – Z prednášok rovno k skúške</title>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
-<noscript><link rel="stylesheet" href="./fonts/kocky.css"></noscript>
+<noscript><link rel="stylesheet" href="./fonts/kniha.css"></noscript>
 </head>
 <body>
 <nav class="tabbar" id="tabbar" data-i18n-label="nav.main" hidden>
@@ -74,12 +74,12 @@
       </figure>
     </div>
 
-    <div class="w-sec" id="wHow">
+    <div class="w-sec w-split" id="wHow">
       <h2 class="w-h2" data-i18n="welcome.howTitle">Ako to funguje</h2>
       <ol class="w-steps">
-        <li><span class="w-step-num" aria-hidden="true">01</span><h3 data-i18n="welcome.s1Title">Nahraj materiály</h3><p class="hint" data-i18n="welcome.s1Text">PDF, slajdy či poznámky. Vzorce označ ako kontext.</p></li>
-        <li><span class="w-step-num" aria-hidden="true">02</span><h3 data-i18n="welcome.s2Title">Prejdi si zhrnutie</h3><p class="hint" data-i18n="welcome.s2Text">Body a kľúčové pojmy bez zbytočnej vaty.</p></li>
-        <li><span class="w-step-num" aria-hidden="true">03</span><h3 data-i18n="welcome.s3Title">Precvičuj chyby</h3><p class="hint" data-i18n="welcome.s3Text">Kvíz opakuje slabé miesta a ukáže zdroj v zhrnutí.</p></li>
+        <li><h3 data-i18n="welcome.s1Title">Nahraj materiály</h3><p class="hint" data-i18n="welcome.s1Text">PDF, slajdy či poznámky. Vzorce označ ako kontext.</p></li>
+        <li><h3 data-i18n="welcome.s2Title">Prejdi si zhrnutie</h3><p class="hint" data-i18n="welcome.s2Text">Body a kľúčové pojmy bez zbytočnej vaty.</p></li>
+        <li><h3 data-i18n="welcome.s3Title">Precvičuj chyby</h3><p class="hint" data-i18n="welcome.s3Text">Kvíz opakuje slabé miesta a ukáže zdroj v zhrnutí.</p></li>
       </ol>
     </div>
 
@@ -89,36 +89,29 @@
           <h2 class="w-h2" data-i18n="welcome.f3Title">Témy zo starých skúšok</h2>
           <p class="hint" data-i18n="welcome.f3Text">Nahraj staré zadania a precvičuj okruhy podľa toho, ako často sa opakujú.</p>
           <p class="hint w-exams-note" data-i18n="welcome.examsPreviewNote">Ukážka z 5 skúšok (2021–2025)</p>
-        </div>
-        <div class="stack w-exams-preview">
-          <div class="tcard">
-            <div class="tbar w-rank-row">
-              <div class="tbar-top"><span data-i18n="welcome.examsRow1">1. Glykolýza a regulácia</span><span class="pct" data-i18n="welcome.examsRow1Count">v 4 z 5 skúšok</span></div>
-              <span class="bar"><i style="width:80%"></i></span>
-            </div>
-          </div>
-          <div class="tcard">
-            <div class="tbar w-rank-row">
-              <div class="tbar-top"><span data-i18n="welcome.examsRow2">2. Oxidačná fosforylácia</span><span class="pct" data-i18n="welcome.examsRow2Count">v 3 z 5 skúšok</span></div>
-              <span class="bar"><i style="width:60%"></i></span>
-            </div>
-          </div>
-          <div class="tcard">
-            <div class="tbar w-rank-row">
-              <div class="tbar-top"><span data-i18n="welcome.examsRow3">3. Citrátový cyklus</span><span class="pct" data-i18n="welcome.examsRow3Count">v 2 z 5 skúšok</span></div>
-              <span class="bar"><i style="width:40%"></i></span>
-            </div>
+          <div class="w-plan-block">
+            <h3 data-i18n="welcome.f2Title">Denný plán do skúšky</h3>
+            <p class="hint" data-i18n="welcome.f2Text">Zadaj dátum termínu a Lekto každý deň namieša opakovania aj nové otázky.</p>
           </div>
         </div>
-      </div>
-
-      <div class="w-plan-block">
-        <h3 data-i18n="welcome.f2Title">Denný plán do skúšky</h3>
-        <p class="hint" data-i18n="welcome.f2Text">Zadaj dátum termínu a Lekto každý deň namieša opakovania aj nové otázky.</p>
+        <div class="w-exams-preview w-rank-ledger">
+          <div class="tbar w-rank-row">
+            <div class="tbar-top"><span data-i18n="welcome.examsRow1">1. Glykolýza a regulácia</span><span class="pct" data-i18n="welcome.examsRow1Count">v 4 z 5 skúšok</span></div>
+            <span class="bar"><i style="width:80%"></i></span>
+          </div>
+          <div class="tbar w-rank-row">
+            <div class="tbar-top"><span data-i18n="welcome.examsRow2">2. Oxidačná fosforylácia</span><span class="pct" data-i18n="welcome.examsRow2Count">v 3 z 5 skúšok</span></div>
+            <span class="bar"><i style="width:60%"></i></span>
+          </div>
+          <div class="tbar w-rank-row">
+            <div class="tbar-top"><span data-i18n="welcome.examsRow3">3. Citrátový cyklus</span><span class="pct" data-i18n="welcome.examsRow3Count">v 2 z 5 skúšok</span></div>
+            <span class="bar"><i style="width:40%"></i></span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="w-sec" id="wFaq">
+    <div class="w-sec w-split" id="wFaq">
       <h2 class="w-h2" data-i18n="welcome.faqTitle">Časté otázky</h2>
       <!-- TODO(pricing): confirm typical lecture count per 100 credits once real usage/paid tiers are finalized -->
       <div class="cards w-faq">
@@ -391,9 +384,9 @@
     <div class="sheet">
       <p class="label" data-i18n="header.looks">Vzhľad</p>
       <div class="looks-grid" id="looks">
-        <button class="look" type="button" data-l="kocky" aria-pressed="true"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.kocky">Kocky</span></button>
+        <button class="look" type="button" data-l="" aria-pressed="true"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.kniha">Účtovná kniha</span></button>
+        <button class="look" type="button" data-l="kocky" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.kocky">Kocky</span></button>
         <button class="look" type="button" data-l="riso" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.riso">Riso</span></button>
-        <button class="look" type="button" data-l="" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.kniha">Účtovná kniha</span></button>
         <button class="look" type="button" data-l="zosit" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.zosit">Zošit</span></button>
         <button class="look" type="button" data-l="tabula" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.tabula">Tabuľa</span></button>
         <button class="look" type="button" data-l="cisty" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i><i></i></span><span data-i18n="look.cisty">Čistý</span></button>

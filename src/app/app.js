@@ -953,18 +953,18 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
 });
 
-// ===== Profile: account, monthly limit, look (Kocky is the default; a saved choice, even the empty Účtovná kniha, wins)
+// ===== Profile: account, monthly limit, look (Účtovná kniha is the default; a saved choice wins)
 
 // The browser's own bars take the page colour of the chosen look.
 function paintChrome() {
   const m = document.querySelector('meta[name="theme-color"]');
   if (m) m.content = getComputedStyle(document.body).getPropertyValue("--paper").trim() || m.content;
 }
-function setLook(l) {
+function setLook(l, save = true) {
   if (l) document.body.dataset.look = l; else delete document.body.dataset.look;
   loadLookFonts(l);
   [...$("looks").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", b.dataset.l === l));
-  try { localStorage.setItem(LOOK_KEY, l); } catch (e) {}
+  if (save) try { localStorage.setItem(LOOK_KEY, l); } catch (e) {}
   // Zošit is light only and Tabuľa dark only.
   const fixed = l === "zosit" || l === "tabula";
   [...$("themes").children].forEach((b) => (b.disabled = fixed));
@@ -992,7 +992,7 @@ $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b
 $("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); } };
 let look0 = null, theme0 = ""; try { look0 = localStorage.getItem(LOOK_KEY); theme0 = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
 setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
-setLook(look0 == null ? "kocky" : look0);
+setLook(look0 == null ? "" : look0, false);
 setLangUI(getLang());
 
 let pendingSignOutOpts = null;
@@ -1033,11 +1033,12 @@ async function renderAccount() {
   $("pSign").hidden = true; $("pLimit").hidden = true; $("pWho").textContent = ""; $("pEmail").textContent = ""; $("pAvatar").textContent = "";
   $("pAvatar").classList.add("wait");
   const cloud = await import("../cloud/supabase.js");
-  if (!cloud.configured) { $("pAvatar").classList.remove("wait"); $("pWho").textContent = t("upload.off"); return; }
+  if (!cloud.configured) { $("pAvatar").classList.remove("wait"); $("pAvatar").replaceChildren(icon("user")); $("pWho").textContent = t("upload.off"); return; }
   let s = null; try { s = await cloud.session(); } catch (e) {}
   $("pAvatar").classList.remove("wait");
   $("pSign").hidden = false;
   if (!s) {
+    $("pAvatar").replaceChildren(icon("user"));
     $("pEmail").textContent = t("profile.guest");
     $("pWho").textContent = t("profile.signedOut");
     $("pSign").className = "btn wide";
