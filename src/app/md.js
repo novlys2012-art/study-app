@@ -26,3 +26,69 @@ export function renderMarkdown(src) {
   }
   return box;
 }
+
+const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const words = (s) => norm(s).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4);
+const stem = (w) => w.slice(0, Math.max(4, w.length - 2));
+
+// Picks the summary block (<p> or <li>) that best matches a quiz question's quote/explanation.
+export function matchSummaryBlock(blocks, { quote = "", extras = [] } = {}) {
+  const qNorm = norm(quote).replace(/\s+/g, " ").trim();
+  if (qNorm.length >= 6) {
+    const exact = blocks.findIndex((b) => norm(b).replace(/\s+/g, " ").includes(qNorm));
+    if (exact >= 0) return { index: exact, phrase: quote.trim() };
+  }
+  const qStems = new Set(words(quote).map(stem));
+  const eStems = new Set(extras.flatMap(words).map(stem));
+  if (!qStems.size && !eStems.size) return null;
+  let best = -1, top = 0;
+  blocks.forEach((b, idx) => {
+    const bw = new Set(words(b).map(stem));
+    let score = 0;
+    qStems.forEach((w) => { if (bw.has(w)) score += 3; });
+    eStems.forEach((w) => { if (bw.has(w)) score += 1; });
+    if (score > top) { top = score; best = idx; }
+  });
+  return top >= 3 ? { index: best, phrase: "" } : null;
+}
+
+export function highlightMatch(el, phrase) {
+  el.classList.add("hl-block");
+  const target = norm(phrase).replace(/\s+/g, " ").trim();
+  if (!target) return el;
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let nStr = "", prevSpace = false;
+  const map = [];
+  for (let t; (t = walk.nextNode()); ) {
+    for (let p = 0; p < t.data.length; p++) {
+      const raw = norm(t.data[p]);
+      for (let c = 0; c < raw.length; c++) {
+        const ch = /\s/.test(raw[c]) ? " " : raw[c];
+        if (ch === " " && prevSpace) continue;
+        prevSpace = ch === " ";
+        nStr += ch;
+        map.push({ t, p });
+      }
+    }
+  }
+  const at = nStr.indexOf(target);
+  if (at < 0) return el;
+  const ranges = new Map();
+  for (let k = at; k < at + target.length; k++) {
+    const { t, p } = map[k];
+    const r = ranges.get(t);
+    if (r) r[1] = p + 1; else ranges.set(t, [p, p + 1]);
+  }
+  for (const [t, [start, rawEnd]] of ranges) {
+    let end = rawEnd;
+    while (end < t.data.length && /[\u0300-\u036f]/.test(t.data[end])) end++;
+    t.splitText(end);
+    const mid = t.splitText(start);
+    const mark = document.createElement("mark");
+    mark.className = "hl";
+    mid.replaceWith(mark);
+    mark.appendChild(mid);
+  }
+  return el;
+}
+

@@ -4,7 +4,7 @@
 import { t, getLang, setLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress } from "./subjects.js";
 import { startSync } from "./autosync.js";
-import { renderMarkdown } from "./md.js";
+import { renderMarkdown, matchSummaryBlock, highlightMatch } from "./md.js";
 import { icon, ring } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
@@ -49,7 +49,7 @@ function buzz(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern)
 const SCREENS = ["today", "home", "subject", "reader", "quiz", "end", "upload", "profile"];
 const TAB_OF = { today: "today", home: "home", subject: "home", profile: "profile" };
 const scrolls = new Map();
-let dir = "fade", shown = null, screen = null, skipPop = false, booted = false;
+let dir = "fade", shown = null, screen = null, skipPop = false, booted = false, readerHint = null, readerFocus = null;
 try { history.scrollRestoration = "manual"; } catch (e) {}
 // After a reload the sheet that was open is closed, so its entry is an ordinary one again.
 if (history.state && history.state.sheet) history.replaceState({ d: history.state.d || 0 }, "");
@@ -104,11 +104,16 @@ function route() {
     const file = sub === "read" ? (sj.files || [])[+arg] : null;
     if (sub === "quiz" && !list.length) { go(sj.id, true); return; }
     if (sub === "quiz") { if (stage === "end") showEnd(); else showQuiz(); }
-    else if (file && file.summary) showReader(file);
+    else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
   } else showToday();
   shown = h; dir = "fade";
   window.scrollTo(0, y);
+  if (readerFocus) {
+    const targetEl = readerFocus;
+    readerFocus = null;
+    requestAnimationFrame(() => targetEl.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }
 }
 // Draws the current screen again in place (after a sync, or a change made in a sheet).
 function refresh() { dir = "none"; route(); }
@@ -384,7 +389,7 @@ function renderFiles() {
   if (sortBy === "az") rows.sort((x, y) => x.name.localeCompare(y.name, getLang()));
   if (sortBy === "long") rows.sort((x, y) => y.size - x.size);
   $("files").replaceChildren(...rows.map(({ f, name }) => {
-    const b = button("rowcard file", null, () => go(CUR.id + "/read/" + CUR.files.indexOf(f)));
+    const b = button("rowcard file", null, () => { readerHint = null; go(CUR.id + "/read/" + CUR.files.indexOf(f)); });
     const g = el("span", "grow"), art = el("span", "file-art");
     art.appendChild(icon("doc"));
     const pageHint = f.context ? t("study.contextPages", { before: f.pagesBefore }) : t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") });
@@ -556,7 +561,7 @@ function openPastExam(id) {
 
 // ===== Summary reader
 
-function showReader(f) {
+function showReader(f, fileIndex = -1) {
   $("rTitle").textContent = f.title || f.name;
   const pagesLabel = f.context ? t("study.contextPages", { before: f.pagesBefore }) : t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") });
   $("rMeta").textContent = [f.title && f.title !== f.name ? f.name : "", pagesLabel].filter(Boolean).join(" · ");
@@ -570,6 +575,12 @@ function showReader(f) {
     heads = [...md.querySelectorAll("h3")];
   } else if (f.text) {
     f.text.split(/\n{2,}/).forEach((p) => body.appendChild(el("p", null, p)));
+  }
+  readerFocus = null;
+  if (readerHint && readerHint.fi === fileIndex) {
+    const blocks = [...body.querySelectorAll("p, li")];
+    const match = matchSummaryBlock(blocks.map((n) => n.textContent), readerHint);
+    if (match) readerFocus = highlightMatch(blocks[match.index], match.phrase);
   }
   // A row of the summary's headings, to jump around a long one.
   $("rToc").replaceChildren(...heads.map((h) => button(null, h.textContent, () => h.scrollIntoView({ behavior: "smooth", block: "start" }))));
@@ -775,7 +786,11 @@ function grade(sel) {
   m.hidden = !m.childNodes.length;
   const fi = ok ? -1 : sourceFile(x);
   $("openSrc").hidden = fi < 0;
-  $("openSrc").onclick = fi >= 0 ? () => go(CUR.id + "/read/" + fi) : null;
+  $("openSrc").onclick = fi >= 0 ? () => {
+    const quote = String(x.s || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+    readerHint = { fi, quote, extras: [x.e, x.q, ...corr(x).map((k) => x.o[k])].filter(Boolean) };
+    go(CUR.id + "/read/" + fi);
+  } : null;
   $("pg").style.width = ((i + 1) / list.length) * 100 + "%";
   $("next").textContent = t(i === list.length - 1 ? "quiz.toResult" : "quiz.next");
   fb.hidden = false;
