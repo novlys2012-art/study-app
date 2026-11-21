@@ -155,12 +155,6 @@ $("tabbar").onclick = (e) => {
   else { markEntered(); go({ today: "", home: "subjects", profile: "profile" }[b.dataset.go], true); }
 };
 $("fab").onclick = () => openUpload();
-document.addEventListener("click", (e) => {
-  if (!e.target.closest("[data-home]")) return;
-  list = []; stage = "quiz"; readerHint = null;
-  markEntered();
-  go("");
-});
 
 // ===== Bottom sheets and the toast
 
@@ -221,15 +215,12 @@ const soonClass = (sj) => { const d = daysTo(sj.exam); return d != null && d >= 
 
 // ===== Today
 
-// What an empty app shows: one sentence, the three steps and the button.
-function emptyState(clickableArt = false) {
+// What an empty app shows: one sentence and the button that fixes it.
+function emptyState() {
   const box = el("div", "empty big");
-  const art = clickableArt ? button("btn empty-art", null, () => openUpload()) : el("span", "empty-art");
-  if (clickableArt) art.setAttribute("aria-label", t("nav.addLong"));
+  const art = el("span", "empty-art");
   art.appendChild(icon("up"));
-  const steps = el("ol", "steps");
-  ["home.stepUpload", "home.stepRead", "home.stepPractise"].forEach((k) => steps.appendChild(el("li", null, t(k))));
-  box.append(art, el("h2", null, t("home.empty.title")), el("p", null, t("home.empty.text")), steps,
+  box.append(art, el("h2", null, t("home.empty.title")), el("p", null, t("home.empty.text")),
     button("btn wide sj add", t("home.empty.go"), () => openUpload()));
   return box;
 }
@@ -244,7 +235,7 @@ function countdown(sj) {
 function renderToday() {
   const box = $("todayBody"); box.innerHTML = ""; $("subjects").innerHTML = "";
   $("todayDate").textContent = new Date().toLocaleDateString(getLang(), { weekday: "long", day: "numeric", month: "long" });
-  if (!SUBJECTS.length) { box.appendChild(emptyState(true)); return; }
+  if (!SUBJECTS.length) { box.appendChild(emptyState()); return; }
   let last = ""; try { last = localStorage.getItem(LAST_KEY) || ""; } catch (e) {}
   const rows = SUBJECTS.map((sj) => {
     const log = readLog(sj);
@@ -259,7 +250,7 @@ function renderToday() {
     const c = el("div", "sheet hero");
     const open = button("hero-open", null, () => go(hero.sj.id));
     const names = el("span", "grow");
-    names.append(el("span", "eyebrow", t(soon ? "today.nextExam" : "today.continue")), el("span", "hero-name", hero.sj.name));
+    names.append(el("span", "hero-name", hero.sj.name));
     open.append(names, icon("chev"));
     c.appendChild(open);
     const mid = el("div", "hero-mid");
@@ -503,7 +494,7 @@ function renderExams() {
     // Empty state: one sentence and the button that fixes it.
     const c = el("div", "empty");
     const art = el("span", "empty-art"); art.appendChild(icon("doc"));
-    c.append(art, el("p", null, t("exams.emptyText")), addExamsButton("exams.add", "btn"), el("p", "hint", t("exams.honest")));
+    c.append(art, el("p", null, t("exams.emptyText")), addExamsButton("exams.add", "btn"));
     box.replaceChildren(c);
     return;
   }

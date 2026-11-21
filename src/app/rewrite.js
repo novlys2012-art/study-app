@@ -58,7 +58,7 @@ export function startRewrite(root, opts = {}) {
 
   const vh = window.innerHeight || 800;
   const raw = [];
-  root.querySelectorAll("[data-i18n], #wSent").forEach((el) => {
+  root.querySelectorAll("[data-i18n]").forEach((el) => {
     if (el.childElementCount > 0 || el.getClientRects().length === 0) return;
     const target = el.textContent;
     if (!target || !target.trim()) return;
