@@ -293,7 +293,7 @@
   "review.practise": "Zopakovať tieto chyby",
   "upload.limitWarn": "Blízko limitu",
   "upload.limitFull": "Limit vyčerpaný",
-  "upload.limitReset": "Obnoví sa 1. v mesiaci",
+  "upload.limitReset": "Obnoví sa {date}",
   "upload.limitNote": "100 kreditov vystačí približne na 20–30 prednášok a zhrnutí mesačne.",
   "welcome.navHow": "Ako to funguje",
   "welcome.navFeatures": "Čo dostaneš",

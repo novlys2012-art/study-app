@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { buildSampleSubject, ensureSampleSubject, SAMPLE_ID } from "../src/app/sample.js";
-import { loadSubjects, saveSubjects, loadMeta, clearLocal, logAnswer, resetProgress, readProgress, unsent, hasUnsynced, onLocalChange } from "../src/app/subjects.js";
+import { loadSubjects, saveSubjects, loadMeta, saveMeta, clearLocal, removeSamples, logAnswer, resetProgress, readProgress, readLog, unsent, hasUnsynced, onLocalChange } from "../src/app/subjects.js";
 import { authMessage, readPendingAuth, writePendingAuth, clearPendingAuth, extractOtpDigits, PENDING_TTL_MS } from "../src/app/auth-state.js";
 import { fontSheetForLook } from "../src/app/fonts.js";
 import { rankExams } from "../src/app/exams.js";
@@ -71,6 +71,33 @@ test("sample subject stays local-only: never marks sync metadata, never appears 
   assert.equal(loadSubjects().length, 0);
   assert.deepEqual(loadMeta().s, {});
   assert.equal(hasUnsynced(), false);
+  assert.equal(changeEvents, 0);
+
+  onLocalChange(null);
+  clearLocal();
+});
+
+test("removeSamples drops preview subjects and their logs without touching real subjects or sync marks", () => {
+  localStorage.clear();
+  const real = { id: "real-1", name: "Mikro", topics: {}, questions: [{ id: "q1", t: "t1", q: "?", o: ["a", "b"], a: 0 }] };
+  saveSubjects([real]);
+  logAnswer(real, "q1", true);
+
+  ensureSampleSubject("sk");
+  const sample = loadSubjects().find((sj) => sj.id === SAMPLE_ID);
+  logAnswer(sample, sample.questions[0].id, true);
+  saveMeta({ user: "u1", s: { "real-1": { at: 1, base: 1, dirty: false, del: false }, [SAMPLE_ID]: { at: 1, dirty: true } }, rc: null });
+
+  let changeEvents = 0;
+  onLocalChange(() => { changeEvents++; });
+
+  assert.equal(removeSamples(), true);
+  assert.equal(removeSamples(), false);
+  assert.deepEqual(loadSubjects().map((sj) => sj.id), ["real-1"]);
+  assert.deepEqual(readLog(SAMPLE_ID), []);
+  assert.equal(readProgress(real).q1.c, 1);
+  assert.equal(loadMeta().s[SAMPLE_ID], undefined);
+  assert.equal(loadMeta().s["real-1"].dirty, false);
   assert.equal(changeEvents, 0);
 
   onLocalChange(null);

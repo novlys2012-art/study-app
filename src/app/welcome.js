@@ -2,6 +2,7 @@
 // Lazy-loads Supabase so first paint stays fast when opening directly into the app.
 import { t, getLang } from "../i18n/index.js";
 import { syncNow } from "./autosync.js";
+import { removeSamples } from "./subjects.js";
 import { startRewrite, stopRewrite } from "./rewrite.js";
 import {
   OTP_LENGTH,
@@ -15,7 +16,7 @@ import {
 const $ = (id) => document.getElementById(id);
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-let wired = false, pendingEmail = "", codeStep = false, busy = false, resendLeft = 0, resendTimer = 0;
+let wired = false, pendingEmail = "", codeStep = false, busy = false, signedIn = false, resendLeft = 0, resendTimer = 0;
 let hooks = null;
 
 const FIELDS = ["wEmail", "wCode", "wAgree"];
@@ -144,10 +145,12 @@ async function refreshAuthState() {
   err("");
   const cloud = await import("../cloud/supabase.js");
   if (!cloud.configured) {
+    signedIn = false;
     $("wOffBox").hidden = false;
     $("wSignedBox").hidden = true;
     $("wAuthForms").hidden = true;
     $("wNavCta").textContent = t("welcome.navCta");
+    $("wGuest").textContent = t("welcome.guest");
     syncHeaderCopy();
     return;
   }
@@ -155,6 +158,8 @@ async function refreshAuthState() {
   let s = null;
   try { s = await cloud.session(); } catch (e) {}
   if (s && s.user) {
+    signedIn = true;
+    removeSamples();
     clearPendingAuth();
     const email = s.user.email || "";
     $("wAvatar").textContent = email.slice(0, 1).toUpperCase();
@@ -162,11 +167,14 @@ async function refreshAuthState() {
     $("wSignedBox").hidden = false;
     $("wAuthForms").hidden = true;
     $("wNavCta").textContent = t("welcome.signedInTitle");
+    $("wGuest").textContent = t("welcome.continueApp");
     syncHeaderCopy();
   } else {
+    signedIn = false;
     $("wSignedBox").hidden = true;
     $("wAuthForms").hidden = false;
     $("wNavCta").textContent = t("welcome.navCta");
+    $("wGuest").textContent = t("welcome.guest");
     restorePendingIfFresh();
   }
 }
@@ -181,6 +189,8 @@ async function submitVerify() {
   setBusy(true, "verify");
   try {
     await cloud.verifyCode(pendingEmail || $("wEmail").value.trim(), code);
+    signedIn = true;
+    removeSamples();
     stopTimer();
     clearPendingAuth();
     pendingEmail = "";
@@ -220,7 +230,7 @@ function wire() {
 
   $("wNavCta").onclick = () => openAuthDialog();
 
-  $("wGuest").onclick = () => hooks.trySample();
+  $("wGuest").onclick = () => (signedIn ? hooks.enterApp() : hooks.trySample());
   $("wOffEnter").onclick = () => { hooks.closeAuthSheet(); hooks.trySample(); };
   $("wFootOpen").onclick = () => hooks.enterApp();
   $("wContinue").onclick = () => { hooks.closeAuthSheet(); hooks.enterApp(); };
@@ -309,7 +319,10 @@ function wire() {
     syncLangButtons();
     syncHeaderCopy();
     if (codeStep && pendingEmail) $("wSent").textContent = t("upload.sent", { email: pendingEmail });
-    if (!$("wSignedBox").hidden) $("wNavCta").textContent = t("welcome.signedInTitle");
+    if (signedIn) {
+      $("wNavCta").textContent = t("welcome.signedInTitle");
+      $("wGuest").textContent = t("welcome.continueApp");
+    }
     updateResend();
     startRewrite($("welcome"));
   };

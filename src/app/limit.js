@@ -14,7 +14,13 @@ export function limitInfo(u) {
   return { pct, state, used, limit, remaining };
 }
 
-export function renderLimit(box, u, t) {
+// Monthly quota resets on the 1st of the next calendar month (UTC, matching Postgres date_trunc('month', now())).
+export function nextResetDate(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return `${d.getUTCDate()}. ${d.getUTCMonth() + 1}. ${d.getUTCFullYear()}`;
+}
+
+export function renderLimit(box, u, t, now) {
   const info = limitInfo(u);
   if (!box || !info) return false;
   box.classList.toggle("warn", info.state === "warn");
@@ -34,7 +40,7 @@ export function renderLimit(box, u, t) {
   const usageEl = box.querySelector("[data-limit-usage]");
   if (usageEl) usageEl.textContent = t("upload.usage", { used: info.used, limit: info.limit });
   const resetEl = box.querySelector("[data-limit-reset]");
-  if (resetEl) resetEl.textContent = t("upload.limitReset");
+  if (resetEl) resetEl.textContent = t("upload.limitReset", { date: nextResetDate(now) });
   box.hidden = false;
   return true;
 }

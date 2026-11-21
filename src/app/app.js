@@ -2,7 +2,7 @@
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
 import { t, getLang, setLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
+import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { icon, ring } from "./icons.js";
@@ -10,7 +10,7 @@ import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
 import { renderLimit } from "./limit.js";
 import { openWelcome } from "./welcome.js";
-import { ensureSampleSubject } from "./sample.js";
+import { ensureSampleSubject, SAMPLE_ID } from "./sample.js";
 import { loadLookFonts } from "./fonts.js";
 
 const LOOK_KEY = "studyapp-look";
@@ -103,6 +103,9 @@ function route() {
   if (!code && !hasSessionToken() && loadMeta().user) {
     clearLocal(); clearEntered();
     try { localStorage.removeItem(LAST_KEY); } catch (e) {}
+  }
+  if (hasSessionToken() && removeSamples()) {
+    try { if (localStorage.getItem(LAST_KEY) === SAMPLE_ID) localStorage.removeItem(LAST_KEY); } catch (e) {}
   }
   SUBJECTS = loadSubjects();
   const h = here();
@@ -1075,6 +1078,7 @@ function showWelcome(openAuth = false) {
   openWelcome({
     enterApp: () => { markEntered(); go(""); },
     trySample: () => {
+      if (hasSessionToken()) { markEntered(); go(""); return; }
       const id = ensureSampleSubject(getLang());
       markEntered();
       go(id);

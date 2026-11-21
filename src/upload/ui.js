@@ -1,7 +1,7 @@
 // The upload screen: sign in, AI consent, pick files, then the pipeline runs and the new subject opens.
 // Loaded only when the screen opens, so pdf.js and Supabase stay out of the first page load.
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects } from "../app/subjects.js";
+import { loadSubjects, saveSubjects, loadMeta, removeSamples } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ext } from "./extract.js";
@@ -84,6 +84,15 @@ async function refresh() {
   let s;
   try { s = await cloud.session(); } catch (e) { error(message(e)); }
   if (!s) { panel("upLogin"); return; }
+  // Magic-link (?code=...) sign-in creates a session here without passing through verifyCode.
+  if (loadMeta().user !== s.user.id) await syncNow(true);
+  removeSamples();
+  if (ctx.target && !loadSubjects().some((x) => x.id === ctx.target)) {
+    ctx.target = null;
+    if (examMode()) ctx.mode = "files";
+    $("upTitle").textContent = t("upload.title");
+    $("upLede").textContent = t("upload.lede");
+  }
   // Opened from Profile only to sign in: that is done, so go back there.
   if (ctx.signIn) { ctx.done(); return; }
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}

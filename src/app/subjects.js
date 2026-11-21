@@ -226,6 +226,22 @@ export function clearLocal() {
   write(STORE, []); saveMeta({ user: null, s: {}, rc: null });
 }
 
+// Drops local-only preview subjects and their logs without touching sync state or marking deletes.
+export function removeSamples() {
+  const prev = rawSubjects();
+  const kept = prev.filter((sj) => !isSample(sj));
+  if (kept.length === prev.length) return false;
+  const meta = loadMeta();
+  let metaChanged = false;
+  prev.filter(isSample).forEach((sj) => {
+    remove(LOG + sj.id); remove(LEGACY + sj.id);
+    if (meta.s[sj.id]) { delete meta.s[sj.id]; metaChanged = true; }
+  });
+  write(STORE, kept);
+  if (metaChanged) saveMeta(meta);
+  return true;
+}
+
 // ----- Sync decisions (used by src/cloud/sync.js)
 
 // What to do with one subject. local: its mark on the device (or undefined); remote: { at, deleted } (or undefined).

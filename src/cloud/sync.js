@@ -3,7 +3,7 @@
 // changed in the account. When both changed a subject, the newer one wins. Answers are separate rows
 // that are only ever added, so answers from two devices are all kept.
 import * as cloud from "./supabase.js";
-import { loadSubjects, loadMeta, saveMeta, unsent, markSent, toRow, applyRemote, clearLocal, decide } from "../app/subjects.js";
+import { loadSubjects, loadMeta, saveMeta, unsent, markSent, toRow, applyRemote, clearLocal, removeSamples, decide } from "../app/subjects.js";
 
 const ms = (iso) => Date.parse(iso);
 const iso = (at) => new Date(at).toISOString();
@@ -45,6 +45,7 @@ async function once() {
   if (!s) return false;
   let meta = loadMeta(), any = false;
   if (meta.user && meta.user !== s.user.id) { clearLocal(); meta = loadMeta(); any = true; }
+  if (removeSamples()) { meta = loadMeta(); any = true; }
   if (!meta.user) {
     // First sync on this device: everything made before signing in goes to the account
     // (the answer log's entries are all still unsent). Built-in sample subjects stay local-only.
