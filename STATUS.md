@@ -82,6 +82,15 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
   - Updated all user-facing brand strings (`<title>`, meta/OG/iOS web-app tags, rail/landing/footer brand marks, `home.eyebrow`, SK/CS copy & legal terms, Supabase OTP email template/subject) and native Capacitor/Android/iOS app names (`Lekto`) and bundle IDs (`sk.lekto.app`).
   - Intentionally kept `localStorage` keys (`studyapp-*`), existing GitHub repo URLs (`novlys2012-art/study-app`), and the legacy `STUDY_APP_ANTHROPIC_KEY` fallback (after `LEKTO_ANTHROPIC_KEY`) so existing browsers and configs suffer zero data loss.
 
+### 1.11 Smart Sonnet/Haiku Routing & Cited-Page Recovery (Token Savings)
+- **Files**: `server/generate.js`, `src/upload/pipeline.js`, `test/server.test.mjs`, `test/exams.test.mjs`
+- **How it works**:
+  - Kept Sonnet (`tier: "strong"`) for `vision` (lowered `effort` from `"medium"` to `"low"` for transcription) and `exam` (`effort: "medium"`).
+  - Moved `group` (past-exam topic clustering) from Sonnet to Haiku (`tier: "fast"`, no `effort`).
+  - Added `needsStrongCheck({ text, questions, fromVision })` in `server/generate.js`: `check` runs on Haiku (`tier: "fast"`) for plain conceptual prose and automatically escalates to Sonnet (`tier: "strong"`, `effort: "medium"`) when any checked page came from `vision` (`fromVision: true`) or when questions/source contain math symbols, equations, calculations, or numeric MCQ options. Fixed `handle()` to log `ai.models[req.tier]` instead of `def.tier` so cached rows record the routed model.
+  - Replaced `citedText()` with `citedForCheck(sec, pages, qs, visionPages)` in `src/upload/pipeline.js`: recovers missing/out-of-range `page` numbers via normalized quote match before falling back to `sec.text`, and passes `fromVision: true` only when a checked page came from `vision`.
+- **Deployment note**: Push to `main` (runs `Deploy server`) or run `npm run fn:prepare` and redeploy `generate` so production picks up the routing changes.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)

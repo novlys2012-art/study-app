@@ -58,11 +58,37 @@ export function retrying(call, { base = 2000, sleep = (ms) => new Promise((r) =>
 const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, k) => a.slice(k * n, k * n + n));
 const questionCount = (text) => Math.max(3, Math.min(12, Math.round(text.length / 3000)));
 
+const normQuote = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+
 // The pages a section's questions quote, so the check reads a few pages instead of the whole section.
-function citedText(sec, pages, qs) {
-  const nums = [...new Set(qs.map((x) => x.page))];
-  if (nums.some((n) => !Number.isInteger(n) || n < sec.from || n > sec.to)) return sec.text;
-  return nums.sort((a, b) => a - b).map((n) => `[${n}]\n${pages[n - 1]}`).join("\n\n");
+// Recovers missing/out-of-range page numbers from each quote before falling back to sec.text.
+export function citedForCheck(sec, pages, qs, visionPages = new Set()) {
+  if (!qs.length) return { text: sec.text, fromVision: false };
+  const nums = new Set();
+  for (const x of qs) {
+    if (Number.isInteger(x.page) && x.page >= sec.from && x.page <= sec.to) {
+      nums.add(x.page);
+      continue;
+    }
+    const q = normQuote(x.s);
+    let found = 0;
+    if (q.length >= 8) {
+      for (let n = sec.from; n <= sec.to; n++) {
+        if (normQuote(pages[n - 1]).includes(q)) { found = n; break; }
+      }
+    }
+    if (!found) {
+      let fromVision = false;
+      for (let n = sec.from; n <= sec.to; n++) if (visionPages.has(n)) { fromVision = true; break; }
+      return { text: sec.text, fromVision };
+    }
+    nums.add(found);
+  }
+  const sorted = [...nums].sort((a, b) => a - b);
+  return {
+    text: sorted.map((n) => `[${n}]\n${pages[n - 1]}`).join("\n\n"),
+    fromVision: sorted.some((n) => visionPages.has(n)),
+  };
 }
 
 export const CONTEXT_MAX = 24_000;
@@ -126,6 +152,7 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
     }
 
     const ctxArg = context ? { context } : {};
+    const visionPages = new Set(d.images.map((im) => im.page));
     const sections = toSections(pages);
     const parts = await each(sections, PARALLEL, async (sec) => {
       const label = sections.length > 1 ? `${d.name} (${sec.from}–${sec.to})` : d.name;
@@ -135,7 +162,8 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
       ]);
       let qs = quiz.questions, out = 0;
       if (qs.length) {
-        const checks = await call("check", { text: citedText(sec, pages, qs), questions: qs, ...ctxArg });
+        const cited = citedForCheck(sec, pages, qs, visionPages);
+        const checks = await call("check", { text: cited.text, questions: qs, ...(cited.fromVision ? { fromVision: true } : {}), ...ctxArg });
         const bad = new Set(checks.filter((c) => c.verdict !== "ok").map((c) => c.i));
         out = qs.filter((_, i) => bad.has(i)).length;
         qs = qs.filter((_, i) => !bad.has(i));

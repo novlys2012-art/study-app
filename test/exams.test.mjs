@@ -40,7 +40,8 @@ test("server: the group task sends cut question wording and checks its size", as
   const exams = [{ name: "A", year: 2024, questions: [{ ref: "e1#1", topic: "Limity", text: "x ".repeat(400) }] }];
   const out = await handle({ task: "group", input: { topics: ["Limita"], exams } }, d);
   assert.deepEqual(out.result, [{ name: "Limita", questions: ["e1#1", "zzz"] }]);
-  assert.equal(d.calls[0].tier, "strong");
+  assert.equal(d.calls[0].tier, "fast");
+  assert.equal(d.calls[0].effort, undefined);
   assert.match(d.calls[0].prompt, /Course topics: Limita/);
   assert.match(d.calls[0].prompt, /## A \(2024\)\ne1#1 \[Limity\] /);
   assert.ok(d.calls[0].prompt.length < 500, "wording is cut to a few hundred characters");

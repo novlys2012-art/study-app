@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handle, HttpError, limitsFrom, cacheKey } from "../server/generate.js";
-import { buildSubject, stepsFor, retrying, backoff, contextOf } from "../src/upload/pipeline.js";
+import { handle, HttpError, limitsFrom, cacheKey, needsStrongCheck } from "../server/generate.js";
+import { buildSubject, stepsFor, retrying, backoff, contextOf, citedForCheck } from "../src/upload/pipeline.js";
 import { parseQuiz, parseTopics, parseVision, parseChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
@@ -69,6 +69,7 @@ test("server: vision uses the strong tier and checks the images", async () => {
   const out = await handle({ task: "vision", input: { images: [{ page: 3, mediaType: "image/jpeg", data: "AAAA" }] } }, d);
   assert.deepEqual(out.result, [{ page: 3, text: "T" }]);
   assert.equal(d.calls[0].tier, "strong");
+  assert.equal(d.calls[0].effort, "low");
   assert.equal(d.calls[0].images.length, 1);
   await rejects(handle({ task: "vision", input: { images: Array(7).fill({ page: 1, mediaType: "image/jpeg", data: "A" }) } }, d), "too_large");
 });
@@ -316,4 +317,55 @@ test("server: optional context is included in prompts and validated", async () =
   await rejects(handle({ task: "summary", input: { title: "L1", text: "Obsah", context: 123 } }, d), "bad_input");
   await rejects(handle({ task: "summary", input: { title: "L1", text: "Obsah", context: "x".repeat(30_001) } }, d), "too_large");
 });
+
+test("server: check uses fast tier for plain prose and escalates to strong for math or vision", async () => {
+  const okReply = '{"checks":[{"i":0,"verdict":"ok","note":""}]}';
+  const cache = memCache();
+  const prose = [{ q: "Čo upravuje zákon č. 40/1964 Zb. v rokoch 2020-2024 pre e-mail a PFK-1?", o: ["1989", "1993", "2004", "2009"], a: 0 }];
+  const d1 = deps({ text: okReply, cache });
+  await handle({ task: "check", input: { text: "[1]\nZákon č. 40/1964 Zb. definuje základné pojmy.", questions: prose } }, d1);
+  assert.equal(d1.calls[0].tier, "fast");
+  assert.equal(d1.calls[0].effort, undefined);
+
+  const mathQ = [{ q: "Vypočítajte hodnotu výrazu x² pri x = 3.", o: ["6", "9", "12", "27"], a: 1 }];
+  const d2 = deps({ text: okReply, cache });
+  await handle({ task: "check", input: { text: "[1]\nMocniny", questions: mathQ } }, d2);
+  assert.equal(d2.calls[0].tier, "strong");
+  assert.equal(d2.calls[0].effort, "medium");
+  // Cached hit logs the routed strong model rather than the default fast tier.
+  await handle({ task: "check", input: { text: "[1]\nMocniny", questions: mathQ } }, d2);
+  assert.equal(d2.rows[1].cached, true);
+  assert.equal(d2.rows[1].model, "m2");
+
+  const d3 = deps({ text: okReply });
+  await handle({ task: "check", input: { text: "[1]\nGraf zo slajdu.", questions: prose, fromVision: true } }, d3);
+  assert.equal(d3.calls[0].tier, "strong");
+  assert.equal(d3.calls[0].effort, "medium");
+
+  assert.equal(needsStrongCheck({ text: "Bežný text a/alebo 1-2 vety", questions: prose }), false);
+  assert.equal(needsStrongCheck({ text: "F = m * a", questions: prose }), true);
+  assert.equal(needsStrongCheck({ text: "Text", questions: [{ q: "Aká je pravdepodobnosť?", o: ["0,05", "0,5", "5", "50"] }] }), true);
+  assert.equal(needsStrongCheck({ text: "Text", questions: [{ q: "Spočítejte směrodatnou odchylku", o: ["A", "B"] }] }), true);
+});
+
+test("pipeline: citedForCheck recovers missing pages from quotes and tracks vision pages", () => {
+  const pages = ["Prvá strana úvod", "Dopyt klesá s cenou na trhu.", "Tretia strana obrázok grafu"];
+  const sec = { from: 1, to: 3, text: "[1]\nPrvá strana úvod\n\n[2]\nDopyt klesá s cenou na trhu.\n\n[3]\nTretia strana obrázok grafu" };
+  const recovered = citedForCheck(sec, pages, [
+    { page: 1, s: "Prvá strana" },
+    { page: null, s: "Dopyt klesá s cenou" },
+  ], new Set([3]));
+  assert.match(recovered.text, /\[1\]/);
+  assert.match(recovered.text, /\[2\]/);
+  assert.doesNotMatch(recovered.text, /\[3\]/);
+  assert.equal(recovered.fromVision, false);
+
+  const withVision = citedForCheck(sec, pages, [{ page: 3, s: "obrázok grafu" }], new Set([3]));
+  assert.equal(withVision.fromVision, true);
+
+  const fallback = citedForCheck(sec, pages, [{ page: null, s: "úplne iný citát" }], new Set([3]));
+  assert.equal(fallback.text, sec.text);
+  assert.equal(fallback.fromVision, true);
+});
+
 

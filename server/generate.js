@@ -57,9 +57,29 @@ function pictures(images) {
 }
 const names = (v) => (Array.isArray(v) ? [...new Set(v.filter((s) => typeof s === "string").map((s) => s.trim().slice(0, 80)).filter(Boolean))].slice(0, 80) : []);
 
+// shortcut: regex heuristic for escalating check to Sonnet on math/formulas/vision; upgrade when paid tiers exist.
+const MATH_SYM = /[∑∏∫∂√∞±≠≤≥≈≡∝∈∉⊂⊃∪∩∀∃⇒⇔÷×²³⁴⁵⁶⁷⁸⁹⁰⁻¹]|\\(?:frac|sqrt|sum|int|lim|prod|cdot|times|pm|leq|geq|neq|approx|alpha|beta|gamma|delta|sigma|mu|lambda|pi|theta)\b/;
+const MATH_EQ = /(?:^|[\s([,;])[A-Za-zΑ-Ωα-ω0-9)\]_'′]+\s*=\s*[-+±]?[A-Za-zΑ-Ωα-ω0-9(\[]/;
+const MATH_OP = /\^|\s[<>]=?\s|[A-Za-z0-9)\]]\s*(?:(?<!\*)\*(?!\*)|\+)\s*[-+]?[A-Za-z0-9(\[]|\d\s+[-\/]\s+\d|\b(?:lim|sin|cos|tan|tg|cotg|arcsin|arccos|log|ln|exp|det|Var|Cov|SD|SE)\s*[([_]/;
+const CALC_VERB = /\b(?:vypočít|spočítej|vyrieš|vyřeš|derivuj|integruj|zintegruj|zderivuj|umocni|odmocni)/i;
+const NUM_OPT = /^\s*[-+±]?\d+(?:[.,]\d+)?(?:\s*(?:%|‰|°|[A-Za-zµμ\/²³^-]{1,6}))?\s*$/;
+const YEAR_OPT = /^\s*(?:1\d{3}|20\d{2})\s*$/;
+
+// Escalate question verification to Sonnet for picture/slide sources or math/formulas; plain prose uses Haiku.
+export function needsStrongCheck({ text: src = "", questions = [], fromVision = false } = {}) {
+  if (fromVision) return true;
+  for (const x of questions) {
+    const opts = Array.isArray(x?.o) ? x.o : [];
+    const joined = `${x?.q || ""}\n${opts.join("\n")}`;
+    if (MATH_SYM.test(joined) || MATH_EQ.test(joined) || MATH_OP.test(joined) || CALC_VERB.test(joined)) return true;
+    if (opts.filter((o) => typeof o === "string" && NUM_OPT.test(o) && !YEAR_OPT.test(o)).length >= 2) return true;
+  }
+  return MATH_SYM.test(src) || MATH_EQ.test(src);
+}
+
 const TASKS = {
   vision: {
-    tier: "strong", effort: "medium", maxTokens: 16000, parse: T.parseVision,
+    tier: "strong", effort: "low", maxTokens: 16000, parse: T.parseVision,
     build({ images }) {
       if (!Array.isArray(images) || !images.length) throw new HttpError(400, "bad_input", "No images.");
       pictures(images);
@@ -98,11 +118,18 @@ const TASKS = {
     }),
   },
   check: {
-    tier: "strong", effort: "medium", maxTokens: 4000, parse: T.parseChecks,
+    tier: "fast", maxTokens: 4000, parse: T.parseChecks,
     build(input, lang) {
       const qs = input.questions;
       if (!Array.isArray(qs) || !qs.length || qs.length > MAX_QUESTIONS) throw new HttpError(400, "bad_input", "Bad questions.");
-      return { system: T.checkSystem(lang), prompt: text(T.checkPrompt({ text: text(input.text), questions: qs, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000) };
+      const src = text(input.text);
+      const strong = needsStrongCheck({ text: src, questions: qs, fromVision: input.fromVision === true });
+      return {
+        tier: strong ? "strong" : "fast",
+        ...(strong ? { effort: "medium" } : {}),
+        system: T.checkSystem(lang),
+        prompt: text(T.checkPrompt({ text: src, questions: qs, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000),
+      };
     },
   },
   topics: {
@@ -120,7 +147,7 @@ const TASKS = {
 const MAX_EXAM_QUESTIONS = 600;
 const GROUP_TEXT = 300;
 TASKS.group = {
-  tier: "strong", effort: "medium", maxTokens: 12000, parse: T.parseExamGroups,
+  tier: "fast", maxTokens: 12000, parse: T.parseExamGroups,
   build(input, lang) {
     const exams = input.exams;
     if (!Array.isArray(exams) || !exams.length) throw new HttpError(400, "bad_input", "No exams.");
@@ -175,7 +202,7 @@ export async function handle(body, { user, ai, spend, record, env, cache = null,
   if ((s.minute || 0) >= lim.perMinute) throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
 
   const req = { tier: def.tier, effort: def.effort, maxTokens: def.maxTokens, ...def.build(input, lang) };
-  const model = ai.models?.[def.tier] ?? "";
+  const model = ai.models?.[req.tier] ?? "";
   const row = (extra) => ({ user_id: user.id, task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false, ...extra });
 
   // A stored answer costs nothing, so it is served even when a spending cap is reached.
