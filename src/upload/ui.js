@@ -116,7 +116,9 @@ function renderExams() {
     li.append(art, el("span", "grow", name), year, rm);
     ul.appendChild(li);
   });
-  $("upCtxHint").hidden = true;
+  $("upCtxWrap").hidden = true;
+  $("upCtxWrap").classList.remove("open");
+  $("upCtxTip").setAttribute("aria-expanded", "false");
   ul.hidden = !exams.length;
   const ready = exams.length > 0 && !!target();
   $("upNext").disabled = !ready;
@@ -126,10 +128,12 @@ function renderExams() {
 function renderPicked() {
   if (examMode()) { renderExams(); return; }
   const ul = $("upList"); ul.innerHTML = "";
+  const tip = t("upload.contextHint");
   picked.forEach((item, k) => {
     const li = el("li", "up-file");
     const ctxBtn = el("button", "tiny up-ctx", t("upload.context"));
     ctxBtn.type = "button";
+    ctxBtn.dataset.tip = tip;
     ctxBtn.setAttribute("aria-pressed", item.context ? "true" : "false");
     ctxBtn.onclick = () => { item.context = !item.context; renderMake(); renderPicked(); };
     const rm = el("button", "iconbtn small"); rm.type = "button";
@@ -140,7 +144,11 @@ function renderPicked() {
     ul.appendChild(li);
   });
   ul.hidden = !picked.length;
-  $("upCtxHint").hidden = !picked.length;
+  $("upCtxWrap").hidden = !picked.length;
+  if (!picked.length) {
+    $("upCtxWrap").classList.remove("open");
+    $("upCtxTip").setAttribute("aria-expanded", "false");
+  }
   const onlyCtx = onlyContext();
   $("upGo").textContent = t(ctx?.target ? "upload.goAdd" : onlyCtx ? "upload.goContext" : "upload.go");
   const ready = picked.length && (ctx.target || $("upName").value.trim());
@@ -348,6 +356,10 @@ function wire() {
   };
   $("upGo").onclick = run;
   $("upOut").onclick = async () => { await cloud.signOut(); refresh(); };
+  const setTip = (on) => { $("upCtxWrap").classList.toggle("open", on); $("upCtxTip").setAttribute("aria-expanded", on ? "true" : "false"); };
+  $("upCtxTip").onclick = () => setTip(!$("upCtxWrap").classList.contains("open"));
+  document.addEventListener("click", (e) => { if ($("upCtxWrap").classList.contains("open") && !$("upCtxWrap").contains(e.target)) setTip(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("upCtxWrap").classList.contains("open")) setTip(false); });
 }
 
 // app: { opened(subjectId, tab), target, mode, signIn, done() }; target is the id of a subject to add files to,

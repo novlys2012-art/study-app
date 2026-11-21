@@ -81,6 +81,7 @@
   "upload.pick": "Vybrat soubory",
   "upload.remove": "Odebrat",
   "upload.context": "Kontext",
+  "upload.contextWhat": "Co znamená Kontext?",
   "upload.contextHint": "Kontext (např. vzorce či příklady) se neshrnuje ani netestuje, ale AI ho použije u ostatních souborů.",
   "upload.go": "Vytvořit shrnutí a kvíz",
   "upload.goContext": "Uložit jako kontext",
