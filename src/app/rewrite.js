@@ -1,26 +1,25 @@
 // Main-page language rewrite animation: clears visible text on #welcome and rewrites it
-// from scratch at a tactile pace during an initial time window, then accelerates to finish fast.
+// sequentially line by line from scratch during an initial window, then accelerates to finish fast.
 export const REWRITE_DEFAULTS = {
-  slowWindow: 360, // ms of deliberate from-scratch typing before fast-forward kicks in
-  fastSpan: 420,   // ms after slowWindow to accelerate and finish every remaining character
-  slowRate: 0.036, // chars/ms (~36 chars/s) during the initial window
-  maxDelay: 80,    // ms cap for top-to-bottom cascade across in-viewport elements
+  slowWindow: 460,   // ms of deliberate line-by-line typing before fast-forward kicks in
+  fastSpan: 520,     // ms after slowWindow to accelerate through every remaining line
+  slowRate: 0.13,    // chars/ms (~130 chars/s) across the sequential stream during slowWindow
+  fastAccel: 0.0022, // quadratic speed-up term (chars/ms^2) after slowWindow
 };
 
 export function rewriteCount(elapsed, total, opts = {}) {
-  if (total <= 0) return 0;
+  if (total <= 0 || elapsed <= 0) return 0;
   const slowWindow = opts.slowWindow ?? REWRITE_DEFAULTS.slowWindow;
   const fastSpan = opts.fastSpan ?? REWRITE_DEFAULTS.fastSpan;
   const slowRate = opts.slowRate ?? REWRITE_DEFAULTS.slowRate;
-  const start = Math.max(0, Math.min(opts.delay ?? 0, slowWindow));
-  if (elapsed <= start) return 0;
-  if (elapsed <= slowWindow) return Math.min(total, Math.floor((elapsed - start) * slowRate));
+  const fastAccel = opts.fastAccel ?? REWRITE_DEFAULTS.fastAccel;
+  if (elapsed <= slowWindow) return Math.min(total, Math.floor(elapsed * slowRate));
   const dt = elapsed - slowWindow;
   if (fastSpan <= 0 || dt >= fastSpan) return total;
-  const c0 = Math.min(total, Math.floor((slowWindow - start) * slowRate));
+  const c0 = Math.min(total, Math.floor(slowWindow * slowRate));
   const rem = total - c0;
   const u = dt / fastSpan;
-  const accel = dt * slowRate + dt * dt * 0.0014;
+  const accel = dt * slowRate + dt * dt * fastAccel;
   return Math.min(total, Math.floor(c0 + Math.max(accel, rem * u * u)));
 }
 
@@ -62,29 +61,27 @@ export function startRewrite(root, opts = {}) {
     if (el.childElementCount > 0 || el.getClientRects().length === 0) return;
     const target = el.textContent;
     if (!target || !target.trim()) return;
-    raw.push({ kind: "text", el, target, rect: el.getBoundingClientRect() });
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom <= 0 || rect.top >= vh) return;
+    raw.push({ kind: "text", el, target });
   });
   root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     if (el.getClientRects().length === 0 || el.value || !el.placeholder) return;
-    raw.push({ kind: "placeholder", el, target: el.placeholder, rect: el.getBoundingClientRect() });
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom <= 0 || rect.top >= vh) return;
+    raw.push({ kind: "placeholder", el, target: el.placeholder });
   });
   if (!raw.length) return;
 
-  // Cascade top-to-bottom across what is currently on screen; off-screen blocks run in parallel.
-  const maxDelay = opts.maxDelay ?? REWRITE_DEFAULTS.maxDelay;
-  const inView = raw.filter((x) => x.rect.bottom > 0 && x.rect.top < vh)
-    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
-  const delays = new Map();
-  inView.forEach((x, idx) => {
-    delays.set(x, inView.length > 1 ? (idx / (inView.length - 1)) * maxDelay : 0);
-  });
-
+  let totalChars = 0;
   const items = raw.map((x) => {
     const chars = [...x.target];
-    const delay = delays.get(x) || 0;
+    const start = totalChars;
+    totalChars += chars.length;
+    const end = totalChars;
     if (x.kind === "placeholder") {
       x.el.placeholder = "";
-      return { kind: "placeholder", el: x.el, target: x.target, chars, delay, shown: 0, tipLen: 0, done: false };
+      return { kind: "placeholder", el: x.el, target: x.target, chars, start, end, shown: 0, tipLen: 0, done: false };
     }
     const wrap = document.createElement("span");
     wrap.className = "rw-wrap";
@@ -96,7 +93,7 @@ export function startRewrite(root, opts = {}) {
     wrap.append(doneEl, tipEl, headEl, restEl);
     x.el.replaceChildren(wrap);
     return {
-      kind: "text", el: x.el, target: x.target, chars, delay,
+      kind: "text", el: x.el, target: x.target, chars, start, end,
       wrap, doneNode, tipNode, headNode, restNode,
       shown: 0, tipLen: 0, done: false,
     };
@@ -112,8 +109,8 @@ export function startRewrite(root, opts = {}) {
     if (root.hidden) { stopRewrite(); return; }
     if (t0 < 0) t0 = now;
     const elapsed = Math.max(0, now - t0);
-    const tipLen = elapsed > slowWindow ? 4 : 2;
-    let remaining = 0;
+    const cursor = rewriteCount(elapsed, totalChars, opts);
+    const tipLen = elapsed > slowWindow ? 6 : 3;
 
     for (const item of items) {
       if (item.done) continue;
@@ -121,13 +118,13 @@ export function startRewrite(root, opts = {}) {
         item.done = true;
         continue;
       }
-      const n = rewriteCount(elapsed, item.chars.length, { ...opts, delay: item.delay });
-      if (n >= item.chars.length) {
+      if (cursor <= item.start) break; // strictly line by line: later blocks wait their turn
+      if (cursor >= item.end) {
         restoreItem(item);
         continue;
       }
-      remaining++;
-      if (n === 0 || (n === item.shown && tipLen === item.tipLen)) continue;
+      const n = cursor - item.start;
+      if (n === item.shown && tipLen === item.tipLen) continue;
       item.shown = n;
       item.tipLen = tipLen;
       if (item.kind === "placeholder") {
@@ -141,7 +138,7 @@ export function startRewrite(root, opts = {}) {
       }
     }
 
-    if (remaining > 0) state.raf = requestAnimationFrame(tick);
+    if (cursor < totalChars) state.raf = requestAnimationFrame(tick);
     else stopRewrite();
   }
 

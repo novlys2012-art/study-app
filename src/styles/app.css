@@ -766,6 +766,7 @@ body[data-look="kocky"] .w-langs .tiny[aria-pressed="true"]{background:var(--led
 body[data-look="riso"] .w-langs .tiny[aria-pressed="true"]{background:var(--pop);color:#1e2a78;border-color:var(--rule)}
 #welcome{--rw-ink:var(--ledger)}
 #welcome .btn:not(.ghost):not(.plain),.w-demo-excerpt mark.hl{--rw-ink:currentColor}
+.w-demo-excerpt mark.hl:has(.rw-head:empty){background:transparent}
 .rw-wrap{display:inline}
 .rw-tip{color:var(--rw-ink)}
 .rw-head{position:relative;color:var(--rw-ink);background:color-mix(in srgb,var(--rw-ink) 16%,transparent);border-radius:min(2px,var(--r-ctl))}
