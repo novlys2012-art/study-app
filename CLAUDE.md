@@ -16,7 +16,7 @@ The five core features, in build order (roadmap phases 3 to 6):
 4. **Exam countdown plan**: exam dates in, a daily plan and local reminders out (spaced repetition with ts-fsrs).
 5. **Slovak and Czech first**: the whole UI and every AI answer in the student's language.
 
-From the quiz site only the multiple-choice quiz engine carries over: topics, round size, unseen questions, mistake review, explanations and the six looks. Its subject-specific modes (booking exercises, account list, math and Spanish practice) are not part of this app.
+From the quiz site only the multiple-choice quiz engine carries over: topics, round size, unseen questions, mistake review and explanations. Its subject-specific modes (booking exercises, account list, math and Spanish practice) and its six legacy looks are not part of this app.
 
 **Not in version 1** (see the roadmap's "After version 1" list): streaks, XP, daily goals and leagues (Duolingo-style features), class sharing and the teacher plan, push notifications, a public library, a chat tutor, school licences, and all marketing.
 
@@ -44,9 +44,9 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 - **Past exams live in the subject.** `sj.exams` holds each old exam (`{ id, name, year, questions: [{ id, n, text, topic, points, manual }] }`) and syncs with the subject. An exam is read by the server task `exam` (Sonnet; its text plus up to 6 page pictures in one call, more pictures go through `vision` first), then the task `group` sorts the questions of all the subject's exams into one set of topics, preferring the subject's own topic names (`src/upload/exams.js`). A question's topic is stored as a name, never a topic key, because sorting topics again renumbers the keys. A topic the student picked (`manual`) is never changed by a later sort. The ranking (`src/app/exams.js`) counts exams per topic, an exam 3 years older than the newest counts half, and always shows the raw count ("v 4 z 5 skúšok"), the sample size, a rough-guess note under 3 exams, and the honest-limits text: it is not a prediction.
 - **Generated questions use the quiz site's format** (`q`, `o`, `a`, `e`, `x`, `s`), so the existing quiz mode can show them unchanged. Every question keeps a source quote.
 - **UI strings go through `src/i18n/`.** Static markup uses `data-i18n="section.key"`; code uses `t("key")`. `sk.json` is the source, `cs.json` is filled in phase 7, missing keys fall back to Slovak.
-- **Keep the look.** The styles in `src/styles/app.css` and the six looks (Účtovná kniha is the default; Kocky, Riso, Zošit, Tabuľa, Čistý) come from the quiz site. The app layout is the app's own and sits at the end of the file. New screens reuse the classes (`sheet`, `btn`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`, `rowcard`, `iconbtn`, `menu`, `empty`, `dock`, `bsheet`), the shape and motion tokens (`--r-card`, `--r-ctl`, `--bw`, `--press`, `--ease`, `--t`) and the colour tokens (`--paper`, `--sheet`, `--ink`, `--ledger`, ...), in light and dark.
+- **Keep the look ("Clean Proof").** The unified minimalistic design language is documented normatively in root `DESIGN.md` and implemented in `src/styles/app.css` (Light, Dark, and Auto; self-hosted variable `Source Sans 3` + utility `JetBrains Mono` via `public/fonts/fonts.css`). New screens reuse the existing primitives (`sheet`, `list`, `btn`, `utabs`, `seg`, `chips`, `opt`, `bar`, `label`, `hint`, `rowcard`, `iconbtn`, `menu`, `empty`, `dock`, `bsheet`), two radii (`--r-ctl: 6px`, `--r-card: 10px`), flat 1 px hairlines (`--rule`), calm motion (`--ease`, `--t-fast`, `--t`), and semantic colour tokens (`--paper`, `--sheet`, `--subtle`, `--ink`, `--ledger`, `--mark`, `--ok`, `--no`, `--warn`), in light and dark.
 - **Follow the design brief.** `docs/design.md` says how screens behave: one main action per screen, a subject always opens on tap, back always works (every screen and open sheet is a history entry; move between screens with `go()` and `back()`, open sheets with `openSheet()`), every tap answers, and a toast confirms a change with no visible result. Wide screens get a side rail instead of the bottom tab bar.
-- **Impeccable design skill (`docs/impeccable/`).** For UI/design work, audits, critiques, or polish, read `docs/impeccable/SKILL.md` and the matching command guide in `docs/impeccable/reference/` (e.g. `audit.md`, `critique.md`, `polish.md`, `distill.md`, `clarify.md`, `harden.md`, `typeset.md`, `layout.md`). Keep `docs/design.md` (the six looks and token system) as the baseline so Impeccable sharpens the existing design rather than replacing it.
+- **Impeccable design skill (`docs/impeccable/`).** For UI/design work, audits, critiques, or polish, read `docs/impeccable/SKILL.md` and the matching command guide in `docs/impeccable/reference/` (e.g. `audit.md`, `critique.md`, `polish.md`, `distill.md`, `clarify.md`, `harden.md`, `typeset.md`, `layout.md`). Keep `DESIGN.md` and `docs/design.md` as the baseline so Impeccable sharpens the Clean Proof system rather than replacing it.
 - **Privacy.** 16+ only unless parental consent is added. Original uploads are deleted once text extraction succeeds. An AI consent screen naming the provider is shown before the first upload (an App Store requirement).
 
 ## Pricing (planned)
@@ -59,7 +59,7 @@ Free tier with a small monthly page limit. Plus at €3.99 a month or €29.99 a
 index.html            page shell, markup tagged with data-i18n
 src/main.js           entry: styles, i18n, then the app
 src/app/app.js        screens: Today, Subjects, one subject (tabs), summary reader, quiz, Profile, and navigation (history, sheets, toast)
-src/app/icons.js      icons and the progress ring for parts built in code
+src/app/icons.js      inline 1.8px stroke SVG icons for parts built in code
 src/app/subjects.js   subjects, questions and the answer log on the device (localStorage), with marks of what changed
 src/app/exams.js      past exam ranking, ranked rounds and re-tagging (pure functions)
 src/app/autosync.js   when to sync with the account (start, after a change, back in front, after sign-in)
@@ -68,7 +68,8 @@ src/upload/           upload screen (ui.js; mode "exams" for old exams), extract
                       pipeline for course files (pipeline.js) and for old exams (exams.js)
 src/cloud/            Supabase sign-in, calls to the server function, and sync of subjects and answers (sync.js)
 src/i18n/             sk.json, cs.json, t() and applyI18n()
-src/styles/           app.css (all looks)
+src/styles/           app.css (Clean Proof design system, Light & Dark)
+DESIGN.md             normative Clean Proof design tokens, hierarchy, components, and rules
 ai/                   provider layer (index.js, providers/, prices.js) and prompts (tasks.js)
 server/generate.js    server task runner: auth, caps, one AI task, cost record (runs in the Edge Function and in tests)
 supabase/             config, migrations (ai_usage, subjects, ai_cache, reviews), functions/generate (Deno entry; shared code copied in by fn:prepare)

@@ -7,7 +7,7 @@ import { extname, join } from "node:path";
 import { chromium } from "playwright";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".woff2": "font/woff2", ".png": "image/png" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2", ".png": "image/png" };
 const server = createServer(async (req, res) => {
   const path = join(DIST, decodeURIComponent(req.url.split("?")[0]).replace(/\/$/, "/index.html"));
   try {
@@ -129,7 +129,7 @@ await page.goBack();
 await page.locator("#moreSheet").waitFor({ state: "hidden" });
 check(await page.locator("#subject").isVisible(), "the back button closes a sheet and stays on the screen");
 await page.click('#tabbar [data-go="home"]');
-check((await page.locator("#subjects .sj").count()) === 1 && await page.locator("#fab").isVisible(), "subjects screen lists the subject and shows the add button");
+check((await page.locator("#subjects .sj").count()) === 1 && await page.locator("#homeAdd").isVisible(), "subjects screen lists the subject and shows the add button");
 await page.click('#tabbar .tab[data-go="today"]');
 check((await page.textContent("#todayBody .hero")).includes("Testovací predmet"), "today leads with the subject whose exam is nearest");
 await page.click("#todayBody .hero .btn");
@@ -137,8 +137,6 @@ check(await page.locator("#quiz").isVisible(), "today's button starts a round");
 await page.click("#quit");
 check(await page.locator("#today").isVisible(), "leaving a round started on Today goes back to Today");
 await page.click('#tabbar [data-go="profile"]');
-await page.click('#looks [data-l="riso"]');
-check((await page.evaluate(() => document.body.dataset.look)) === "riso", "profile switches the look");
 await page.click('#themes [data-th="dark"]');
 check((await page.evaluate(() => document.documentElement.dataset.theme)) === "dark", "profile switches to dark");
 

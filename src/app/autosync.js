@@ -29,5 +29,6 @@ export function startSync(pulled) {
   onLocalChange(() => { clearTimeout(timer); timer = setTimeout(syncNow, 1500); });
   document.addEventListener("visibilitychange", () => syncNow());
   window.addEventListener("online", () => syncNow());
+  window.addEventListener("lekto:resume", () => syncNow());
   syncNow();
 }

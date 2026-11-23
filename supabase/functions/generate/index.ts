@@ -37,6 +37,10 @@ Deno.serve(async (req) => {
         const { error } = await admin.from("ai_usage").insert(row);
         if (error) throw error;
       },
+      async deleteUser(uid: string) {
+        const { error } = await admin.auth.admin.deleteUser(uid);
+        if (error) throw error;
+      },
       // Answers stored by content hash (table ai_cache, service role only), so a repeated request is free.
       cache: {
         async get(key: string) {

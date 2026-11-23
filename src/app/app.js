@@ -5,15 +5,21 @@ import { t, getLang, setLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
-import { icon, ring } from "./icons.js";
+import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
 import { renderLimit } from "./limit.js";
 import { openWelcome } from "./welcome.js";
 import { ensureSampleSubject, SAMPLE_ID } from "./sample.js";
-import { loadLookFonts } from "./fonts.js";
+import { clearPendingAuth } from "./auth-state.js";
+import {
+  initNativeShell, isNative, syncNativeChrome, haptic, minimizeApp,
+  onHardwareBack, onOpenSubject, reminderPermission, requestReminderPermission,
+  scheduleNativeReminders, cancelNativeReminders, registerServiceWorker,
+} from "./native.js";
+import { loadReminderPrefs, saveReminderPrefs, clearReminderPrefs, buildReminderSchedule } from "./reminders.js";
+import { enableSheetSwipe, trackKeyboardViewport } from "./gestures.js";
 
-const LOOK_KEY = "studyapp-look";
 const THEME_KEY = "studyapp-theme";
 const LAST_KEY = "studyapp-last-subject";
 const ENTERED_KEY = "studyapp-entered";
@@ -43,7 +49,9 @@ function button(cls, text, onclick) { const b = el("button", cls, text); b.type 
 // Slovak and Czech plurals: base.one (1), base.few (2 to 4), base.many (0, 5 and more).
 const plural = (base, n, vars) => t(base + (n === 1 ? ".one" : n >= 2 && n <= 4 ? ".few" : ".many"), { n, ...vars });
 function bar(pct) { const b = el("span", "bar"), fill = el("i"); fill.style.width = pct + "%"; b.appendChild(fill); return b; }
-function buzz(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
+initNativeShell();
+trackKeyboardViewport();
+registerServiceWorker();
 
 // ===== Navigation: every screen is a history entry, so the back button always goes one step back
 //
@@ -84,9 +92,9 @@ function show(id) {
   document.body.classList.toggle("has-tabbar", !!on);
   document.body.classList.toggle("is-welcome", id === "welcome");
   $("tabbar").querySelectorAll(".tab").forEach((b) => { if (b.dataset.go === on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-  const fab = (id === "today" || id === "home") && SUBJECTS.length > 0;
-  $("fab").hidden = !fab;
-  document.body.classList.toggle("has-fab", fab);
+  const showAdd = SUBJECTS.length > 0;
+  $("todayAdd").hidden = !showAdd;
+  $("homeAdd").hidden = !showAdd;
   if (dir !== "none") {
     const s = $(id);
     s.classList.remove("in-fwd", "in-back", "in-fade"); void s.offsetWidth; s.classList.add("in-" + dir);
@@ -154,10 +162,33 @@ window.addEventListener("hashchange", () => { if (here() !== shown) route(); });
 
 $("tabbar").onclick = (e) => {
   const b = e.target.closest("[data-go]"); if (!b) return;
+  haptic("selection");
   if (b.dataset.go === "upload") openUpload();
   else { markEntered(); go({ today: "", home: "subjects", profile: "profile" }[b.dataset.go], true); }
 };
-$("fab").onclick = () => openUpload();
+const onHeaderAdd = () => { haptic("light"); openUpload(); };
+$("todayAdd").onclick = onHeaderAdd;
+$("homeAdd").onclick = onHeaderAdd;
+
+// Hardware back button (Android): close sheet first, quit quiz, go back in history, or return to Today / minimize.
+onHardwareBack(() => {
+  const open = document.querySelector("dialog[open]");
+  if (open) { closeSheet(open); return; }
+  if (screen === "quiz") { $("quit").click(); return; }
+  if (screen === "end") { leaveQuiz(); return; }
+  if (depth() > 0) { history.back(); return; }
+  if (screen === "reader" || screen === "upload") { go(CUR ? CUR.id : "", true); return; }
+  if (screen === "subject") { go("subjects", true); return; }
+  if (screen === "home" || screen === "profile") { go("", true); return; }
+  minimizeApp();
+});
+
+// Tapping a local study reminder notification opens the targeted subject directly.
+onOpenSubject((subjectId) => {
+  SUBJECTS = loadSubjects();
+  if (SUBJECTS.some((x) => x.id === subjectId)) { markEntered(); go(subjectId, true); }
+  else { markEntered(); go("", true); }
+});
 
 // ===== Bottom sheets and the toast
 
@@ -174,13 +205,14 @@ function closeSheet(d) {
   setTimeout(() => { if (d.open) d.close(); }, 170);
 }
 document.querySelectorAll("dialog.bsheet").forEach((d) => {
-  // A sheet closes with its ✕ button, a tap outside, Esc or the back button.
+  // A sheet closes with its ✕ button, a tap outside, swipe down on touch, Esc or the back button.
   d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-close]")) closeSheet(d); });
   d.addEventListener("cancel", (e) => { e.preventDefault(); closeSheet(d); });
   d.addEventListener("close", () => {
     d.classList.remove("closing");
     if (history.state && history.state.sheet) { skipPop = true; history.back(); }
   });
+  enableSheetSwipe(d, closeSheet);
 });
 
 let toastTimer = 0;
@@ -230,7 +262,7 @@ function emptyState() {
 function countdown(sj) {
   const d = daysTo(sj.exam);
   if (d == null || d < 0) return null;
-  const box = el("div", "countdown");
+  const box = el("div", "countdown" + (d <= 7 ? " soon" : ""));
   box.append(el("b", null, d === 0 ? t("today.cdToday") : d === 1 ? t("today.cdTomorrow") : String(d)),
     el("span", null, (d < 2 ? t("today.cdExam") : t(d < 5 ? "today.cdFew" : "today.cdMany")) + " · " + examDate(sj)));
   return box;
@@ -259,9 +291,16 @@ function renderToday() {
     const mid = el("div", "hero-mid");
     const cd = countdown(hero.sj);
     if (cd) mid.appendChild(cd);
-    else mid.appendChild(button("hero-chip", null, () => { enter(hero.sj); openExam(); }));
-    if (!cd) mid.firstChild.append(icon("cal"), el("span", null, t("exam.add")));
-    mid.appendChild(ring(hero.st.pct, pctLabel(hero.st), "on-hero"));
+    else {
+      const chip = button("hero-chip", null, () => { enter(hero.sj); openExam(); });
+      chip.append(icon("cal"), el("span", null, t("exam.add")));
+      mid.appendChild(chip);
+    }
+    const prog = el("div", "hero-prog");
+    const progTop = el("div", "hero-prog-top");
+    progTop.append(el("b", null, pctLabel(hero.st)));
+    prog.append(progTop, bar(hero.st.pct));
+    mid.appendChild(prog);
     const topicOrder = examTopicOrder(hero.sj);
     const basePlan = plan.hasExam
       ? (plan.target > 0
@@ -280,22 +319,30 @@ function renderToday() {
     box.appendChild(c);
   }
   const rest = rows.filter((r) => r !== hero).sort((a, b) => (a.d != null && a.d >= 0 ? a.d : 1e9) - (b.d != null && b.d >= 0 ? b.d : 1e9));
-  if (rest.length) box.appendChild(el("p", "label", t(hero ? "today.others" : "home.title")));
-  rest.forEach((r) => {
-    // The row opens the subject; its round button starts a round straight away.
-    const row = el("div", "rowcard split");
-    const main = button("rc-main", null, () => go(r.sj.id));
-    const g = el("span", "grow");
-    g.append(el("span", "rc-title", r.sj.name), el("span", "hint" + soonClass(r.sj), examText(r.sj) || (r.st.total ? dueText(r.st) : t("today.read"))));
-    main.append(ring(r.st.pct, pctLabel(r.st)), g);
-    row.appendChild(main);
-    if (r.st.total) {
-      const play = button("play", null, () => { enter(r.sj); learn(); });
-      play.setAttribute("aria-label", t("today.practise", { name: r.sj.name })); play.appendChild(icon("play"));
-      row.appendChild(play);
-    } else main.appendChild(icon("chev", "chev"));
-    box.appendChild(row);
-  });
+  if (rest.length) {
+    box.appendChild(el("p", "label", t(hero ? "today.others" : "home.title")));
+    const listBox = el("div", "list");
+    rest.forEach((r) => {
+      // The row opens the subject; its play button starts a round straight away.
+      const row = el("div", "rowcard split");
+      const main = button("rc-main", null, () => go(r.sj.id));
+      const g = el("span", "grow");
+      const head = el("span", "rc-head");
+      head.append(el("span", "rc-title", r.sj.name));
+      if (r.st.total) head.append(el("span", "rc-pct", r.st.pct + " %"));
+      g.append(head, el("span", "hint" + soonClass(r.sj), examText(r.sj) || (r.st.total ? dueText(r.st) : t("today.read"))));
+      if (r.st.total) g.append(bar(r.st.pct));
+      main.append(g);
+      row.appendChild(main);
+      if (r.st.total) {
+        const play = button("play", null, () => { enter(r.sj); learn(); });
+        play.setAttribute("aria-label", t("today.practise", { name: r.sj.name })); play.appendChild(icon("play"));
+        row.appendChild(play);
+      } else main.appendChild(icon("chev", "chev"));
+      listBox.appendChild(row);
+    });
+    box.appendChild(listBox);
+  }
 }
 function showToday() { CUR = null; renderToday(); show("today"); }
 
@@ -305,11 +352,15 @@ function subjectRow(sj) {
   const st = stats(sj.questions, readLog(sj));
   const b = button("rowcard sj", null, () => go(sj.id));
   const g = el("span", "grow");
-  g.appendChild(el("span", "rc-title", sj.name));
+  const head = el("span", "rc-head");
+  head.append(el("span", "rc-title", sj.name));
+  if (st.total) head.append(el("span", "rc-pct", st.pct + " %"));
+  g.append(head);
   const ex = examText(sj);
   if (ex) g.appendChild(el("span", "hint" + soonClass(sj), ex));
   g.appendChild(el("span", "hint", st.total ? dueText(st) : t("home.noQuestions")));
-  b.append(ring(st.pct, pctLabel(st)), g, icon("chev", "chev"));
+  if (st.total) g.appendChild(bar(st.pct));
+  b.append(g, icon("chev", "chev"));
   return b;
 }
 function showHome() {
@@ -349,17 +400,19 @@ function renderSubject() {
   const open = Object.keys(has).filter((k) => has[k]);
   $("sCard").hidden = !open.length;
   $("sStat").hidden = !st.total; $("sActions").hidden = !st.total;
-  $("sRing").replaceChildren(ring(st.pct, pctLabel(st), "lg"));
   $("sPct").textContent = pctLabel(st);
   $("sDue").textContent = dueText(st);
+  $("sBar").style.width = st.pct + "%";
   $("sExamText").textContent = examText(CUR) || t("exam.add");
   $("sExam").className = "chiprow" + (CUR.exam ? soonClass(CUR) : " unset");
   if (!has[tab]) tab = open[0] || "overview";
   const tabs = [...$("sTabs").children];
-  tabs.forEach((b) => { b.hidden = !has[b.dataset.tab]; b.setAttribute("aria-pressed", b.dataset.tab === tab); });
-  // The sliding marker under the chosen tab.
-  $("sTabs").style.setProperty("--n", open.length || 1);
-  $("sTabs").style.setProperty("--i", Math.max(0, open.indexOf(tab)));
+  tabs.forEach((b) => {
+    const active = b.dataset.tab === tab;
+    b.hidden = !has[b.dataset.tab];
+    b.setAttribute("aria-selected", active);
+    b.setAttribute("aria-pressed", active);
+  });
   $("sTabs").hidden = open.length < 2;
   $("sEmpty").hidden = open.length > 0;
   $("tabOverview").hidden = tab !== "overview" || !has.overview;
@@ -521,15 +574,16 @@ function renderExams() {
     out.push(go);
   }
   out.push(el("p", "hint", t("exams.honest")), el("p", "label", t("exams.listLabel")));
+  const exList = el("div", "list");
   exams.slice().sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name)).forEach((ex) => {
     const b = button("rowcard file", null, () => openPastExam(ex.id));
     const g = el("span", "grow"), art = el("span", "file-art");
     art.appendChild(icon("doc"));
     g.append(el("span", "rc-title", ex.name), el("span", "hint", [ex.year || t("exams.noYear"), plural("exams.q", ex.questions.length)].join(" · ")));
     b.append(art, g, icon("chev", "chev"));
-    out.push(b);
+    exList.appendChild(b);
   });
-  out.push(addExamsButton("exams.addMore", "btn wide ghost"));
+  out.push(exList, addExamsButton("exams.addMore", "btn wide ghost"));
   box.replaceChildren(...out);
 }
 
@@ -775,6 +829,7 @@ function setExam(v) {
   const keep = CUR;
   refresh();
   if (!CUR) CUR = keep; // Today has no open subject, but the sheet is still on this one
+  resyncReminders();
   toast(t(v ? "exam.saved" : "exam.removed"));
 }
 $("sExam").onclick = openExam;
@@ -802,6 +857,7 @@ $("delSubj").onclick = () => { $("delConfirm").hidden = false; $("delSubj").hidd
 $("delNo").onclick = () => { $("delConfirm").hidden = true; $("delSubj").hidden = false; };
 $("delYes").onclick = () => {
   saveSubjects(loadSubjects().filter((x) => x.id !== CUR.id));
+  resyncReminders();
   go("subjects");
   toast(t("setup.deleted"));
 };
@@ -869,7 +925,7 @@ function grade(sel) {
   const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
   logAnswer(CUR, x.id, ok);
   LOG = readLog(CUR);
-  buzz(ok ? 12 : [18, 60, 18]);
+  haptic(ok ? "success" : "error");
   [...$("opts").children].forEach((b, n) => {
     b.setAttribute("aria-disabled", "true"); b.removeAttribute("aria-pressed");
     if (C.has(n)) { b.classList.add("ok"); if (!sel.has(n) && sel.size && Array.isArray(x.a)) b.classList.add("missed"); }
@@ -902,13 +958,17 @@ $("next").onclick = () => { i++; i < list.length ? render() : finish(); };
 // ✕ ends the round: with answers it shows the result so far, without any it just leaves.
 $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.length ? finish() : leaveQuiz(); };
 
-function finish() { stage = "end"; dir = "fwd"; showEnd(); dir = "fade"; window.scrollTo(0, 0); }
+function finish() { stage = "end"; dir = "fwd"; showEnd(); dir = "fade"; window.scrollTo(0, 0); resyncReminders(); }
 function showEnd() {
   show("end");
   $("endSubj").textContent = CUR ? CUR.name : "";
   const n = list.length, pct = Math.round((score / n) * 100);
-  $("endRing").replaceChildren(ring(pct, pct + " %", "xl " + (pct >= 70 ? "good" : "low")));
+  const tone = pct >= 70 ? "good" : "low";
   $("final").textContent = score + " / " + n;
+  $("endPct").textContent = pct + " %";
+  $("endPct").className = "result-pct " + tone;
+  $("endBar").style.width = pct + "%";
+  $("endBar").parentElement.className = "bar result-bar " + tone;
   $("note").textContent = t(pct >= 90 ? "end.great" : pct >= 70 ? "end.good" : "end.low");
   const ul = $("miss"); ul.innerHTML = "";
   wrong.forEach((x) => {
@@ -953,24 +1013,16 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
 });
 
-// ===== Profile: account, monthly limit, look (Účtovná kniha is the default; a saved choice wins)
+// ===== Profile: account, monthly limit, Light / Dark / Auto theme, language
 
-// The browser's own bars take the page colour of the chosen look.
+// The browser's own bars and native iOS/Android status & navigation bars take the canvas colour.
 function paintChrome() {
+  const color = getComputedStyle(document.body).getPropertyValue("--paper").trim();
   const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.content = getComputedStyle(document.body).getPropertyValue("--paper").trim() || m.content;
+  if (m && color) m.content = color;
+  syncNativeChrome(color);
 }
-function setLook(l, save = true) {
-  if (l) document.body.dataset.look = l; else delete document.body.dataset.look;
-  loadLookFonts(l);
-  [...$("looks").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", b.dataset.l === l));
-  if (save) try { localStorage.setItem(LOOK_KEY, l); } catch (e) {}
-  // Zošit is light only and Tabuľa dark only.
-  const fixed = l === "zosit" || l === "tabula";
-  [...$("themes").children].forEach((b) => (b.disabled = fixed));
-  $("themeHint").hidden = !fixed;
-  paintChrome();
-}
+try { matchMedia("(prefers-color-scheme:dark)").addEventListener("change", paintChrome); } catch (e) {}
 function setTheme(th) {
   if (th) document.documentElement.dataset.theme = th; else delete document.documentElement.dataset.theme;
   const all = [...$("themes").children];
@@ -987,13 +1039,79 @@ function setLangUI(l) {
   $("langs").style.setProperty("--n", all.length);
   $("langs").style.setProperty("--i", Math.max(0, all.findIndex((b) => b.dataset.lang === l)));
 }
-$("looks").onclick = (e) => { const b = e.target.closest("button"); if (b) setLook(b.dataset.l); };
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
-$("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); } };
-let look0 = null, theme0 = ""; try { look0 = localStorage.getItem(LOOK_KEY); theme0 = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
+$("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
+let theme0 = ""; try { theme0 = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
 setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
-setLook(look0 == null ? "" : look0, false);
 setLangUI(getLang());
+
+// ===== Local exam-countdown study reminders (iOS & Android native local notifications)
+
+async function resyncReminders() {
+  if (!isNative()) return;
+  const prefs = loadReminderPrefs();
+  if (!prefs.enabled) { await cancelNativeReminders(); return; }
+  const perm = await reminderPermission();
+  if (perm !== "granted") { await cancelNativeReminders(); return; }
+  const items = buildReminderSchedule(loadSubjects(), prefs, { readLog, t, roundSize: ROUND });
+  if (items.length) await scheduleNativeReminders(items);
+  else await cancelNativeReminders();
+}
+
+async function renderReminders() {
+  const native = isNative();
+  const prefs = loadReminderPrefs();
+  const btns = [...$("remToggle").children];
+  const on = native && prefs.enabled;
+  btns.forEach((b) => {
+    b.disabled = !native;
+    b.setAttribute("aria-pressed", (b.dataset.rem === "1") === on ? "true" : "false");
+  });
+  $("remToggle").style.setProperty("--n", btns.length);
+  $("remToggle").style.setProperty("--i", on ? 1 : 0);
+  $("remTime").value = prefs.time;
+  $("remTimeRow").hidden = !on;
+  if (!native) {
+    $("remHint").textContent = t("profile.remindersWebNote");
+    return;
+  }
+  const perm = await reminderPermission();
+  if (perm === "denied") $("remHint").textContent = t("profile.remindersDenied");
+  else $("remHint").textContent = t("profile.remindersHint");
+}
+
+$("remToggle").onclick = async (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled || !isNative()) return;
+  const want = b.dataset.rem === "1";
+  const cur = loadReminderPrefs();
+  if (want === cur.enabled) return;
+  if (want) {
+    const state = await requestReminderPermission();
+    if (state !== "granted") {
+      saveReminderPrefs({ enabled: false, time: cur.time });
+      await renderReminders();
+      $("remHint").textContent = t("profile.remindersDenied");
+      return;
+    }
+    saveReminderPrefs({ enabled: true, time: $("remTime").value || cur.time });
+    await renderReminders();
+    await resyncReminders();
+    toast(t("profile.remindersSaved"));
+  } else {
+    saveReminderPrefs({ enabled: false, time: cur.time });
+    await renderReminders();
+    await cancelNativeReminders();
+    toast(t("profile.remindersDisabled"));
+  }
+};
+$("remTime").onchange = async () => {
+  const cur = loadReminderPrefs();
+  if (!cur.enabled || !isNative()) return;
+  saveReminderPrefs({ enabled: true, time: $("remTime").value || cur.time });
+  await resyncReminders();
+  toast(t("profile.remindersSaved"));
+};
 
 let pendingSignOutOpts = null;
 async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
@@ -1007,10 +1125,12 @@ async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
     }
   }
   cancelSync();
+  await cancelNativeReminders();
   const cloud = await import("../cloud/supabase.js");
   if (cloud.configured) await cloud.signOut();
   clearLocal();
   clearEntered();
+  clearPendingAuth();
   try { localStorage.removeItem(LAST_KEY); } catch (e) {}
   SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
   list = []; wrong = []; stage = "quiz"; readerHint = null;
@@ -1028,9 +1148,50 @@ $("signOutForce").onclick = async () => {
   await signOutAccount({ ...opts, force: true });
 };
 
+// In-app permanent account deletion (App Store 5.1.1(v) & Google Play requirement).
+$("pDelete").onclick = () => {
+  $("delAcctErr").hidden = true;
+  $("delAcctErr").textContent = "";
+  $("delAcctConfirm").disabled = false;
+  $("delAcctConfirm").textContent = t("profile.deleteConfirm");
+  openSheet($("deleteAccountSheet"));
+};
+$("delAcctConfirm").onclick = async () => {
+  const btn = $("delAcctConfirm");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = t("profile.deleting");
+  $("delAcctErr").hidden = true;
+  $("delAcctErr").textContent = "";
+  try {
+    cancelSync();
+    const cloud = await import("../cloud/supabase.js");
+    await cloud.deleteAccount(getLang());
+    await cancelNativeReminders();
+    clearReminderPrefs();
+    clearPendingAuth();
+    clearLocal();
+    clearEntered();
+    try { localStorage.removeItem(LAST_KEY); } catch (e) {}
+    SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
+    list = []; wrong = []; stage = "quiz"; readerHint = null;
+    if ($("deleteAccountSheet").open) {
+      if (history.state && history.state.sheet) { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+      $("deleteAccountSheet").close();
+    }
+    toast(t("profile.deletedToast"));
+    go("welcome", true);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = t("profile.deleteConfirm");
+    $("delAcctErr").textContent = t("profile.deleteErr");
+    $("delAcctErr").hidden = false;
+  }
+};
+
 // The account lives in Supabase, whose code loads only here and on the upload screen.
 async function renderAccount() {
-  $("pSign").hidden = true; $("pLimit").hidden = true; $("pWho").textContent = ""; $("pEmail").textContent = ""; $("pAvatar").textContent = "";
+  $("pSign").hidden = true; $("pLimit").hidden = true; $("pDelete").hidden = true; $("pWho").textContent = ""; $("pEmail").textContent = ""; $("pAvatar").textContent = "";
   $("pAvatar").classList.add("wait");
   const cloud = await import("../cloud/supabase.js");
   if (!cloud.configured) { $("pAvatar").classList.remove("wait"); $("pAvatar").replaceChildren(icon("user")); $("pWho").textContent = t("upload.off"); return; }
@@ -1055,12 +1216,13 @@ async function renderAccount() {
     $("pSign").disabled = true;
     try { await signOutAccount(); } finally { $("pSign").disabled = false; }
   };
+  $("pDelete").hidden = false;
   try {
     const u = (await cloud.call("usage", {}, getLang())).usage;
     renderLimit($("pLimit"), u, t);
   } catch (e) {}
 }
-function showProfile() { CUR = null; show("profile"); if (dir !== "none") renderAccount(); }
+function showProfile() { CUR = null; show("profile"); renderReminders(); if (dir !== "none") renderAccount(); }
 $("pLanding").onclick = () => go("welcome");
 
 function openLegal(kind) {
@@ -1111,16 +1273,18 @@ function showUpload(target, signIn, mode) {
   import("../upload/ui.js").then((m) => m.open({
     target: into ? into.id : null, signIn: !!signIn, mode: exams ? "exams" : "files",
     // tabName: the subject tab to open on ("exams" after reading old exams).
-    opened: (id, tabName) => { CUR = null; go(id, true); if (tabName) { tab = tabName; refresh(); } },
+    opened: (id, tabName) => { CUR = null; resyncReminders(); go(id, true); if (tabName) { tab = tabName; refresh(); } },
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
     onSignOut: () => signOutAccount(),
   }));
 }
 
 route();
+resyncReminders();
 
 // Subjects or progress arrived from the account (another device, or this one after its storage was cleared).
 startSync(() => {
+  resyncReminders();
   if (!["today", "home", "subject"].includes(screen)) return;
   if (screen === "subject" && !loadSubjects().some((x) => x.id === CUR.id)) { go("subjects", true); return; }
   refresh();

@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import { buildSampleSubject, ensureSampleSubject, SAMPLE_ID } from "../src/app/sample.js";
 import { loadSubjects, saveSubjects, loadMeta, saveMeta, clearLocal, removeSamples, logAnswer, resetProgress, readProgress, readLog, unsent, hasUnsynced, onLocalChange } from "../src/app/subjects.js";
 import { authMessage, readPendingAuth, writePendingAuth, clearPendingAuth, extractOtpDigits, PENDING_TTL_MS } from "../src/app/auth-state.js";
-import { fontSheetForLook } from "../src/app/fonts.js";
 import { rankExams } from "../src/app/exams.js";
 import { sourceFileIndex, matchSummaryBlock, summaryBlocks, stripSourceMeta } from "../src/app/md.js";
 
@@ -135,16 +134,12 @@ test("pending auth stores email + timestamp only, expires after 15 minutes, and 
   assert.equal(readPendingAuth(t0, store), null);
 });
 
-test("extractOtpDigits handles pasted spaced codes and fontSheetForLook maps every look", () => {
+test("extractOtpDigits handles pasted spaced codes and fonts.css ships Source Sans 3 + JetBrains Mono", async () => {
   assert.equal(extractOtpDigits("1234 5678"), "12345678");
   assert.equal(extractOtpDigits(" 12-34-56-78\n"), "12345678");
-  assert.equal(fontSheetForLook("kocky"), "kocky");
-  assert.equal(fontSheetForLook(""), "kniha");
-  assert.equal(fontSheetForLook("zosit"), "zosit");
-  assert.equal(fontSheetForLook("tabula"), "zosit");
-  assert.equal(fontSheetForLook("cisty"), "cisty");
-  assert.equal(fontSheetForLook("riso"), "riso");
-  assert.equal(fontSheetForLook("unknown"), "kniha");
+  const css = await readFile(new URL("../public/fonts/fonts.css", import.meta.url), "utf8");
+  assert.ok(css.includes("Source Sans 3") && css.includes("400 700"), "fonts.css declares variable Source Sans 3");
+  assert.ok(css.includes("JetBrains Mono"), "fonts.css declares JetBrains Mono");
 });
 
 test("public static legal pages exist for SK and CS and stay synced with i18n text", async () => {

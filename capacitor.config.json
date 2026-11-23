@@ -1,5 +1,18 @@
 {
   "appId": "sk.lekto.app",
   "appName": "Lekto",
-  "webDir": "dist"
+  "webDir": "dist",
+  "backgroundColor": "#f7f7f5",
+  "ios": {
+    "contentInset": "never",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile",
+    "backgroundColor": "#f7f7f5"
+  },
+  "android": {
+    "backgroundColor": "#f7f7f5",
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  }
 }

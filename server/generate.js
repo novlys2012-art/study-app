@@ -186,13 +186,20 @@ function aiFailure(e) {
 }
 
 // body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId) -> {month, today, minute},
-// record(row), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, log? }.
+// record(row), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, deleteUser?(userId), log? }.
 // task "usage" returns the caller's spending without an AI call.
-export async function handle(body, { user, ai, spend, record, env, cache = null, log = console.error }) {
+// task "delete_account" deletes the caller's own account and cascades all user data (runs even over caps / off allowlist).
+export async function handle(body, { user, ai, spend, record, env, cache = null, deleteUser = null, log = console.error }) {
   if (!user) throw new HttpError(401, "auth", "Sign in first.");
+  const { task, input = {}, lang: l } = body || {};
+  if (task === "delete_account") {
+    if (!input || input.confirm !== true) throw new HttpError(400, "bad_input", "Missing delete confirmation.");
+    if (typeof deleteUser !== "function") throw new HttpError(503, "server_error", "Account deletion unavailable.");
+    await deleteUser(user.id);
+    return { deleted: true };
+  }
   const lim = limitsFrom(env);
   if (lim.allowed && !lim.allowed.includes(String(user.email || "").toLowerCase())) throw new HttpError(403, "not_allowed", "This account is not on the test list.");
-  const { task, input = {}, lang: l } = body || {};
   const lang = l === "cs" ? "cs" : "sk";
   const s = await spend(user.id);
   const usage = (extra = 0) => ({ monthUsd: +(s.month + extra).toFixed(4), limitUsd: lim.userMonthUsd });

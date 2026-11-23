@@ -368,4 +368,20 @@ test("pipeline: citedForCheck recovers missing pages from quotes and tracks visi
   assert.equal(fallback.fromVision, true);
 });
 
+test("server: delete_account requires auth and confirm, and works even over limits or off allowlist", async () => {
+  const deleted = [];
+  const delDeps = (extra = {}) => ({
+    ...deps({ month: 99, today: 99, env: { ALLOWED_EMAILS: "other@example.com" } }),
+    deleteUser: async (uid) => { deleted.push(uid); },
+    ...extra,
+  });
+  await rejects(handle({ task: "delete_account", input: { confirm: true } }, delDeps({ user: null })), "auth");
+  await rejects(handle({ task: "delete_account", input: {} }, delDeps()), "bad_input");
+  await rejects(handle({ task: "delete_account", input: { confirm: true } }, delDeps({ deleteUser: null })), "server_error");
+  const out = await handle({ task: "delete_account", input: { confirm: true } }, delDeps());
+  assert.deepEqual(out, { deleted: true });
+  assert.deepEqual(deleted, [user.id]);
+});
+
+
 

@@ -30,11 +30,14 @@ const isNetworkErr = (e) => {
   return (e && e.name === "AuthRetryableFetchError") || /failed to fetch|networkerror|load failed|fetch|offline|timeout/i.test(m);
 };
 
-// Sends the sign-in email: a code to type on any device, plus a link that works in this browser.
+// Sends the sign-in email: a code to type on any device, plus a link that works in web browsers.
+// Native Capacitor shells rely on the OTP code and omit capacitor:// / localhost redirect URLs.
 export async function signIn(email) {
   let error;
+  const native = typeof window !== "undefined" && (location.protocol === "capacitor:" || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()));
+  const options = native ? {} : { emailRedirectTo: location.origin + location.pathname };
   try {
-    ({ error } = await client().auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } }));
+    ({ error } = await client().auth.signInWithOtp({ email, options }));
   } catch (e) {
     throw new CloudError(isNetworkErr(e) ? "network" : "signIn", e && e.message);
   }
@@ -76,6 +79,12 @@ export async function signOut() {
       if (key && /^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
     }
   } catch (e) {}
+}
+
+// Permanently deletes the signed-in user and cascades all synced subjects, answers and usage rows.
+export async function deleteAccount(lang = "sk") {
+  await call("delete_account", { confirm: true }, lang);
+  await signOut();
 }
 
 // One server task. Returns { result, usage: { monthUsd, limitUsd } }.

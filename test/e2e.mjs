@@ -128,7 +128,7 @@ const api = createServer(async (req, res) => {
 execFileSync("npx", ["vite", "build", "--outDir", OUT, "--emptyOutDir", "--logLevel", "warn"], {
   cwd: ROOT, stdio: "inherit", env: { ...process.env, VITE_SUPABASE_URL: API, VITE_SUPABASE_KEY: "fake-publishable-key" },
 });
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".woff2": "font/woff2", ".png": "image/png" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2", ".png": "image/png" };
 const web = createServer(async (req, res) => {
   const path = join(OUT, decodeURIComponent(req.url.split("?")[0]).replace(/\/$/, "/index.html"));
   try { res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream" }); res.end(await readFile(path)); }

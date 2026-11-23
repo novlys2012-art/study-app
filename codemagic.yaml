@@ -1,0 +1,53 @@
+# Codemagic CI/CD for iOS & iPadOS builds (App Store Connect / TestFlight).
+# Configure environment groups `lekto_app` (VITE_SUPABASE_URL, VITE_SUPABASE_KEY)
+# and an App Store Connect API key integration named `app_store_connect` in Codemagic.
+workflows:
+  ios-release:
+    name: Lekto iOS & iPadOS Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: app_store_connect
+    environment:
+      groups:
+        - lekto_app
+      vars:
+        BUNDLE_ID: "sk.lekto.app"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install dependencies and run unit tests
+        script: |
+          npm ci
+          npm test
+      - name: Build web app and sync iOS Capacitor project
+        script: |
+          npm run cap:sync
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: Bump iOS build number from App Store Connect
+        script: |
+          cd ios/App
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+      - name: Build signed IPA for iPhone and iPad
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

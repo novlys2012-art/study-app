@@ -3,7 +3,6 @@
 import { t, getLang } from "../i18n/index.js";
 import { syncNow } from "./autosync.js";
 import { removeSamples } from "./subjects.js";
-import { startRewrite, stopRewrite } from "./rewrite.js";
 import {
   OTP_LENGTH,
   extractOtpDigits,
@@ -314,7 +313,6 @@ function wire() {
   $("wLangs").onclick = (e) => {
     const b = e.target.closest("button[data-lang]");
     if (!b || b.dataset.lang === getLang()) return;
-    stopRewrite();
     hooks.setLangUI(b.dataset.lang);
     syncLangButtons();
     syncHeaderCopy();
@@ -324,13 +322,11 @@ function wire() {
       $("wGuest").textContent = t("welcome.continueApp");
     }
     updateResend();
-    startRewrite($("welcome"));
   };
 }
 
 export async function openAuthDialog() {
   if (!hooks) return;
-  stopRewrite();
   await refreshAuthState();
   hooks.openAuthSheet();
   requestAnimationFrame(() => {
@@ -343,7 +339,6 @@ export async function openAuthDialog() {
 
 export function openWelcome(nextHooks, openAuth = false) {
   hooks = nextHooks;
-  stopRewrite();
   wire();
   syncLangButtons();
   setBusy(false);

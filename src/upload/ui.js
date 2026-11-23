@@ -4,7 +4,7 @@ import { t, getLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, loadMeta, removeSamples } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
-import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ext } from "./extract.js";
+import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, ext } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { icon } from "../app/icons.js";
@@ -98,7 +98,7 @@ async function refresh() {
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}
   if (!agreed) { panel("upConsent"); return; }
   $("upWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
-  $("upFiles").accept = (examMode() ? TYPES.concat(PHOTO_TYPES) : TYPES).join(",");
+  $("upFiles").accept = examMode() ? ACCEPT_EXAMS : ACCEPT_FILES;
   $("upFilesHint").textContent = t(examMode() ? "upload.examsHint" : "upload.filesHint");
   $("upMakeBox").hidden = examMode();
   renderSubjects(); step(1);

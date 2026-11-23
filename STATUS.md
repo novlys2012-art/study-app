@@ -1,9 +1,9 @@
 # Lekto — Status & Handoff
 
-Last updated: 2026-11-21
-Build / checks: `npm run build` passes, `npm run lint` passes, `npm test` passes (**65/65**).
+Last updated: 2026-11-23
+Build / checks: Pending CI/Node run after Clean Proof design system overhaul (Node.js not installed in local Windows workspace; mechanical i18n/JSON/HTML/JS/CSS checks verified).
 
-Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
+Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
 
 ---
 
@@ -91,6 +91,27 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
   - Replaced `citedText()` with `citedForCheck(sec, pages, qs, visionPages)` in `src/upload/pipeline.js`: recovers missing/out-of-range `page` numbers via normalized quote match before falling back to `sec.text`, and passes `fromVision: true` only when a checked page came from `vision`.
 - **Deployment note**: Push to `main` (runs `Deploy server`) or run `npm run fn:prepare` and redeploy `generate` so production picks up the routing changes.
 
+### 1.12 Ship-Ready Mobile, Tablet & Store Release Package (iOS, iPadOS, Android & PWA)
+- **Files**: `src/styles/app.css`, `src/app/{app.js,native.js,reminders.js,gestures.js,autosync.js}`, `src/cloud/supabase.js`, `src/upload/{extract.js,ui.js}`, `index.html`, `src/i18n/{sk,cs}.json`, `server/generate.js`, `supabase/functions/generate/index.ts`, `public/{manifest.webmanifest,sw.js,icons/*}`, `capacitor.config.json`, `android/app/{build.gradle,proguard-rules.pro,src/main/AndroidManifest.xml,src/main/java/sk/lekto/app/*,src/main/res/*}`, `ios/App/{App/AppDelegate.swift,App/SceneDelegate.swift,App/Info.plist,App/PrivacyInfo.xcprivacy,App/Base.lproj/Main.storyboard,App/Assets.xcassets/*,App.xcodeproj/project.pbxproj}`, `codemagic.yaml`, `.github/workflows/{build.yml,mobile-release.yml}`, `docs/mobile-release.md`, `test/{reminders.test.mjs,server.test.mjs}`
+- **How it works**:
+  - **Adaptive phone & tablet layouts (`src/styles/app.css`)**: Added dedicated breakpoints for phone landscape (`max-height: 500px`), tablet portrait (`640px–899px`: 2-column Today/Subjects/Summaries/Quiz grids, split hero card, 2-column Profile at `>=760px`), and tablet landscape (`900px–1099px`: safe-area-aware side rail + split Subject & Reader workspaces). Fixed double safe-area insets, `.fb-in` 4-value safe-area padding, `#welcome` safe-area top/bottom padding, 44px touch targets (`.iconbtn.small`, `.tiny`, `.up-ctx`, `.custom input`), and mobile `.up-file` wrapping.
+  - **Touch gestures & keyboard viewport (`src/app/gestures.js`)**: Added swipe-to-dismiss touch physics for mobile bottom sheets (respecting internal scroll and `prefers-reduced-motion`) and `visualViewport` `--kb` tracking so inputs inside sheets/forms stay clear of soft keyboards.
+  - **First-party native bridge (`LektoNative` on Android & iOS + `src/app/native.js`)**: Zero extra npm dependencies (`package.json` & `package-lock.json` remain intact for `npm ci`). Handles Android hardware/predictive Back (`OnBackPressedCallback`), live status/navigation bar & WebView background sync across all 6 looks & light/dark modes, native iOS/Android haptics, foreground resume cloud sync (`lekto:resume`), and local study reminder notifications with subject deep-link tap handling.
+  - **Local exam-countdown reminders (`src/app/reminders.js`, `test/reminders.test.mjs`)**: Schedules up to 14 days of daily device-local notifications prioritizing nearest upcoming exams and due review plans (excluding sample subjects), managed in `Profil` and auto-resynced on exam/subject/quiz/sync updates.
+  - **In-app account deletion (`server/generate.js`, `supabase/functions/generate/index.ts`, `src/cloud/supabase.js`, `src/app/app.js`, `test/server.test.mjs`)**: Added `task: "delete_account"` (runs even over caps / off allowlist, requires `{ confirm: true }`, cascades all user tables via `admin.auth.admin.deleteUser`) wired to `Profil -> Odstrániť účet` + `#deleteAccountSheet`.
+  - **Installable PWA & branded native assets**: Added `public/manifest.webmanifest`, offline app-shell `public/sw.js`, and generated branded Lekto icons & light/dark splash screens across Web/PWA, iOS/iPadOS, and Android (including adaptive vector + Material You monochrome icons).
+  - **Store compliance & release CI**: Added `ios/App/App/PrivacyInfo.xcprivacy`, `Info.plist` camera/photo usage descriptions, `ITSAppUsesNonExemptEncryption = false`, `UIRequiresFullScreen = false` (iPad multitasking), Android R8/ProGuard + env-driven release keystore signing in `build.gradle`, `codemagic.yaml` (iOS/iPadOS), `.github/workflows/mobile-release.yml` (Android Play Store `.aab`), and `docs/mobile-release.md`.
+  - **Android/iOS file picker & native OTP auth**: Added MIME types alongside extensions in `src/upload/extract.js` (`ACCEPT_FILES`, `ACCEPT_EXAMS`) and omitted `emailRedirectTo` inside Capacitor native shells so OTP sign-in works cleanly without broken localhost links.
+- **Deployment note**: Push to `main` (runs `Deploy server` + `Build` + `Deploy web preview`) so `generate` picks up `delete_account` and GitHub Actions verifies `npm test`, `npm run smoke`, `npm run e2e`, and Android `./gradlew assembleDebug`. See `docs/mobile-release.md` for Play Store & Codemagic signing secrets.
+
+### 1.13 "Clean Proof" Minimalistic Design Language & Root `DESIGN.md`
+- **Files**: `DESIGN.md`, `src/styles/app.css`, `index.html`, `src/app/{app.js,icons.js,welcome.js,native.js}`, `src/i18n/{sk,cs}.json`, `public/fonts/fonts.css`, `public/{manifest.webmanifest,sw.js,terms.html,privacy.html,cs/terms.html,cs/privacy.html}`, `capacitor.config.json`, `android/app/src/main/res/{values,values-night}/colors.xml`, `ios/App/App/SceneDelegate.swift`, `test/{smoke.mjs,welcome.test.mjs}`, `docs/design.md`, `CLAUDE.md` (removed `src/app/fonts.js`, `src/app/rewrite.js`, `test/rewrite.test.mjs`, and 18 legacy look font files + 5 look CSS files).
+- **How it works**:
+  - Replaced the 6 legacy `kviz-final` looks with one unified minimalistic design system (**Clean Proof**, documented normatively in root `DESIGN.md`) in Light, Dark, and Auto: flat mineral paper (`#f7f7f5` / `#121312`), clean sheet (`#ffffff` / `#191b19`), 1 px hairline rules, one **Spruce Ink** primary action accent (`#14524c` / `#68cbbf`), and one **Marker Citron** proof highlight (`#f5e28a` / `rgba(245,226,138,.22)`) directly inside calm `65ch` prose with no nested amber border box.
+  - Consolidated typography to self-hosted variable `Source Sans 3` (`400 700` `latin` + `latin-ext`) with `tabular-nums` for counts/percentages and `JetBrains Mono` strictly for OTP codes, `<kbd>`, and inline code/formulas—shrinking `public/fonts/` from 27 files (~620 KB) to 5 files (~118 KB).
+  - Cut visual chrome and motion bloat: replaced SVG progress rings (`icons.js:ring()`) with tabular `%` + `3 px` hairline progress tracks, moved the mobile floating `.fab` to inline `+ Nahrať` header buttons (`#todayAdd` / `#homeAdd`), unified repeated lists (`#todayBody .list`, `#subjects`, `#tbars`, `#files`, `.ranks`, `#tabExams .list`, `.up-list`) into flat hairline-ruled lists, switched `#sTabs` to flat underline tabs (`.utabs`), removed `backdrop-filter: blur()`, spring bounces, quiz shake/stagger animations, and the `#welcome` typewriter rewrite script (`src/app/rewrite.js`).
+  - Synced `public/manifest.webmanifest`, `public/sw.js` (`lekto-shell-v2`), static SK/CS legal pages, `capacitor.config.json`, Android `colors.xml`, iOS `SceneDelegate.swift`, and `test/smoke.mjs` / `test/welcome.test.mjs`.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)
@@ -125,6 +146,7 @@ Read `CLAUDE.md` and `docs/design.md` alongside this file for product scope, sta
 
 ## 5. Open / Next Tasks
 
-- [ ] Run `npm run fn:prepare` and deploy the updated Supabase `generate` Edge Function so production accepts `context`.
-- [ ] Optional: Verify `sourceFile(x)` / reader highlight if quiz questions ever cite a context file directly.
-- [ ] Remaining roadmap items from `CLAUDE.md`: full Czech review/polish, payments (Stripe / RevenueCat), age-gate / ToS wording for user-uploaded materials, native Capacitor builds (`npm run cap:sync`).
+- [ ] Run `npm run fn:prepare` and deploy the updated Supabase `generate` Edge Function so production accepts `context`, smart routing, and `delete_account`.
+- [ ] Run `npm test && npm run lint && npm run build && npm run smoke && npm run e2e` + `./gradlew assembleDebug` in GitHub Actions CI (or a machine with Node 22) and test on physical iPhone, iPad, and Android devices (`docs/mobile-release.md`).
+- [ ] Configure Android upload keystore secrets and Codemagic iOS App Store Connect integration (`docs/mobile-release.md`).
+- [ ] Remaining roadmap items from `CLAUDE.md`: payments (Stripe / RevenueCat) once paid tier launches.

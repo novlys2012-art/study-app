@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ochrana súkromia – Lekto</title>
 <meta name="description" content="Pre fungovanie účtu ukladáme tvoju e-mailovú adresu, tvoje predmety a históriu odpovedí v zabezpečenej databáze prístupnej len tvojmu účtu.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23195d4b'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23ffd86b'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="./fonts/kniha.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2314524c'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23f5e28a'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./fonts/fonts.css">
 <style>
-:root{--paper:#f5f2eb;--sheet:#fcfbf7;--ink:#171f1c;--muted:#555a53;--rule:#dcd6c9;--accent:#195d4b;--on-accent:#fcfbf7}
-@media (prefers-color-scheme:dark){:root{--paper:#121513;--sheet:#191d1a;--ink:#ece9e1;--muted:#9a9c93;--rule:#2b302b;--accent:#6bc4a6;--on-accent:#0d1814;color-scheme:dark}}
+:root{--paper:#f7f7f5;--sheet:#ffffff;--ink:#161716;--muted:#595b57;--rule:#e2e2dc;--accent:#14524c;--on-accent:#ffffff}
+@media (prefers-color-scheme:dark){:root{--paper:#121312;--sheet:#191b19;--ink:#ecece8;--muted:#9e9f9a;--rule:#2a2d2a;--accent:#68cbbf;--on-accent:#0d1918;color-scheme:dark}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.65 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:680px;margin:0 auto;padding:32px 20px 64px;display:grid;gap:20px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
-.brand{display:inline-flex;align-items:center;gap:9px;font:700 19px "Bricolage Grotesque","Segoe UI",system-ui,sans-serif;color:var(--ink);text-decoration:none}
-.mark{width:28px;height:28px;border-radius:4px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.brand{display:inline-flex;align-items:center;gap:9px;font:700 19px "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+.mark{width:28px;height:28px;border-radius:6px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
 .mark svg{width:17px;height:17px}
-article{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:26px;display:grid;gap:14px}
-h1{font:700 clamp(26px,5vw,34px)/1.15 "Bricolage Grotesque","Segoe UI",system-ui,sans-serif;margin:0}
+article{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:26px;display:grid;gap:14px}
+h1{font:700 clamp(26px,5vw,32px)/1.15 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
 nav{display:flex;flex-wrap:wrap;gap:14px;font-size:15px}

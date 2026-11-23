@@ -10,6 +10,16 @@ export const MAX_BYTES = 60 * 1024 * 1024;
 export const TYPES = [".pdf", ".pptx", ".docx", ".txt", ".md"];
 // Photos of exam pages (past exam mode). HEIC opens in Safari, which is where iPhone photos come from.
 export const PHOTO_TYPES = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+// MIME types alongside extensions so Android WebView and iOS Files pickers reliably enable supported documents.
+const FILE_MIMES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "text/markdown",
+];
+export const ACCEPT_FILES = [...TYPES, ...FILE_MIMES].join(",");
+export const ACCEPT_EXAMS = [...TYPES, ...PHOTO_TYPES, ...FILE_MIMES, "image/*"].join(",");
 export const PHOTO_SIDE = 1600;      // px, long side: a whole phone photo of a page stays readable
 
 export class ExtractError extends Error {
