@@ -1,15 +1,25 @@
-// Pure helpers for passwordless auth state and error mapping.
+// Pure helpers for password + email-verification auth state and error mapping.
 export const PENDING_AUTH_KEY = "lekto-pending-auth";
 export const PENDING_TTL_MS = 15 * 60 * 1000;
 export const OTP_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 8;
 
 export function extractOtpDigits(raw) {
   return String(raw || "").replace(/\D+/g, "");
 }
 
+export function isPasswordValid(password) {
+  return typeof password === "string" && password.length >= MIN_PASSWORD_LENGTH;
+}
+
 // Maps auth/network errors to dedicated auth.err.* keys; never exposes raw server/fetch strings.
 export function authMessage(e, t) {
   const code = e && e.code;
+  if (code === "credentials") return t("auth.err.wrongCredentials");
+  if (code === "unconfirmed") return t("auth.err.unconfirmed");
+  if (code === "exists") return t("auth.err.emailTaken");
+  if (code === "weakPassword") return t("auth.err.passwordShort");
+  if (code === "samePassword") return t("auth.err.samePassword");
   if (code === "code") return t("auth.err.wrongCode");
   if (code === "expired") return t("auth.err.expiredCode");
   if (code === "rate") return t("auth.err.rate");
@@ -36,15 +46,17 @@ export function readPendingAuth(now = Date.now(), store = typeof sessionStorage 
       store.removeItem(PENDING_AUTH_KEY);
       return null;
     }
-    return { email: parsed.email, at: parsed.at };
+    const kind = parsed.kind === "recovery" ? "recovery" : "signup";
+    return { email: parsed.email, kind, at: parsed.at };
   } catch (e) {
     return null;
   }
 }
 
-export function writePendingAuth(email, now = Date.now(), store = typeof sessionStorage !== "undefined" ? sessionStorage : null) {
+export function writePendingAuth(email, kind = "signup", now = Date.now(), store = typeof sessionStorage !== "undefined" ? sessionStorage : null) {
   if (!store || !email) return;
-  try { store.setItem(PENDING_AUTH_KEY, JSON.stringify({ email, at: now })); } catch (e) {}
+  const safeKind = kind === "recovery" ? "recovery" : "signup";
+  try { store.setItem(PENDING_AUTH_KEY, JSON.stringify({ email, kind: safeKind, at: now })); } catch (e) {}
 }
 
 export function clearPendingAuth(store = typeof sessionStorage !== "undefined" ? sessionStorage : null) {

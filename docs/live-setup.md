@@ -26,24 +26,35 @@ Keep the key open in that tab for step 4.
 
 ## 3. Sign-in
 
-Students sign in with a 6-digit code from an email, so they can read the email on their phone and type the code on the computer. The link in the same email also works, but only in the browser that asked for it.
+Students register with an email + password (min. 8 characters) and verify their email once with an 8-digit code, then log in directly with email + password (plus a code-based "Forgot password" flow that also lets earlier passwordless accounts set a password).
+
+**Auth settings.** Authentication → Providers → Email:
+
+- Ensure **Enable Email provider** and **Confirm email** are turned ON.
+- Under Authentication → Settings → Password Settings, set **Minimum password length** to `8`.
 
 **URLs.** Authentication → URL Configuration:
 
 - **Site URL:** `https://novlys2012-art.github.io/study-app/`
 - **Redirect URLs:** add `https://novlys2012-art.github.io/study-app/` and `http://localhost:5173/`
 
-**The email.** Authentication → Emails → Templates. Do this for both **Magic link** and **Confirm signup**, because a first sign-in uses the second one:
+**The emails.** Authentication → Emails → Templates (switch each editor to Source):
 
-- **Subject:** `Kód na prihlásenie do Lekto: {{ .Token }}`
-- **Body:** switch the editor to source and paste the whole of [`supabase/templates/sign-in.html`](../supabase/templates/sign-in.html) (open it on GitHub, press the copy button).
+1. **Confirm signup**
+   - **Subject:** `Overovací kód pre Lekto`
+   - **Body:** paste the whole of [`supabase/templates/sign-in.html`](../supabase/templates/sign-in.html).
+2. **Reset password**
+   - **Subject:** `Obnovenie hesla v Lekto`
+   - **Body:** paste the whole of [`supabase/templates/reset-password.html`](../supabase/templates/reset-password.html).
 
-**Your own mail sender.** Supabase's built-in sender only sends about 2 emails an hour for the whole project, and only to members of your Supabase organisation. Connect your own sender to lift both limits. Authentication → Emails → SMTP Settings → enable custom SMTP:
+Both templates intentionally send only the verification code with no external redirect link (`{{ .ConfirmationURL }}`), which avoids cross-domain spam flags and works cleanly on iOS/Android.
 
-- **Without your own domain: Gmail.** Turn on 2-Step Verification for your Google account, then create an app password at https://myaccount.google.com/apppasswords (name it `lekto`). Fill in host `smtp.gmail.com`, port `465`, username = your Gmail address, password = the 16-letter app password, sender email = your Gmail address, sender name `Lekto`. Gmail allows about 500 emails a day, plenty for testing.
-- **With your own domain (later): Resend.** Sign up at https://resend.com, add and verify your domain, create an API key, then fill in host `smtp.resend.com`, port `465`, username `resend`, password = the API key, sender email `prihlasenie@<your domain>`. The free plan sends 100 emails a day. Without a verified domain Resend only delivers to your own address.
+**Your own mail sender (avoiding spam).** Supabase's built-in sender (`noreply@mail.app.supabase.io`) is a shared domain with low reputation and a 2-email/hour cap — it frequently lands in Spam. Sending transactional auth mail from a personal `@gmail.com` SMTP account also often gets filtered because consumer Gmail accounts are not meant for app auth mail.
 
-After that, raise the cap under Authentication → Rate Limits → "Rate limit for sending emails" (for example 30 an hour). Type the password or key only into the Supabase page, never into a chat.
+- **Recommended (even before launch): Resend (or Postmark / Brevo) with your own domain.** Buy a cheap domain (e.g. `lekto.sk`), add it in https://resend.com, publish the **SPF**, **DKIM**, and **DMARC** (`v=DMARC1; p=none;` -> later `p=quarantine;`) DNS records Resend gives you, then set Supabase Authentication → Emails → SMTP Settings to `smtp.resend.com`, port `465`, username `resend`, password = API key, sender `prihlasenie@<your-domain>`, sender name `Lekto`. The free plan sends 100 emails/day (3,000/month) and lands in Primary inbox reliably.
+- **Quick personal testing only (expect Spam folder): Gmail SMTP.** Turn on 2-Step Verification for your Google account, create an app password at https://myaccount.google.com/apppasswords, and fill in `smtp.gmail.com`, port `465`, username = your Gmail address, password = the 16-letter app password.
+
+After configuring custom SMTP, raise the cap under Authentication → Rate Limits → "Rate limit for sending emails" (for example 30 an hour). Type passwords or API keys only into the Supabase dashboard, never into a chat.
 
 ## 4. Secrets for the server function
 

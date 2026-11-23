@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handle, HttpError, limitsFrom, cacheKey, needsStrongCheck } from "../server/generate.js";
 import { buildSubject, stepsFor, retrying, backoff, contextOf, citedForCheck } from "../src/upload/pipeline.js";
+import { createSubject } from "../src/app/subjects.js";
 import { parseQuiz, parseProblems, parseTopics, parseVision, parseChecks, parseProblemChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
@@ -476,6 +477,23 @@ test("pipeline: generates, verifies, repairs, drops and preserves worked practic
   assert.equal(kept.kind, "problem");
   assert.deepEqual(kept.steps, ["(2+4+6)/3 = 4"]);
   assert.equal(kept.ans, "4");
+});
+
+test("pipeline: uploading files later into an empty subject preserves its id, name and exam date", async () => {
+  const empty = { ...createSubject("Mikroekonómia"), exam: "2027-01-15" };
+  const docs = [{ name: "L1.pdf", pages: ["Dopyt klesá s cenou. ".repeat(20)], images: [] }];
+  const { call: baseCall } = fakeCall();
+  const call = async (task, input) => (task === "topics"
+    ? { topics: [{ name: "Dopyt", files: ["L1.pdf"], summary: "S", questions: input.questions.map((x) => x.id), weakSpots: [] }] }
+    : baseCall(task, input));
+  const filled = await buildSubject({ name: "", existing: empty, docs, call });
+  assert.equal(filled.id, empty.id);
+  assert.equal(filled.name, "Mikroekonómia");
+  assert.equal(filled.exam, "2027-01-15");
+  assert.equal(filled.files.length, 1);
+  assert.equal(filled.questions.length, 1);
+  assert.equal(filled.questions[0].t, "t1");
+  assert.deepEqual(filled.topics, { t1: "Dopyt" });
 });
 
 

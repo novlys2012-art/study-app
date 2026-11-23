@@ -25,6 +25,23 @@ export function newId(bytes = 16) {
 }
 export const questionId = () => "q" + newId(5);
 
+export function createSubject(name) {
+  const clean = String(name || "").trim().slice(0, 80);
+  if (!clean) throw new Error("Subject name is required");
+  return {
+    id: "u" + Date.now().toString(36) + newId(3),
+    code: clean.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "NEW",
+    name: clean,
+    term: "",
+    createdAt: new Date().toISOString(),
+    topics: {},
+    topicInfo: {},
+    files: [],
+    questions: [],
+    checkedOut: 0,
+  };
+}
+
 function read(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; } catch (e) { return fallback; }
 }

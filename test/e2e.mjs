@@ -59,25 +59,52 @@ const fakeAi = {
   },
 };
 
-// ----- Fake Supabase: sign-in link request and the generate function.
+// ----- Fake Supabase: email/password signup with verification, password login, and the generate function.
 const USER = { id: "11111111-1111-1111-1111-111111111111", email: "student@example.com", aud: "authenticated", role: "authenticated" };
 const ledger = [], tasks = [], cache = new Map();
 const db = { subjects: new Map(), progress: new Map(), reviews: new Map() };
+const accounts = new Map();
 let bodyBytes = "";
 const api = createServer(async (req, res) => {
-  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-version, prefer, accept-profile, content-profile", "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS" };
+  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-version, prefer, accept-profile, content-profile", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS" };
   const send = (status, body) => { res.writeHead(status, { ...cors, "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
   if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
   let raw = ""; for await (const c of req) raw += c;
   const path = req.url.split("?")[0];
-  if (path === "/auth/v1/otp") return send(200, {});
-  if (path === "/auth/v1/user") return send(200, USER);
-  // The 6-digit code from the email: 123456 is right, anything else is wrong or expired.
+  const sessionBody = () => {
+    const now = Math.floor(Date.now() / 1000);
+    return { access_token: "fake-token", token_type: "bearer", expires_in: 3600, expires_at: now + 3600, refresh_token: "r", user: USER };
+  };
+  if (path === "/auth/v1/signup") {
+    const { email, password } = JSON.parse(raw || "{}");
+    const existing = accounts.get(email);
+    if (existing?.confirmed) return send(200, { user: { ...USER, email, identities: [] }, session: null });
+    accounts.set(email, { password, confirmed: false });
+    return send(200, { user: { ...USER, email, identities: [{ id: "id-1" }] }, session: null });
+  }
+  if (path === "/auth/v1/resend" || path === "/auth/v1/recover") return send(200, {});
+  if (path === "/auth/v1/token") {
+    const { email, password } = JSON.parse(raw || "{}");
+    const acct = accounts.get(email);
+    if (!acct || acct.password !== password) return send(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
+    if (!acct.confirmed) return send(400, { error_code: "email_not_confirmed", msg: "Email not confirmed" });
+    return send(200, sessionBody());
+  }
+  if (path === "/auth/v1/user") {
+    if (req.method === "PUT") {
+      const { password } = JSON.parse(raw || "{}");
+      const acct = accounts.get(USER.email);
+      if (acct && password) acct.password = password;
+    }
+    return send(200, USER);
+  }
+  // The verification code from the email: 123456 is right, anything else is wrong or expired.
   if (path === "/auth/v1/verify") {
     const { token, email, type } = JSON.parse(raw || "{}");
-    if (token !== "123456" || email !== USER.email || type !== "email") return send(403, { code: "otp_expired", error_code: "otp_expired", msg: "Token has expired or is invalid" });
-    const now = Math.floor(Date.now() / 1000);
-    return send(200, { access_token: "fake-token", token_type: "bearer", expires_in: 3600, expires_at: now + 3600, refresh_token: "r", user: USER });
+    if (token !== "123456" || email !== USER.email || (type !== "signup" && type !== "recovery")) return send(403, { code: "otp_expired", error_code: "otp_expired", msg: "Token has expired or is invalid" });
+    const acct = accounts.get(email);
+    if (acct) acct.confirmed = true;
+    return send(200, sessionBody());
   }
   if (path === "/functions/v1/generate") {
     bodyBytes += raw;
@@ -188,8 +215,8 @@ await page.addInitScript(() => {
 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-let refusing = false; // the wrong-code step expects the browser to log one 403
-page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && !(refusing && /status of 403/.test(m.text())) && errors.push(m.text()));
+let refusing = false; // expected auth rejection steps log one 400 or 403
+page.on("console", (m) => m.type() === "error" && !/fonts\./.test(m.text()) && !(refusing && /status of 40[03]/.test(m.text())) && errors.push(m.text()));
 const check = (cond, msg) => { if (!cond) errors.push(msg); else console.log("✓ " + msg); };
 
 try {
@@ -198,20 +225,23 @@ try {
   await page.click(".sj.add");
   await page.locator("#upLogin").waitFor();
   check(page.url().endsWith("#upload"), "the add card opens the upload screen");
-  await page.fill("#upEmail", USER.email);
-  await page.click("#upSend");
-  await page.locator("#upSent").waitFor();
-  check((await page.textContent("#upSent")).includes(USER.email), "sign-in code requested");
-  await page.fill("#upCode", "654321");
+  await page.click('#wModeTabs [data-auth-mode="signup"]');
+  await page.fill("#wEmail", USER.email);
+  await page.fill("#wPass", "skuska2026");
+  await page.check("#wAgree");
+  await page.click("#wSubmit");
+  await page.locator("#wSent").waitFor();
+  check((await page.textContent("#wSent")).includes(USER.email), "sign-up verification code requested");
+  await page.fill("#wCode", "654321");
   refusing = true;
-  await page.click("#upVerify");
-  await page.locator("#upErr").waitFor();
+  await page.click("#wVerify");
+  await page.locator("#wErr").waitFor();
   refusing = false;
-  check((await page.textContent("#upErr")).includes("Kód nesedí"), "a wrong code is refused");
-  await page.fill("#upCode", "123 456");
-  await page.press("#upCode", "Enter");
+  check((await page.textContent("#wErr")).includes("Kód nesedí"), "a wrong code is refused");
+  await page.fill("#wCode", "123 456");
+  await page.press("#wCode", "Enter");
   await page.locator("#upConsent").waitFor();
-  check(await page.locator("#upErr").isHidden(), "the right code signs in");
+  check(await page.locator("#wErr").isHidden(), "the right verification code confirms sign-up and signs in");
   await page.reload();
   await page.locator("#upConsent").waitFor();
   check(true, "the session survives a reload");
@@ -327,11 +357,16 @@ try {
   const other = await (await browser.newContext()).newPage();
   other.on("pageerror", (e) => errors.push("second device: " + e.message));
   await other.goto(base + "#upload");
-  await other.fill("#upEmail", USER.email);
-  await other.click("#upSend");
-  await other.fill("#upCode", "123456");
-  await other.click("#upVerify");
+  await other.locator("#upLogin").waitFor();
+  await other.fill("#wEmail", USER.email);
+  await other.fill("#wPass", "wrongpass");
+  await other.click("#wSubmit");
+  await other.locator("#wErr").waitFor();
+  check((await other.textContent("#wErr")).includes("Nesprávny e-mail alebo heslo"), "a wrong password is refused on log-in");
+  await other.fill("#wPass", "skuska2026");
+  await other.click("#wSubmit");
   await other.locator("#upConsent").waitFor();
+  check(true, "email + password signs in directly on a second device");
   await other.click("#upClose");
   await other.click('#tabbar [data-go="home"]');
   check((await other.locator("#subjects .sj:not(.add)").count()) === 1, "signing in on a second device brings the subject");
@@ -394,7 +429,7 @@ try {
   check(ledger.length > rowsBefore && paid() === paidBefore, "running the same files again costs nothing");
 } catch (e) {
   errors.push(e.message);
-  const shown = await page.locator("#upErr").textContent().catch(() => "");
+  const shown = (await page.locator("#upErr").textContent().catch(() => "")) || (await page.locator("#wErr").textContent().catch(() => ""));
   if (shown) errors.push("on screen: " + shown);
   await page.screenshot({ path: join(ROOT, "e2e-failure.png") }).catch(() => {});
 }

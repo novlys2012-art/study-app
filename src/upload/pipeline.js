@@ -5,7 +5,7 @@
 // finished are kept. The server stores every answer by content, so running a failed file again
 // only pays for the parts that did not finish.
 import { toSections } from "./text.js";
-import { questionId } from "../app/subjects.js";
+import { questionId, createSubject } from "../app/subjects.js";
 
 export const NORMOSTRANA = 1800; // characters in a standard page, for "pages after"
 const VISION_BATCH = 4;
@@ -292,9 +292,7 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
     };
   }
   return {
-    id: "u" + Date.now().toString(36),
-    code: name.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "NEW",
-    name, term: "", createdAt: new Date().toISOString(),
+    ...createSubject(name),
     topics: topicNames, topicInfo, files, questions, checkedOut, failed,
   };
 }

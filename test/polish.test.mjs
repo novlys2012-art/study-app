@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { saveSubjects, logAnswer, markSent, saveMeta, clearLocal, hasUnsynced, subjectFileCounts, unsent } from "../src/app/subjects.js";
+import { saveSubjects, loadSubjects, createSubject, logAnswer, markSent, saveMeta, clearLocal, hasUnsynced, subjectFileCounts, unsent } from "../src/app/subjects.js";
 
 function mockStorage() {
   const map = new Map();
@@ -42,4 +42,30 @@ test("hasUnsynced detects pending answers and dirty subjects", () => {
 
   markSent("s1", unsent().map((x) => x.e.id));
   assert.equal(hasUnsynced(), false);
+});
+
+test("createSubject creates valid empty subjects that persist and mark dirty for sync", () => {
+  mockStorage();
+  clearLocal();
+
+  assert.throws(() => createSubject("   "));
+  const a = createSubject("  Štatistika  ");
+  const b = createSubject("---");
+  assert.notEqual(a.id, b.id);
+  assert.match(a.id, /^u[0-9a-z]+$/);
+  assert.equal(a.name, "Štatistika");
+  assert.equal(a.code, "ŠTA");
+  assert.equal(b.code, "NEW");
+  assert.deepEqual(a.topics, {});
+  assert.deepEqual(a.topicInfo, {});
+  assert.deepEqual(a.files, []);
+  assert.deepEqual(a.questions, []);
+  assert.equal(a.checkedOut, 0);
+
+  saveSubjects([a]);
+  const [loaded] = loadSubjects();
+  assert.equal(loaded.id, a.id);
+  assert.equal(loaded.name, "Štatistika");
+  assert.deepEqual(loaded.questions, []);
+  assert.equal(hasUnsynced(), true);
 });

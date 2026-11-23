@@ -121,7 +121,7 @@
       <h2 class="w-h2" data-i18n="welcome.faqTitle">Časté otázky</h2>
       <!-- TODO(pricing): confirm typical lecture count per 100 credits once real usage/paid tiers are finalized -->
       <div class="cards w-faq">
-        <details class="card"><summary><span data-i18n="welcome.q1">Ako funguje prihlásenie?</span></summary><div class="card-body"><p data-i18n="welcome.a1">Zadáš e-mail a dostaneš jednorazový kód. Bez hesla, na mobile aj počítači.</p></div></details>
+        <details class="card"><summary><span data-i18n="welcome.q1">Ako funguje prihlásenie?</span></summary><div class="card-body"><p data-i18n="welcome.a1">Pri registrácii overíš e-mail jednorazovým kódom a zvolíš si heslo. Potom sa na mobile aj počítači prihlasuješ e-mailom a heslom.</p></div></details>
         <details class="card"><summary><span data-i18n="welcome.q2">Čo sa deje s mojimi súbormi?</span></summary><div class="card-body"><p data-i18n="welcome.a2">Pôvodné súbory ostávajú v zariadení. Cez Claude (Anthropic) sa spracuje len text a skeny bez textu – netrénuje na nich. Zhodné pasáže sa môžu znova použiť v zdieľanej cache bez tvojho mena.</p></div></details>
         <details class="card"><summary><span data-i18n="welcome.q3">Aký je bezplatný limit?</span></summary><div class="card-body"><p data-i18n="welcome.a3">100 kreditov mesačne, obnovujú sa 1. dňa v mesiaci. Po vyčerpaní sa pozastaví len spracovanie nových súborov – uložené predmety, zhrnutia a kvízy fungujú ďalej.</p></div></details>
         <details class="card"><summary><span data-i18n="welcome.q4">Môžem Lekto skúsiť bez účtu?</span></summary><div class="card-body"><p data-i18n="welcome.a4">Áno, na ukážkovom predmete bez prihlásenia. Účet potrebuješ až na vlastné súbory a synchronizáciu.</p></div></details>
@@ -155,6 +155,7 @@
       <button class="btn ghost head-add" id="homeAdd" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="nav.add">Nahrať</span></button>
     </header>
     <div class="stack" id="subjects"></div>
+    <button class="btn wide ghost" id="homeNew" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="subject.new">Nový predmet</span></button>
   </section>
 
   <section class="screen" id="subject" hidden>
@@ -208,6 +209,10 @@
       <span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M13 12v6M10 15h6"/></svg></span>
       <p data-i18n="subject.empty">Tento predmet je zatiaľ prázdny.</p>
       <button class="btn" id="sEmptyAdd" type="button" data-i18n="subject.emptyAdd">Pridať súbory</button>
+      <div class="empty-more">
+        <button class="btn ghost" id="sEmptyExams" type="button" data-i18n="exams.add">Pridať staré skúšky</button>
+        <button class="btn ghost" id="sEmptyTemplates" type="button" data-i18n="templates.add">Pridať vzorový príklad</button>
+      </div>
     </div>
   </section>
 
@@ -385,18 +390,7 @@
     </div>
     <div class="group" id="upLogin" hidden>
       <p class="label" data-i18n="upload.loginLabel">Prihlásenie</p>
-      <div class="group" id="upAsk">
-        <p class="hint" data-i18n="upload.loginHint">Pošleme ti e-mail s kódom na prihlásenie. Môžeš ho otvoriť aj v mobile.</p>
-        <input class="search" id="upEmail" type="email" autocomplete="email" inputmode="email" enterkeyhint="send" data-i18n-placeholder="upload.emailPlaceholder">
-        <button class="btn wide" id="upSend" type="button" data-i18n="upload.send">Poslať kód</button>
-      </div>
-      <div class="group" id="upCodeBox" hidden>
-        <p class="tipbox" id="upSent"></p>
-        <label class="label" for="upCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
-        <input class="search code-input" id="upCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="12345678">
-        <button class="btn wide" id="upVerify" type="button" data-i18n="upload.verify">Prihlásiť sa</button>
-        <button class="btn wide plain" id="upAgain" type="button" data-i18n="upload.again">Poslať nový kód alebo zmeniť e-mail</button>
-      </div>
+      <div class="group" id="upAuthMount"></div>
     </div>
     <div class="group" id="upConsent" hidden>
       <p class="label" data-i18n="upload.consentLabel">Spracovanie súborov</p>
@@ -415,7 +409,7 @@
           <input class="search" id="upName" type="text" maxlength="80" data-i18n-placeholder="upload.namePlaceholder">
         </div>
         <div class="group">
-          <p class="label" data-i18n="upload.filesLabel">Súbory</p>
+          <p class="label" id="upFilesLabel" data-i18n="upload.filesLabel">Súbory</p>
           <label class="drop" for="upFiles" id="upDrop"><span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><b data-i18n="upload.pick">Vybrať súbory</b><span id="upFilesHint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
           <input id="upFiles" class="visually-hidden" type="file" multiple>
           <ul class="up-list" id="upList" hidden></ul>
@@ -590,6 +584,19 @@
   </div>
 </dialog>
 
+<dialog class="bsheet" id="newSubjectSheet">
+  <div class="bsheet-in">
+    <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 data-i18n="subject.new">Nový predmet</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <form class="group" id="newSubjForm" novalidate>
+      <label class="label" for="newSubjName" data-i18n="upload.nameLabel">Názov predmetu</label>
+      <input class="search" id="newSubjName" type="text" maxlength="80" autocomplete="off" enterkeyhint="done" data-i18n-placeholder="upload.namePlaceholder">
+      <p class="hint" data-i18n="subject.newHint">Materiály, staré skúšky aj vzory môžeš nahrať kedykoľvek neskôr.</p>
+      <p class="err" id="newSubjErr" role="alert" hidden></p>
+      <button class="btn wide" id="newSubjSave" type="submit" data-i18n="subject.create">Vytvoriť predmet</button>
+    </form>
+  </div>
+</dialog>
+
 <dialog class="bsheet" id="moreSheet">
   <div class="bsheet-in">
     <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 id="mName"></h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
@@ -610,7 +617,7 @@
   <div class="bsheet-in w-auth" id="wAuthCard">
     <div class="grab" aria-hidden="true"></div>
     <div class="bsheet-head">
-      <h2 id="wCardTitle" data-i18n="welcome.authTitle">Prihlásiť sa e-mailom</h2>
+      <h2 id="wCardTitle" data-i18n="welcome.authTitle">Prihlásiť sa</h2>
       <button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
 
@@ -632,29 +639,54 @@
     </div>
 
     <div class="group" id="wAuthForms">
-      <p class="hint" id="wCardSub" data-i18n="welcome.authSub">Zadaj e-mail a pošleme ti jednorazový kód. Ak účet ešte nemáš, vytvorí sa automaticky.</p>
+      <div class="seg fill" id="wModeTabs" style="--n:2;--i:0">
+        <button type="button" data-auth-mode="login" aria-pressed="true" data-i18n="welcome.tabLogin">Prihlásenie</button>
+        <button type="button" data-auth-mode="signup" aria-pressed="false" data-i18n="welcome.tabSignup">Registrácia</button>
+      </div>
+      <p class="hint" id="wCardSub" data-i18n="welcome.authSub">Zadaj e-mail a heslo k svojmu účtu.</p>
 
-      <div class="group" id="wAsk">
+      <form class="group" id="wCredForm" novalidate>
         <label class="label" for="wEmail" data-i18n="welcome.emailLabel">E-mail</label>
-        <input class="search" id="wEmail" type="email" autocomplete="email" inputmode="email" enterkeyhint="send" data-i18n-placeholder="upload.emailPlaceholder">
-        <label class="w-check" id="wAgreeWrap">
+        <input class="search" id="wEmail" name="email" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" data-i18n-placeholder="upload.emailPlaceholder">
+        <div class="group" id="wPassWrap">
+          <label class="label" for="wPass" data-i18n="welcome.passLabel">Heslo</label>
+          <div class="pw-field">
+            <input class="search" id="wPass" name="password" type="password" autocomplete="current-password" enterkeyhint="done">
+            <button class="iconbtn small pw-toggle" id="wPassToggle" type="button" aria-pressed="false" data-i18n-label="welcome.showPass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></button>
+          </div>
+          <p class="hint" id="wPassHint" hidden data-i18n="welcome.passHint">Aspoň 8 znakov.</p>
+        </div>
+        <label class="w-check" id="wAgreeWrap" hidden>
           <input id="wAgree" type="checkbox">
           <span><span data-i18n="welcome.agreePrefix">Mám aspoň 16 rokov a súhlasím s </span><a class="link w-inline" href="./terms.html" data-legal="terms" data-i18n="welcome.termsLink">podmienkami používania</a><span data-i18n="welcome.agreeAnd"> a </span><a class="link w-inline" href="./privacy.html" data-legal="privacy" data-i18n="welcome.privacyLink">ochranou súkromia</a>.</span>
         </label>
-        <button class="btn wide" id="wSend" type="button" data-i18n="welcome.sendEmail">Pokračovať s e-mailom</button>
-        <p class="hint" data-i18n="welcome.passwordless">Bez hesla – kód z e-mailu funguje na mobile aj počítači.</p>
-      </div>
+        <button class="btn wide" id="wSubmit" type="submit" data-i18n="welcome.loginBtn">Prihlásiť sa</button>
+        <div class="w-code-actions" id="wAuthFoot">
+          <button class="link" id="wForgot" type="button" data-i18n="welcome.forgot">Zabudnuté heslo?</button>
+          <button class="link" id="wBackLogin" type="button" hidden data-i18n="welcome.backLogin">Späť na prihlásenie</button>
+        </div>
+      </form>
 
       <div class="group" id="wCodeBox" hidden>
         <p class="tipbox" id="wSent"></p>
         <label class="label" for="wCode" data-i18n="upload.codeLabel">Kód z e-mailu</label>
         <input class="search code-input" id="wCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12345678">
-        <button class="btn wide" id="wVerify" type="button" data-i18n="welcome.verifyBtn">Overiť a vstúpiť</button>
+        <button class="btn wide" id="wVerify" type="button" data-i18n="welcome.verifyEmailBtn">Overiť e-mail</button>
         <div class="w-code-actions">
           <button class="link" id="wResend" type="button" data-i18n="welcome.resendNow">Poslať kód znova</button>
           <button class="link" id="wChangeEmail" type="button" data-i18n="welcome.changeEmail">Zmeniť e-mail</button>
         </div>
       </div>
+
+      <form class="group" id="wNewPassForm" novalidate hidden>
+        <label class="label" for="wNewPass" data-i18n="welcome.newPassLabel">Nové heslo</label>
+        <div class="pw-field">
+          <input class="search" id="wNewPass" name="new-password" type="password" autocomplete="new-password" enterkeyhint="done">
+          <button class="iconbtn small pw-toggle" id="wNewPassToggle" type="button" aria-pressed="false" data-i18n-label="welcome.showPass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></button>
+        </div>
+        <p class="hint" data-i18n="welcome.passHint">Aspoň 8 znakov.</p>
+        <button class="btn wide" id="wSavePass" type="submit" data-i18n="welcome.savePassBtn">Uložiť heslo a prihlásiť sa</button>
+      </form>
 
       <p class="err" id="wErr" role="alert" hidden></p>
     </div>

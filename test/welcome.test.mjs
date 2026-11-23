@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { buildSampleSubject, ensureSampleSubject, SAMPLE_ID } from "../src/app/sample.js";
 import { loadSubjects, saveSubjects, loadMeta, saveMeta, clearLocal, removeSamples, logAnswer, resetProgress, readProgress, readLog, unsent, hasUnsynced, onLocalChange } from "../src/app/subjects.js";
-import { authMessage, readPendingAuth, writePendingAuth, clearPendingAuth, extractOtpDigits, PENDING_TTL_MS } from "../src/app/auth-state.js";
+import { authMessage, isPasswordValid, readPendingAuth, writePendingAuth, clearPendingAuth, extractOtpDigits, PENDING_TTL_MS, MIN_PASSWORD_LENGTH } from "../src/app/auth-state.js";
 import { rankExams } from "../src/app/exams.js";
 import { sourceFileIndex, matchSummaryBlock, summaryBlocks, stripSourceMeta } from "../src/app/md.js";
 
@@ -108,6 +108,11 @@ test("authMessage maps errors to dedicated auth.err.* keys and never leaks raw f
   const sk = JSON.parse(await readFile(new URL("../src/i18n/sk.json", import.meta.url), "utf8"));
   const tr = (k) => sk[k] ?? k;
 
+  assert.equal(authMessage({ code: "credentials", message: "Invalid login credentials" }, tr), sk["auth.err.wrongCredentials"]);
+  assert.equal(authMessage({ code: "unconfirmed", message: "Email not confirmed" }, tr), sk["auth.err.unconfirmed"]);
+  assert.equal(authMessage({ code: "exists", message: "User already registered" }, tr), sk["auth.err.emailTaken"]);
+  assert.equal(authMessage({ code: "weakPassword", message: "Password should be at least 8 characters" }, tr), sk["auth.err.passwordShort"]);
+  assert.equal(authMessage({ code: "samePassword", message: "New password should be different from the old password" }, tr), sk["auth.err.samePassword"]);
   assert.equal(authMessage({ code: "code", message: "Invalid token" }, tr), sk["auth.err.wrongCode"]);
   assert.equal(authMessage({ code: "expired", message: "Token has expired" }, tr), sk["auth.err.expiredCode"]);
   assert.equal(authMessage({ code: "rate", message: "429" }, tr), sk["auth.err.rate"]);
@@ -117,21 +122,30 @@ test("authMessage maps errors to dedicated auth.err.* keys and never leaks raw f
   assert.equal(authMessage(new Error("raw postgres detail"), tr), sk["auth.err.unknown"]);
   assert.ok(!authMessage(new TypeError("Failed to fetch"), tr).includes("Failed to fetch"));
   assert.ok(!authMessage(new Error("raw postgres detail"), tr).includes("postgres"));
+
+  assert.equal(isPasswordValid(""), false);
+  assert.equal(isPasswordValid("1234567"), false);
+  assert.equal(isPasswordValid("a".repeat(MIN_PASSWORD_LENGTH)), true);
 });
 
-test("pending auth stores email + timestamp only, expires after 15 minutes, and clears cleanly", () => {
+test("pending auth stores email, kind and timestamp only (never password), expires after 15 minutes, and clears cleanly", () => {
   const store = memoryStorage();
   const t0 = 1_700_000_000_000;
-  writePendingAuth("student@uniba.sk", t0, store);
+  writePendingAuth("student@uniba.sk", "signup", t0, store);
   const raw = JSON.parse(store.getItem("lekto-pending-auth"));
-  assert.deepEqual(Object.keys(raw).sort(), ["at", "email"]);
-  assert.equal(readPendingAuth(t0 + 60_000, store).email, "student@uniba.sk");
+  assert.deepEqual(Object.keys(raw).sort(), ["at", "email", "kind"]);
+  assert.deepEqual(readPendingAuth(t0 + 60_000, store), { email: "student@uniba.sk", kind: "signup", at: t0 });
   assert.equal(readPendingAuth(t0 + PENDING_TTL_MS + 1, store), null);
   assert.equal(store.getItem("lekto-pending-auth"), null);
 
-  writePendingAuth("student@uniba.sk", t0, store);
+  writePendingAuth("student@uniba.sk", "recovery", t0, store);
+  assert.equal(readPendingAuth(t0 + 1000, store).kind, "recovery");
   clearPendingAuth(store);
   assert.equal(readPendingAuth(t0, store), null);
+
+  // Legacy entries without kind still read cleanly as signup.
+  store.setItem("lekto-pending-auth", JSON.stringify({ email: "old@uniba.sk", at: t0 }));
+  assert.equal(readPendingAuth(t0 + 1000, store).kind, "signup");
 });
 
 test("extractOtpDigits handles pasted spaced codes and fonts.css ships Source Sans 3 + JetBrains Mono", async () => {

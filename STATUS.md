@@ -126,6 +126,24 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
 - **How it works**: Adds a `Vzory` tab on subjects (`sj.templates`) to upload workbooks or handwritten workings (short PDFs <= 6 pages render as images via `preferImages`), extract up to 12 reusable problem templates (`template` on Sonnet), and generate up to 2 fresh similar problem variants per template (`template_problem`, smart fast/strong routing, cached in `ai_cache`) practised on `#template` with step-by-step reveal, progressive hints, and optional numeric checking.
 - **Deployment note**: Requires `npm run fn:prepare` and Supabase `generate` Edge Function redeploy alongside `problems` / `check_problems`.
 
+### 1.16 Email + Password Login, Email-Verified Sign-Up & Password Reset
+- **Files**: `src/cloud/supabase.js`, `src/app/{auth-state.js,welcome.js,app.js,icons.js}`, `src/upload/ui.js`, `index.html`, `src/styles/app.css`, `src/i18n/{sk,cs}.json`, `supabase/{config.toml,templates/sign-in.html,templates/reset-password.html}`, `test/{welcome.test.mjs,e2e.mjs}`, `docs/{live-setup.md,mobile-release.md}`, `CLAUDE.md`
+- **How it works**:
+  - **Shared auth controller (`#wAuthForms` in `src/app/welcome.js`)**: Mounted into `#authSheet` on `#welcome`/`#signin`/`#signup` and into `#upAuthMount` inside `#upload` (`src/upload/ui.js`), removing the duplicate upload login form.
+  - **Sign-up with email verification**: `cloud.signUp(email, password)` requires >= 8-char password + 16+ terms consent, detects already-confirmed accounts (`identities.length === 0` -> `exists`), and routes to the 8-digit email verification code step (`cloud.verifyCode(email, code, "signup")`, with 60s resend cooldown via `cloud.resendVerification`).
+  - **Password login + unconfirmed recovery**: `cloud.signInWithPassword(email, password)` signs in directly with no email sent. If an account is unconfirmed (`email_not_confirmed`), the UI automatically resends a verification code and opens the verify step.
+  - **Code-based password reset**: `"Zabudnuté heslo?"` sends a recovery code (`cloud.requestPasswordReset`), verifies it (`verifyCode(..., "recovery")`), and sets a new password (`cloud.updatePassword`) in-app — also letting earlier passwordless OTP accounts set a password without losing data.
+  - **Deliverability cleanup**: Updated `supabase/templates/sign-in.html` (Confirm signup) and added `supabase/templates/reset-password.html` (Reset password) as clean HTML code-only templates without cross-domain `{{ .ConfirmationURL }}` links.
+- **Dashboard note**: Ensure Supabase Auth has **Confirm email** enabled, minimum password length set to `8`, and paste the updated `Confirm signup` and `Reset password` templates (`docs/live-setup.md` step 3).
+
+### 1.17 Create Subjects Without Uploading Files
+- **Files**: `src/app/{subjects.js,app.js}`, `src/upload/{pipeline.js,ui.js}`, `index.html`, `src/styles/app.css`, `src/i18n/{sk,cs}.json`, `test/{polish.test.mjs,server.test.mjs}`
+- **How it works**:
+  - Added shared `createSubject(name)` in `src/app/subjects.js` (also reused by `buildSubject()` in `src/upload/pipeline.js`) so empty subjects have the exact schema and sync cleanly without requiring sign-in or AI calls.
+  - Added `#newSubjectSheet` (`dialog.bsheet`), reachable from the secondary ghost button `"Vytvoriť predmet bez súborov"` in `emptyState()` (`#today`/`#home`) and `+ Nový predmet` (`#homeNew`) on `#home`.
+  - Enabled creating a new subject without picking files on `#upload` Step 1 (`#upFilesLabel` shows `"Súbory (voliteľné)"` and `#upNext` creates the empty subject when 0 files are picked, switching back to `"Ďalej"` once any file is picked).
+  - Kept `#sCard` (exam date) visible on empty subjects, aligned `#sEmpty` into desktop column 2 with direct buttons to upload course files, past exams, or worked-example templates later, and showed honest `"Zatiaľ bez materiálov"` subtitles on `#today` and `#home`.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)

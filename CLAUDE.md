@@ -26,7 +26,7 @@ From the quiz site only the multiple-choice quiz engine carries over: topics, ro
 |---|---|
 | App | Plain JavaScript modules, built with Vite, wrapped for Android and iOS with Capacitor |
 | Text extraction | pdf.js, mammoth.js, JSZip, on the device; AI vision only for pages with no text |
-| Accounts, database, storage, server function | Supabase, Frankfurt region: email-code sign-in, tables `ai_usage`, `ai_cache`, `subjects` and `reviews` (plus the old `progress`, read-only), Edge Function `generate`. Deployed by `.github/workflows/server.yml`; the site gets `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` at build time |
+| Accounts, database, storage, server function | Supabase, Frankfurt region: email + password login with email verification code on sign-up (and code-based password reset), tables `ai_usage`, `ai_cache`, `subjects` and `reviews` (plus the old `progress`, read-only), Edge Function `generate`. Deployed by `.github/workflows/server.yml`; the site gets `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` at build time |
 | AI | **Claude** (decided 28 Oct, no multi-provider test). Claude Haiku 5.5 (`claude-haiku-5-5`) for summaries, quizzes and topics; Claude Sonnet 5.5 (`claude-sonnet-5-5`) for checking questions and reading scanned past exams. Calls go through `ai/index.js`, which keeps a provider switch (a Gemini adapter exists but is unused). |
 | Payments | RevenueCat (stores) and Stripe (web), phase 7 |
 | iPhone builds | Codemagic free tier |

@@ -2,7 +2,7 @@
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
 import { t, getLang, setLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
+import { loadSubjects, saveSubjects, createSubject, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { isProblem, correctAnswers, checkNumericAnswer } from "./problems.js";
@@ -10,7 +10,7 @@ import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
 import { renderLimit } from "./limit.js";
-import { openWelcome } from "./welcome.js";
+import { openWelcome, syncAuthCopy } from "./welcome.js";
 import { ensureSampleSubject, SAMPLE_ID } from "./sample.js";
 import { clearPendingAuth } from "./auth-state.js";
 import {
@@ -132,7 +132,7 @@ function route() {
   const sj = SUBJECTS.find((x) => h === x.id || h.startsWith(x.id + "/"));
   booted = true;
   if (h === "welcome") showWelcome(false);
-  else if (h === "signin" || h === "signup") showWelcome(true);
+  else if (h === "signin" || h === "signup") showWelcome(true, h === "signup" ? "signup" : "login");
   else if (h.startsWith("upload/")) showUpload(h.slice(7));
   else if (h.startsWith("exams/")) showUpload(h.slice(6), false, "exams");
   else if (h.startsWith("templates/")) showUpload(h.slice(10), false, "templates");
@@ -265,12 +265,18 @@ const soonClass = (sj) => { const d = daysTo(sj.exam); return d != null && d >= 
 // ===== Today
 
 // What an empty app shows: one sentence and the button that fixes it.
+const hasReadableFiles = (sj) => (sj.files || []).some((f) => f.summary || (f.context && f.text));
+const hasMaterials = (sj) => sj.questions.length > 0 || hasReadableFiles(sj) || (sj.exams || []).length > 0 || (sj.templates || []).length > 0;
 function emptyState() {
   const box = el("div", "empty big");
   const art = el("span", "empty-art");
   art.appendChild(icon("up"));
-  box.append(art, el("h2", null, t("home.empty.title")), el("p", null, t("home.empty.text")),
-    button("btn wide sj add", t("home.empty.go"), () => openUpload()));
+  const actions = el("div", "empty-actions");
+  actions.append(
+    button("btn wide sj add", t("home.empty.go"), () => openUpload()),
+    button("btn wide ghost", t("subject.createEmpty"), () => openNewSubject()),
+  );
+  box.append(art, el("h2", null, t("home.empty.title")), el("p", null, t("home.empty.text")), actions);
   return box;
 }
 function countdown(sj) {
@@ -344,7 +350,8 @@ function renderToday() {
       const head = el("span", "rc-head");
       head.append(el("span", "rc-title", r.sj.name));
       if (r.st.total) head.append(el("span", "rc-pct", r.st.pct + " %"));
-      g.append(head, el("span", "hint" + soonClass(r.sj), examText(r.sj) || (r.st.total ? dueText(r.st) : t("today.read"))));
+      const subLine = examText(r.sj) || (r.st.total ? dueText(r.st) : hasReadableFiles(r.sj) ? t("today.read") : hasMaterials(r.sj) ? t("home.noQuestions") : t("home.noMaterials"));
+      g.append(head, el("span", "hint" + soonClass(r.sj), subLine));
       if (r.st.total) g.append(bar(r.st.pct));
       main.append(g);
       row.appendChild(main);
@@ -372,7 +379,7 @@ function subjectRow(sj) {
   g.append(head);
   const ex = examText(sj);
   if (ex) g.appendChild(el("span", "hint" + soonClass(sj), ex));
-  g.appendChild(el("span", "hint", st.total ? dueText(st) : t("home.noQuestions")));
+  g.appendChild(el("span", "hint", st.total ? dueText(st) : hasMaterials(sj) ? t("home.noQuestions") : t("home.noMaterials")));
   if (st.total) g.appendChild(bar(st.pct));
   b.append(g, icon("chev", "chev"));
   return b;
@@ -382,8 +389,42 @@ function showHome() {
   const box = $("subjects"); box.innerHTML = ""; $("todayBody").innerHTML = "";
   SUBJECTS.forEach((sj) => box.appendChild(subjectRow(sj)));
   if (!SUBJECTS.length) box.appendChild(emptyState());
+  $("homeNew").hidden = !SUBJECTS.length;
   show("home");
 }
+
+function clearNewSubjErr() {
+  $("newSubjErr").hidden = true;
+  $("newSubjErr").textContent = "";
+  $("newSubjName").removeAttribute("aria-invalid");
+  $("newSubjName").removeAttribute("aria-describedby");
+}
+function openNewSubject() {
+  $("newSubjName").value = "";
+  clearNewSubjErr();
+  openSheet($("newSubjectSheet"));
+  requestAnimationFrame(() => $("newSubjName").focus());
+}
+$("homeNew").onclick = () => { haptic("light"); openNewSubject(); };
+$("newSubjName").oninput = clearNewSubjErr;
+$("newSubjForm").onsubmit = (e) => {
+  e.preventDefault();
+  const name = $("newSubjName").value.trim();
+  if (!name) {
+    $("newSubjErr").textContent = t("subject.nameRequired");
+    $("newSubjErr").hidden = false;
+    $("newSubjName").setAttribute("aria-invalid", "true");
+    $("newSubjName").setAttribute("aria-describedby", "newSubjErr");
+    $("newSubjName").focus();
+    return;
+  }
+  const sj = createSubject(name);
+  saveSubjects([...loadSubjects(), sj]);
+  markEntered();
+  haptic("success");
+  go(sj.id);
+  toast(t("subject.created"));
+};
 
 // ===== One subject
 
@@ -414,11 +455,10 @@ function renderSubject() {
     templates.length ? plural("templates.count", templates.length) : "",
   ].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
-  const exams = CUR.exams || [];
-  const hasAny = QUESTIONS.length > 0 || files > 0 || exams.length > 0 || templates.length > 0;
-  const has = { overview: topicKeys().length > 0, files: files > 0, exams: QUESTIONS.length > 0 || exams.length > 0, templates: hasAny };
+  const hasAny = hasMaterials(CUR);
+  const has = { overview: topicKeys().length > 0, files: files > 0, exams: hasAny, templates: hasAny };
   const open = Object.keys(has).filter((k) => has[k]);
-  $("sCard").hidden = !open.length;
+  $("sCard").hidden = false;
   $("sStat").hidden = !QUESTIONS.length; $("sActions").hidden = !QUESTIONS.length;
   $("sKind").hidden = !mixed;
   if (mixed) {
@@ -458,6 +498,8 @@ $("sKind").onclick = (e) => { const b = e.target.closest("button"); if (b && b.d
 $("sTabs").onclick = (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderSubject(); } };
 $("sBack").onclick = () => back("subjects");
 $("sEmptyAdd").onclick = () => openUpload(CUR.id);
+$("sEmptyExams").onclick = () => openUpload(CUR.id, "exams");
+$("sEmptyTemplates").onclick = () => openUpload(CUR.id, "templates");
 
 // Topics from the weakest. A topic opens to its summary, weak spots and a button that practises it.
 function renderOverview() {
@@ -1506,6 +1548,7 @@ function setLangUI(l) {
   all.forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === l));
   $("langs").style.setProperty("--n", all.length);
   $("langs").style.setProperty("--i", Math.max(0, all.findIndex((b) => b.dataset.lang === l)));
+  syncAuthCopy();
 }
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
 $("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
@@ -1703,7 +1746,7 @@ function openLegal(kind) {
   openSheet($("legalSheet"));
 }
 
-function showWelcome(openAuth = false) {
+function showWelcome(openAuth = false, preferredMode = "login") {
   CUR = null;
   show("welcome");
   openWelcome({
@@ -1720,7 +1763,7 @@ function showWelcome(openAuth = false) {
     setLangUI,
     signOut: () => signOutAccount({ stayOnWelcome: true }),
     toast,
-  }, openAuth);
+  }, openAuth, preferredMode);
 }
 
 // ===== Upload
@@ -1743,9 +1786,11 @@ function showUpload(target, signIn, mode) {
   import("../upload/ui.js").then((m) => m.open({
     target: into ? into.id : null, signIn: !!signIn, mode: exams ? "exams" : templates ? "templates" : "files",
     // tabName: the subject tab to open on ("exams" or "templates").
-    opened: (id, tabName) => { CUR = null; resyncReminders(); go(id, true); if (tabName) { tab = tabName; refresh(); } },
+    opened: (id, tabName, created) => { CUR = null; resyncReminders(); go(id, true); if (tabName) { tab = tabName; refresh(); } if (created) toast(t("subject.created")); },
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
     onSignOut: () => signOutAccount(),
+    openLegal,
+    toast,
   }));
 }
 

@@ -1,7 +1,7 @@
 // The upload screen: sign in, AI consent, pick files, then the pipeline runs and the new subject opens.
 // Loaded only when the screen opens, so pdf.js and Supabase stay out of the first page load.
 import { t, getLang } from "../i18n/index.js";
-import { loadSubjects, saveSubjects, loadMeta, removeSamples } from "../app/subjects.js";
+import { loadSubjects, saveSubjects, createSubject, loadMeta, removeSamples } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
 import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, ext } from "./extract.js";
@@ -10,7 +10,7 @@ import { readExams, guessYear } from "./exams.js";
 import { readTemplates } from "./templates.js";
 import { icon } from "../app/icons.js";
 import { renderLimit } from "../app/limit.js";
-import { authMessage } from "../app/welcome.js";
+import { mountAuth } from "../app/welcome.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
 const MAKE_KEY = "studyapp-make";
@@ -40,21 +40,9 @@ function panel(id) {
   dots(id === "upWork" ? 3 : id === "upForm" ? ($("upStep2").hidden ? 1 : 2) : 0);
 }
 function step(n) { $("upStep1").hidden = n !== 1; $("upStep2").hidden = n !== 2; dots(n); }
-function clearFieldInvalid(id) {
-  const f = $(id);
-  if (!f) return;
-  f.removeAttribute("aria-invalid");
-  f.removeAttribute("aria-describedby");
-}
-function error(msg, fieldId) {
+function error(msg) {
   $("upErr").textContent = msg || "";
   $("upErr").hidden = !msg;
-  clearFieldInvalid("upEmail");
-  clearFieldInvalid("upCode");
-  if (msg && fieldId && $(fieldId)) {
-    $(fieldId).setAttribute("aria-invalid", "true");
-    $(fieldId).setAttribute("aria-describedby", "upErr");
-  }
 }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
@@ -97,7 +85,17 @@ async function refresh() {
   if (!cloud.configured) { panel("upOff"); return; }
   let s;
   try { s = await cloud.session(); } catch (e) { error(message(e)); }
-  if (!s) { panel("upLogin"); return; }
+  if (!s) {
+    panel("upLogin");
+    mountAuth($("upAuthMount"), {
+      openLegal: ctx?.openLegal,
+      onSignedIn: async (msg) => {
+        if (msg && ctx?.toast) ctx.toast(msg);
+        await refresh();
+      },
+    });
+    return;
+  }
   // Magic-link (?code=...) sign-in creates a session here without passing through verifyCode.
   if (loadMeta().user !== s.user.id) await syncNow(true);
   removeSamples();
@@ -157,6 +155,8 @@ function renderExams() {
   $("upCtxWrap").classList.remove("open");
   $("upCtxTip").setAttribute("aria-expanded", "false");
   ul.hidden = !exams.length;
+  $("upFilesLabel").textContent = t("upload.filesLabel");
+  $("upNext").textContent = t("upload.next");
   const ready = exams.length > 0 && !!target();
   $("upNext").disabled = !ready;
   $("upGo").disabled = !ready;
@@ -188,8 +188,13 @@ function renderPicked() {
   }
   const onlyCtx = onlyContext();
   $("upGo").textContent = goLabel();
-  const ready = picked.length && (ctx.target || $("upName").value.trim());
-  const ok = ready && (make.summary || make.quiz || make.problems || onlyCtx);
+  const name = $("upName").value.trim();
+  const newSubject = !ctx.target;
+  const canCreateEmpty = newSubject && !picked.length;
+  $("upFilesLabel").textContent = t(newSubject ? "upload.filesOptional" : "upload.filesLabel");
+  $("upNext").textContent = t(canCreateEmpty ? "subject.createEmpty" : "upload.next");
+  const ready = canCreateEmpty ? !!name : (picked.length && (ctx.target || name));
+  const ok = picked.length && (ctx.target || name) && (make.summary || make.quiz || make.problems || onlyCtx);
   $("upNext").disabled = !ready;
   $("upGo").disabled = !ok;
 }
@@ -392,28 +397,6 @@ async function run() {
 let wired = false;
 function wire() {
   if (wired) return; wired = true;
-  const askCode = (on) => { $("upAsk").hidden = on; $("upCodeBox").hidden = !on; if (on) $("upCode").focus(); };
-  $("upSend").onclick = async () => {
-    const email = $("upEmail").value.trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { error(t("upload.err.email"), "upEmail"); $("upEmail").focus(); return; }
-    error(""); $("upSend").disabled = true;
-    try { await cloud.signIn(email); $("upSent").textContent = t("upload.sent", { email }); $("upCode").value = ""; askCode(true); }
-    catch (e) { error(authMessage(e), "upEmail"); }
-    finally { $("upSend").disabled = false; }
-  };
-  $("upVerify").onclick = async () => {
-    const code = $("upCode").value.replace(/\s/g, "");
-    if (!/^\d{6,10}$/.test(code)) { error(t("upload.err.codeFormat"), "upCode"); $("upCode").focus(); return; }
-    error(""); $("upVerify").disabled = true;
-    try { await cloud.verifyCode($("upEmail").value.trim(), code); askCode(false); await syncNow(true); await refresh(); }
-    catch (e) { error(authMessage(e), "upCode"); }
-    finally { $("upVerify").disabled = false; }
-  };
-  $("upCode").onkeydown = (e) => { if (e.key === "Enter") $("upVerify").click(); };
-  $("upEmail").onkeydown = (e) => { if (e.key === "Enter") $("upSend").click(); };
-  $("upEmail").oninput = () => clearFieldInvalid("upEmail");
-  $("upCode").oninput = () => clearFieldInvalid("upCode");
-  $("upAgain").onclick = () => { error(""); askCode(false); };
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
     error("");
@@ -438,8 +421,21 @@ function wire() {
     renderMake(); renderPicked();
   };
   $("upName").oninput = renderPicked;
+  $("upName").onkeydown = (e) => { if (e.key === "Enter" && !$("upNext").disabled) $("upNext").click(); };
   $("upSubject").onchange = () => { ctx.target = $("upSubject").value || null; renderSubjects(); renderPicked(); };
-  $("upNext").onclick = () => { error(""); step(2); };
+  $("upNext").onclick = () => {
+    error("");
+    if (!photoMode() && !ctx.target && !picked.length) {
+      const name = $("upName").value.trim();
+      if (!name) return;
+      const saved = createSubject(name);
+      saveSubjects([...loadSubjects(), saved]);
+      $("upName").value = "";
+      ctx.opened(saved.id, null, true);
+      return;
+    }
+    step(2);
+  };
   $("upPrev").onclick = () => { error(""); step(1); };
   $("upMake").onclick = (e) => {
     const b = e.target.closest("button"); if (!b) return;

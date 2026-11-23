@@ -6,12 +6,13 @@ project_id = "lekto"
 # The function checks the signed-in user itself, so it also works with the new publishable keys.
 verify_jwt = false
 
-# The sign-in email, in Slovak with the code at the top. Used by a local `supabase start`;
-# on the live project paste the same subject and file into the dashboard (docs/live-setup.md, step 3).
-[auth.email.template.magic_link]
-subject = "Kód na prihlásenie do Lekto: {{ .Token }}"
+# Sign-up verification and password recovery emails, code-only (no external redirect links, which
+# improves spam deliverability and works cleanly on iOS/Android). Used by local `supabase start`;
+# on the live project paste the same subjects and files into the dashboard (docs/live-setup.md, step 3).
+[auth.email.template.confirmation]
+subject = "Overovací kód pre Lekto"
 content_path = "./supabase/templates/sign-in.html"
 
-[auth.email.template.confirmation]
-subject = "Kód na prihlásenie do Lekto: {{ .Token }}"
-content_path = "./supabase/templates/sign-in.html"
+[auth.email.template.recovery]
+subject = "Obnovenie hesla v Lekto"
+content_path = "./supabase/templates/reset-password.html"

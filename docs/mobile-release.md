@@ -52,7 +52,7 @@ Base64-encode the keystore (`base64 -w 0 lekto-upload.jks`) and add these GitHub
 5. Run the **Lekto iOS & iPadOS Release** workflow in Codemagic to build and push directly to TestFlight.
 
 ### App Store Review Notes (Include in Review Submission)
-- **Sign-in**: Passwordless email OTP code; provide a reviewer test email or remove `ALLOWED_EMAILS` restriction before review. Students can also explore the built-in sample subject without signing in.
+- **Sign-in**: Email + password login with 8-digit email verification code on sign-up and code-based password reset; provide a reviewer test account or remove `ALLOWED_EMAILS` restriction before review. Students can also explore the built-in sample subject without signing in.
 - **Account deletion (Guideline 5.1.1(v))**: Available in `Profil -> Odstrániť účet`, permanently deleting the auth user and cascading all synced subjects, answers, and usage records.
 - **AI disclosure**: One-time upload consent screen explicitly discloses Claude (Anthropic) before any text or textless-page image is sent; original uploaded files stay on the device.
 - **Age rating**: 16+ (aligned with `CLAUDE.md` privacy rule and signup confirmation checkbox).

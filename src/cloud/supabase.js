@@ -30,28 +30,86 @@ const isNetworkErr = (e) => {
   return (e && e.name === "AuthRetryableFetchError") || /failed to fetch|networkerror|load failed|fetch|offline|timeout/i.test(m);
 };
 
-// Sends the sign-in email: a code to type on any device, plus a link that works in web browsers.
-// Native Capacitor shells rely on the OTP code and omit capacitor:// / localhost redirect URLs.
-export async function signIn(email) {
-  let error;
-  const native = typeof window !== "undefined" && (location.protocol === "capacitor:" || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()));
-  const options = native ? {} : { emailRedirectTo: location.origin + location.pathname };
+const isNativeShell = () => typeof window !== "undefined" && (location.protocol === "capacitor:" || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()));
+
+// Log in with email + password. Unconfirmed accounts throw CloudError("unconfirmed") so the UI can verify them.
+export async function signInWithPassword(email, password) {
+  let data, error;
   try {
-    ({ error } = await client().auth.signInWithOtp({ email, options }));
+    ({ data, error } = await client().auth.signInWithPassword({ email, password }));
   } catch (e) {
-    throw new CloudError(isNetworkErr(e) ? "network" : "signIn", e && e.message);
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
+  }
+  if (error) {
+    if (isNetworkErr(error)) throw new CloudError("network", error.message);
+    const code = error.code || "";
+    const msg = error.message || "";
+    if (error.status === 429) throw new CloudError("rate", msg);
+    if (code === "email_not_confirmed" || /email not confirmed/i.test(msg)) throw new CloudError("unconfirmed", msg);
+    if (code === "invalid_credentials" || /invalid login credentials/i.test(msg)) throw new CloudError("credentials", msg);
+    throw new CloudError("unknown", msg);
+  }
+  return data.session;
+}
+
+// Create an account with email + password. When Supabase requires email confirmation, returns { session: null, needsVerification: true }.
+export async function signUp(email, password) {
+  let data, error;
+  const options = isNativeShell() ? {} : { emailRedirectTo: location.origin + location.pathname };
+  try {
+    ({ data, error } = await client().auth.signUp({ email, password, options }));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
+  }
+  if (error) {
+    if (isNetworkErr(error)) throw new CloudError("network", error.message);
+    const code = error.code || "";
+    const msg = error.message || "";
+    if (error.status === 429) throw new CloudError(/seconds/i.test(msg) ? "wait" : "rate", msg);
+    if (code === "user_already_exists" || /already registered|already exists/i.test(msg)) throw new CloudError("exists", msg);
+    if (code === "weak_password" || /password.*(short|least|weak|character)/i.test(msg)) throw new CloudError("weakPassword", msg);
+    if (code === "email_address_invalid" || /invalid.*email|unable to validate email/i.test(msg)) throw new CloudError("email", msg);
+    throw new CloudError("unknown", msg);
+  }
+  // Supabase signals an already-confirmed email with an empty identities array and sends no verification email.
+  if (!data.session && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new CloudError("exists", "User already registered");
+  }
+  return { session: data.session || null, needsVerification: !data.session };
+}
+
+export async function resendVerification(email) {
+  let error;
+  const options = isNativeShell() ? {} : { emailRedirectTo: location.origin + location.pathname };
+  try {
+    ({ error } = await client().auth.resend({ type: "signup", email, options }));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
   }
   if (!error) return;
   if (isNetworkErr(error)) throw new CloudError("network", error.message);
-  // 429 is either the project's hourly email cap or the one-minute wait between codes for one address.
-  if (error.status === 429) throw new CloudError(/seconds/i.test(error.message) ? "wait" : "rate", error.message);
-  throw new CloudError("signIn", error.message);
+  if (error.status === 429) throw new CloudError(/seconds/i.test(error.message || "") ? "wait" : "rate", error.message);
+  throw new CloudError("unknown", error.message);
 }
 
-export async function verifyCode(email, code) {
+export async function requestPasswordReset(email) {
+  let error;
+  const options = isNativeShell() ? {} : { redirectTo: location.origin + location.pathname };
+  try {
+    ({ error } = await client().auth.resetPasswordForEmail(email, options));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
+  }
+  if (!error) return;
+  if (isNetworkErr(error)) throw new CloudError("network", error.message);
+  if (error.status === 429) throw new CloudError(/seconds/i.test(error.message || "") ? "wait" : "rate", error.message);
+  throw new CloudError("unknown", error.message);
+}
+
+export async function verifyCode(email, code, type = "signup") {
   let data, error;
   try {
-    ({ data, error } = await client().auth.verifyOtp({ email, token: code, type: "email" }));
+    ({ data, error } = await client().auth.verifyOtp({ email, token: code, type }));
   } catch (e) {
     throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
   }
@@ -62,6 +120,25 @@ export async function verifyCode(email, code) {
     throw new CloudError("code", error.message);
   }
   return data.session;
+}
+
+export async function updatePassword(password) {
+  let data, error;
+  try {
+    ({ data, error } = await client().auth.updateUser({ password }));
+  } catch (e) {
+    throw new CloudError(isNetworkErr(e) ? "network" : "unknown", e && e.message);
+  }
+  if (error) {
+    if (isNetworkErr(error)) throw new CloudError("network", error.message);
+    const code = error.code || "";
+    const msg = error.message || "";
+    if (error.status === 429) throw new CloudError("rate", msg);
+    if (code === "same_password" || /different from the old password/i.test(msg)) throw new CloudError("samePassword", msg);
+    if (code === "weak_password" || /password.*(short|least|weak|character)/i.test(msg)) throw new CloudError("weakPassword", msg);
+    throw new CloudError("unknown", msg);
+  }
+  return data.user;
 }
 
 export async function signOut() {
