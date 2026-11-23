@@ -181,4 +181,5 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
 - [ ] Run `npm run fn:prepare` and deploy the updated Supabase `generate` Edge Function so production accepts `context`, smart routing, and `delete_account`.
 - [ ] Run `npm test && npm run lint && npm run build && npm run smoke && npm run e2e` + `./gradlew assembleDebug` in GitHub Actions CI (or a machine with Node 22) and test on physical iPhone, iPad, and Android devices (`docs/mobile-release.md`).
 - [ ] Configure Android upload keystore secrets and Codemagic iOS App Store Connect integration (`docs/mobile-release.md`).
+- [ ] **Security fixes before public launch** (`docs/security-todo.md`, review of 23 Nov): atomic spending reservation in `generate` (caps can be raced today), the global daily cap as a kill switch, a per-user row limit on `subjects`/`reviews`, plus the smaller items listed there.
 - [ ] Remaining roadmap items from `CLAUDE.md`: payments (Stripe / RevenueCat) once paid tier launches.
