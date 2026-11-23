@@ -1,16 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handle, HttpError, limitsFrom, cacheKey, needsStrongCheck } from "../server/generate.js";
+import { handle, HttpError, limitsFrom, isPlusUser, PLUS_TASKS, accountKey, MAX_CONCURRENT, cacheKey, needsStrongCheck } from "../server/generate.js";
 import { buildSubject, stepsFor, retrying, backoff, contextOf, citedForCheck } from "../src/upload/pipeline.js";
 import { createSubject } from "../src/app/subjects.js";
 import { parseQuiz, parseProblems, parseTopics, parseVision, parseChecks, parseProblemChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
 const user = { id: "u1", email: "simon@example.com" };
-function deps({ month = 0, today = 0, minute = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null } = {}) {
+function deps({ month = 0, today = 0, minute = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null, user: u = user } = {}) {
   const rows = [], calls = [];
   return {
-    rows, calls, user, env, cache, log: () => {},
+    rows, calls, user: u, env, cache, log: () => {},
     spend: async () => ({ month, today, minute }),
     record: async (r) => rows.push(r),
     ai: {
@@ -38,13 +38,78 @@ test("server: needs a signed-in user and a known task", async () => {
 });
 
 test("server: stops at the monthly and daily caps before calling the AI", async () => {
-  const d = deps({ month: 1 });
+  const d = deps({ month: 0.15 });
   await rejects(handle({ task: "summary", input: { text: "abc" } }, d), "user_limit");
   await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ today: 5 })), "daily_limit");
-  const raised = deps({ month: 1, env: { USER_MONTHLY_LIMIT_USD: "2" } });
+  const raised = deps({ month: 0.15, env: { USER_MONTHLY_LIMIT_USD: "2" } });
   await handle({ task: "summary", input: { text: "abc" } }, raised);
   assert.equal(d.calls.length, 0);
   assert.equal(raised.calls.length, 1);
+});
+
+test("server: free vs plus tier limits and paywalled tasks", async () => {
+  const lim = limitsFrom({ PLUS_EMAILS: "Plus@Example.com, vip@skola.sk" });
+  assert.equal(lim.freeMonthUsd, 0.15);
+  assert.equal(lim.plusMonthUsd, 1.5);
+  assert.equal(isPlusUser(user, lim), false);
+  assert.equal(isPlusUser({ id: "u2", email: "plus@example.com" }, lim), true);
+  assert.equal(isPlusUser({ id: "u3", email: "a@b.c", plan: "plus" }, lim), true);
+
+  // Free user cannot run Plus tasks (exam, group, problems, check_problems, template, template_problem).
+  for (const task of PLUS_TASKS) {
+    await rejects(handle({ task, input: {} }, deps()), "plus_required");
+  }
+
+  // Plus user gets $1.50 (150 credits) monthly limit and can run above the $0.15 free limit.
+  const plusDeps = { ...deps({ month: 0.5, env: { PLUS_EMAILS: user.email } }) };
+  const uOut = await handle({ task: "usage" }, plusDeps);
+  assert.deepEqual(uOut.usage, { plan: "plus", monthUsd: 0.5, limitUsd: 1.5 });
+  await handle({ task: "summary", input: { text: "abc" } }, plusDeps);
+  assert.equal(plusDeps.calls.length, 1);
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, { ...plusDeps, spend: async () => ({ month: 1.5, today: 0, minute: 0 }) }), "user_limit");
+});
+
+test("server: pre-call cost reservation & concurrency cap block parallel TOCTOU bursts and release on failure", async () => {
+  const key = await accountKey(user);
+  assert.match(key, /^[0-9a-f]{64}$/);
+  assert.equal(await accountKey({ id: "u9", email: "  SIMON@EXAMPLE.COM " }), key);
+
+  // Two parallel requests when only 1 fast reservation ($0.005) fits under the $0.15 free cap:
+  // the first enters ai.complete, the second sees the reserved spend and is rejected before calling AI.
+  const nearCap = deps({ month: 0.146, user: { id: "u-race", email: "race@example.com" } });
+  const [r1, r2] = await Promise.allSettled([
+    handle({ task: "summary", input: { text: "one" } }, nearCap),
+    handle({ task: "summary", input: { text: "two" } }, nearCap),
+  ]);
+  assert.equal(r1.status, "fulfilled");
+  assert.equal(r2.status, "rejected");
+  assert.equal(r2.reason.code, "user_limit");
+  assert.equal(nearCap.calls.length, 1, "only one parallel call reached the AI");
+  assert.equal(nearCap.rows[0].account_key, await accountKey({ id: "u-race", email: "race@example.com" }));
+
+  // Firing more than MAX_CONCURRENT.free parallel requests triggers rate_limit on the excess.
+  const burst = deps({ month: 0, user: { id: "u-burst", email: "burst@example.com" } });
+  const batch = await Promise.allSettled(
+    Array.from({ length: MAX_CONCURRENT.free + 2 }, (_, k) => handle({ task: "summary", input: { text: `part ${k}` } }, burst)),
+  );
+  assert.equal(batch.filter((x) => x.status === "fulfilled").length, MAX_CONCURRENT.free);
+  assert.deepEqual(batch.filter((x) => x.status === "rejected").map((x) => x.reason.code), ["rate_limit", "rate_limit"]);
+
+  // DB reserve/release hooks: reservation is updated on success and deleted when ai.complete fails.
+  const dbRows = new Map();
+  let seq = 1;
+  const withDbReserve = (fail = null) => ({
+    ...deps({ fail, user: { id: "u-db", email: "db@example.com" } }),
+    reserve: async (row) => { const id = seq++; dbRows.set(id, row); return id; },
+    release: async (id) => { dbRows.delete(id); },
+    record: async (row, id) => { dbRows.set(id ?? seq++, row); },
+  });
+  await handle({ task: "summary", input: { text: "ok" } }, withDbReserve());
+  assert.equal(dbRows.size, 1);
+  assert.equal([...dbRows.values()][0].cost_usd, 0.01);
+
+  await rejects(handle({ task: "summary", input: { text: "fail" } }, withDbReserve(Object.assign(new Error("busy"), { status: 503 }))), "ai_busy");
+  assert.equal(dbRows.size, 1, "failed provider call released its reserved row");
 });
 
 test("server: the test list blocks other accounts", async () => {
@@ -55,10 +120,10 @@ test("server: the test list blocks other accounts", async () => {
 });
 
 test("server: runs a task, records its cost and returns the new total", async () => {
-  const d = deps({ month: 0.2 });
+  const d = deps({ month: 0.05 });
   const out = await handle({ task: "summary", input: { title: "L1", text: "[1]\nText" }, lang: "cs" }, d);
   assert.equal(out.result.summary, "- a");
-  assert.deepEqual(out.usage, { monthUsd: 0.21, limitUsd: 1 });
+  assert.deepEqual(out.usage, { plan: "free", monthUsd: 0.06, limitUsd: 0.15 });
   assert.equal(d.rows[0].cost_usd, 0.01);
   assert.equal(d.rows[0].task, "summary");
   assert.equal(d.calls[0].tier, "fast");
@@ -407,13 +472,13 @@ test("server & parsers: problems run on fast tier and check_problems runs on str
   assert.equal(checks[0].fix, null);
   assert.deepEqual(checks[1].fix, { steps: ["2 + 3 = 5"], ans: "5", check: { num: 5, tol: 0.01, unit: "" } });
 
-  const d1 = deps({ text: '{"problems":[{"q":"Nájdi deriváciu x²","hints":["Mocninové pravidlo"],"steps":["(x²)′ = 2x"],"ans":"2x","check":null,"e":"","s":"derivácia","page":1}]}' });
+  const d1 = { ...deps({ text: '{"problems":[{"q":"Nájdi deriváciu x²","hints":["Mocninové pravidlo"],"steps":["(x²)′ = 2x"],"ans":"2x","check":null,"e":"","s":"derivácia","page":1}]}' }), user: { ...user, plan: "plus" } };
   const r1 = await handle({ task: "problems", input: { title: "Mat1", text: "[1]\nDerivácia x²", context: "Vzorec: (xⁿ)′ = n·xⁿ⁻¹" } }, d1);
   assert.equal(d1.calls[0].tier, "fast");
   assert.match(d1.calls[0].prompt, /<context>/);
   assert.equal(r1.result.problems.length, 1);
 
-  const d2 = deps({ text: '{"checks":[{"i":0,"verdict":"ok","note":"","fix":null}]}' });
+  const d2 = { ...deps({ text: '{"checks":[{"i":0,"verdict":"ok","note":"","fix":null}]}' }), user: { ...user, plan: "plus" } };
   await handle({ task: "check_problems", input: { text: "[1]\nDerivácia x²", problems: r1.result.problems } }, d2);
   assert.equal(d2.calls[0].tier, "strong");
   assert.equal(d2.calls[0].effort, "medium");

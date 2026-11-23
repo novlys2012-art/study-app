@@ -45,6 +45,7 @@
       <nav class="w-links" id="wNavLinks" data-i18n-label="nav.main">
         <a href="#wHow" data-jump="wHow" data-i18n="welcome.navHow">Ako to funguje</a>
         <a href="#wFeatures" data-jump="wFeatures" data-i18n="welcome.navFeatures">Skúšky a plán</a>
+        <a href="#wPricing" data-jump="wPricing" data-i18n="welcome.navPricing">Cenník</a>
         <a href="#wFaq" data-jump="wFaq" data-i18n="welcome.navFaq">Otázky</a>
       </nav>
       <div class="w-nav-actions">
@@ -117,13 +118,49 @@
       </div>
     </div>
 
+    <div class="w-sec w-split" id="wPricing">
+      <div class="group">
+        <h2 class="w-h2" data-i18n="welcome.priceTitle">Cenník</h2>
+        <p class="hint" data-i18n="welcome.priceLede">Začni zadarmo na vlastných prednáškach. Na skúškové si odomkni staré skúšky, príklady, vzory a 10× vyšší limit.</p>
+      </div>
+      <div class="w-plans">
+        <div class="w-plan">
+          <div class="w-plan-head">
+            <h3 data-i18n="profile.planFree">Zadarmo</h3>
+            <b class="w-plan-price" data-i18n="welcome.freePrice">0 €</b>
+          </div>
+          <p class="hint" data-i18n="welcome.freeSub">15 kreditov mesačne · približne 1 predmet (3–5 prednášok)</p>
+          <ul class="w-plan-list">
+            <li data-i18n="welcome.freeF1">Čisté zhrnutia, témy a kvíz so skokom na presný zdroj</li>
+            <li data-i18n="welcome.freeF2">Denný plán do skúšky, zhrnutie chýb, pripomienky a synchronizácia</li>
+            <li data-i18n="welcome.freeF3">Až 6 skenovaných strán bez textu v jednom súbore</li>
+          </ul>
+          <button class="btn ghost wide" id="wFreeCta" type="button" data-i18n="welcome.freeCta">Začať zadarmo</button>
+        </div>
+        <div class="w-plan is-plus">
+          <div class="w-plan-head">
+            <h3 data-i18n="profile.planPlus">Lekto Plus</h3>
+            <b class="w-plan-price" data-i18n="welcome.plusPrice">34,99 € / rok</b>
+          </div>
+          <p class="hint" data-i18n="welcome.plusSub">2,92 € mesačne pri ročnej platbe (ušetríš 51 %) · alebo 5,99 € / mesiac</p>
+          <ul class="w-plan-list">
+            <li data-i18n="profile.plusF1">150 kreditov mesačne (10× viac prednášok, skrípt a skenov)</li>
+            <li data-i18n="profile.plusF2">Staré skúšky: zadania zoradené podľa najčastejšie skúšaných tém</li>
+            <li data-i18n="profile.plusF3">Riešené príklady: výpočtové úlohy s nápovedou, postupom a kontrolou</li>
+            <li data-i18n="profile.plusF4">Vzorové príklady: nové podobné úlohy podľa cvičebnice alebo zošita</li>
+            <li data-i18n="profile.plusF5">Až 40 skenovaných strán bez textu v jednom súbore</li>
+          </ul>
+          <button class="btn ghost wide" id="wPlusCta" type="button" data-i18n="welcome.plusCta">Odomknúť Lekto Plus</button>
+        </div>
+      </div>
+    </div>
+
     <div class="w-sec w-split" id="wFaq">
       <h2 class="w-h2" data-i18n="welcome.faqTitle">Časté otázky</h2>
-      <!-- TODO(pricing): confirm typical lecture count per 100 credits once real usage/paid tiers are finalized -->
       <div class="cards w-faq">
         <details class="card"><summary><span data-i18n="welcome.q1">Ako funguje prihlásenie?</span></summary><div class="card-body"><p data-i18n="welcome.a1">Pri registrácii overíš e-mail jednorazovým kódom a zvolíš si heslo. Potom sa na mobile aj počítači prihlasuješ e-mailom a heslom.</p></div></details>
         <details class="card"><summary><span data-i18n="welcome.q2">Čo sa deje s mojimi súbormi?</span></summary><div class="card-body"><p data-i18n="welcome.a2">Pôvodné súbory ostávajú v zariadení. Cez Claude (Anthropic) sa spracuje len text a skeny bez textu – netrénuje na nich. Zhodné pasáže sa môžu znova použiť v zdieľanej cache bez tvojho mena.</p></div></details>
-        <details class="card"><summary><span data-i18n="welcome.q3">Aký je bezplatný limit?</span></summary><div class="card-body"><p data-i18n="welcome.a3">100 kreditov mesačne, obnovujú sa 1. dňa v mesiaci. Po vyčerpaní sa pozastaví len spracovanie nových súborov – uložené predmety, zhrnutia a kvízy fungujú ďalej.</p></div></details>
+        <details class="card"><summary><span data-i18n="welcome.q3">Aký je bezplatný limit a čo odomkne Lekto Plus?</span></summary><div class="card-body"><p data-i18n="welcome.a3">Bezplatný plán má 15 kreditov mesačne (obnovujú sa 1. dňa v mesiaci). Lekto Plus (5,99 € / mesiac alebo 34,99 € / rok) prináša 150 kreditov mesačne, staré skúšky, riešené príklady, vzory a až 40 skenovaných strán v súbore. Uložené predmety, zhrnutia a kvízy fungujú vždy bez obmedzenia.</p></div></details>
         <details class="card"><summary><span data-i18n="welcome.q4">Môžem Lekto skúsiť bez účtu?</span></summary><div class="card-body"><p data-i18n="welcome.a4">Áno, na ukážkovom predmete bez prihlásenia. Účet potrebuješ až na vlastné súbory a synchronizáciu.</p></div></details>
       </div>
     </div>
@@ -441,7 +478,7 @@
         </div>
         <div class="group limit" id="upLimit" hidden>
           <div class="limit-head">
-            <span class="label" data-i18n="upload.limitLabel">Mesačný limit</span>
+            <span class="label"><span data-i18n="upload.limitLabel">Mesačný limit</span> · <span class="limit-plan" data-limit-plan data-i18n="profile.planFree">Zadarmo</span></span>
             <span class="limit-meta"><span class="limit-state" data-limit-state hidden></span><b class="limit-pct" data-limit-pct>0 %</b></span>
           </div>
           <div class="limit-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-label="upload.limitLabel">
@@ -452,7 +489,8 @@
             <span id="upUsage" data-limit-usage></span>
             <span data-limit-reset></span>
           </div>
-          <p class="hint limit-note" data-i18n="upload.limitNote">100 kreditov vystačí približne na 20–30 prednášok a zhrnutí mesačne.</p>
+          <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov vystačí približne na 1 predmet (3–5 prednášok) mesačne. S Lekto Plus získaš 150 kreditov, staré skúšky, príklady a vzory.</p>
+          <button class="btn ghost wide limit-upg" id="upUpgrade" type="button" data-limit-upgrade hidden data-i18n="profile.upgradeBtn">Prejsť na Lekto Plus</button>
         </div>
         <button class="btn wide" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
         <button class="btn wide plain" id="upPrev" type="button" data-i18n="nav.back">Späť</button>
@@ -478,7 +516,7 @@
       <button class="btn wide" id="pSign" type="button" hidden></button>
       <div class="group limit" id="pLimit" hidden>
         <div class="limit-head">
-          <span class="label" data-i18n="upload.limitLabel">Mesačný limit</span>
+          <span class="label"><span data-i18n="upload.limitLabel">Mesačný limit</span> · <span class="limit-plan" data-limit-plan data-i18n="profile.planFree">Zadarmo</span></span>
           <span class="limit-meta"><span class="limit-state" data-limit-state hidden></span><b class="limit-pct" data-limit-pct>0 %</b></span>
         </div>
         <div class="limit-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-label="upload.limitLabel">
@@ -489,7 +527,8 @@
           <span id="pUsage" data-limit-usage></span>
           <span data-limit-reset></span>
         </div>
-        <p class="hint limit-note" data-i18n="upload.limitNote">100 kreditov vystačí približne na 20–30 prednášok a zhrnutí mesačne.</p>
+        <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov vystačí približne na 1 predmet (3–5 prednášok) mesačne. S Lekto Plus získaš 150 kreditov, staré skúšky, príklady a vzory.</p>
+        <button class="btn ghost wide limit-upg" id="pUpgrade" type="button" data-limit-upgrade hidden data-i18n="profile.upgradeBtn">Prejsť na Lekto Plus</button>
       </div>
       <button class="chiprow" id="pLanding" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 14h5"/></svg><span class="grow" data-i18n="welcome.openLanding">Úvodná stránka</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       <div class="group" id="pReminders">
@@ -717,6 +756,36 @@
       <button class="btn wide ghost danger" id="delAcctConfirm" type="button" data-i18n="profile.deleteConfirm">Natrvalo odstrániť účet</button>
       <button class="btn wide" type="button" data-close data-i18n="setup.no">Zrušiť</button>
     </div>
+  </div>
+</dialog>
+<dialog class="bsheet" id="plusSheet">
+  <div class="bsheet-in">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="bsheet-head">
+      <h2 data-i18n="profile.planPlus">Lekto Plus</h2>
+      <button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <p class="tipbox" id="plusReason" hidden></p>
+    <div class="seg fill" id="plusCycle" role="group" data-i18n-label="profile.plusCycleLabel" style="--n:2;--i:0">
+      <button type="button" data-cycle="annual" aria-pressed="true" data-i18n="profile.plusAnnualTab">Ročne · -51 %</button>
+      <button type="button" data-cycle="monthly" aria-pressed="false" data-i18n="profile.plusMonthlyTab">Mesačne</button>
+    </div>
+    <div class="plus-price-box">
+      <div class="plus-price-row">
+        <b class="plus-price" id="plusPriceMain" data-i18n="welcome.plusPrice">34,99 € / rok</b>
+        <span class="plus-badge" id="plusSaveBadge" data-i18n="profile.plusSaveBadge">2,92 € / mes.</span>
+      </div>
+      <p class="hint" id="plusPriceSub" data-i18n="profile.plusAnnualNote">Jedna platba na celý akademický rok (zimné aj letné skúškové).</p>
+    </div>
+    <ul class="w-plan-list plus-sheet-list">
+      <li data-i18n="profile.plusF1">150 kreditov mesačne (10× viac prednášok, skrípt a skenov)</li>
+      <li data-i18n="profile.plusF2">Staré skúšky: zadania zoradené podľa najčastejšie skúšaných tém</li>
+      <li data-i18n="profile.plusF3">Riešené príklady: výpočtové úlohy s nápovedou, postupom a kontrolou</li>
+      <li data-i18n="profile.plusF4">Vzorové príklady: nové podobné úlohy podľa cvičebnice alebo zošita</li>
+      <li data-i18n="profile.plusF5">Až 40 skenovaných strán bez textu v jednom súbore</li>
+    </ul>
+    <p class="tipbox" id="plusWaitNote" hidden data-i18n="profile.plusWaitNote">Online platby spúšťame čoskoro. Ak chceš Lekto Plus aktivovať už na toto skúškové, ozvi sa nám.</p>
+    <button class="btn wide" id="plusCta" type="button" data-i18n="profile.plusCtaAnnual">Aktivovať Lekto Plus · 34,99 € / rok</button>
   </div>
 </dialog>
 <script type="module" src="/src/main.js"></script>

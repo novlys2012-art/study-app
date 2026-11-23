@@ -64,7 +64,10 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 |---|---|
 | `ANTHROPIC_API_KEY` | the key from step 1 |
 | `ALLOWED_EMAILS` | your email; add testers separated by commas. Leave it out to let anyone who signs in use it. |
-| `USER_MONTHLY_LIMIT_USD` | optional, default `1` (each account's AI spending per calendar month) |
+| `PLUS_EMAILS` | optional, comma-separated emails (or `*` for all users) granted Lekto Plus (`150` credits/month + `Skúšky`, `Príklady`, `Vzory`). Accounts with `app_metadata.plan = "plus"` in Supabase Auth also get Plus. |
+| `FREE_MONTHLY_LIMIT_USD` | optional, default `0.15` (15 credits per calendar month on the free plan) |
+| `PLUS_MONTHLY_LIMIT_USD` | optional, default `1.5` (150 credits per calendar month on Lekto Plus) |
+| `USER_MONTHLY_LIMIT_USD` | optional legacy override when `FREE_MONTHLY_LIMIT_USD` / `PLUS_MONTHLY_LIMIT_USD` are not set |
 | `DAILY_LIMIT_USD` | optional, default `5` (the whole app's AI spending per day, UTC) |
 | `USER_RATE_PER_MINUTE` | optional, default `60` (AI tasks one account may run in a minute; the app waits and tries again when it is reached) |
 

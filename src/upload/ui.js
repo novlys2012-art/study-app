@@ -4,12 +4,12 @@ import { t, getLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, createSubject, loadMeta, removeSamples } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
-import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, ext } from "./extract.js";
+import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, MAX_PICTURES, MAX_FREE_PICTURES, ext } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { readTemplates } from "./templates.js";
 import { icon } from "../app/icons.js";
-import { renderLimit } from "../app/limit.js";
+import { renderLimit, limitInfo, getCachedUsage, isPlusActive } from "../app/limit.js";
 import { mountAuth } from "../app/welcome.js";
 
 const CONSENT_KEY = "studyapp-ai-consent";
@@ -57,8 +57,17 @@ function message(e) {
   return t("upload.err.server", { msg: e.message || String(e) });
 }
 
-// The monthly limit as a structured quota meter. The plan counts pages later; for now the cap is in dollars.
-function showUsage(u) { renderLimit($("upLimit"), u, t); }
+// The monthly limit as a structured quota meter.
+function showUsage(u) {
+  renderLimit($("upLimit"), u, t);
+  renderMake();
+}
+
+function maybeOpenPlusForError(code) {
+  if (!ctx?.openPlus) return;
+  if (code === "plus_required") ctx.openPlus(examMode() ? "exams" : templateMode() ? "templates" : "problems");
+  else if (code === "user_limit" && !isPlusActive()) ctx.openPlus("limit");
+}
 
 function goLabel() {
   if (examMode()) return t("upload.goExams");
@@ -71,6 +80,10 @@ function goLabel() {
 
 function renderMake() {
   const onlyCtx = onlyContext();
+  const knownFree = Boolean(getCachedUsage()) && !isPlusActive();
+  if (knownFree && make.problems) make.problems = false;
+  const probBtn = $("upMake").querySelector('[data-k="problems"]');
+  if (probBtn) probBtn.textContent = t(knownFree ? "upload.makeProblemsPlus" : "upload.makeProblems");
   const hasPractice = !!(make.quiz || make.problems);
   [...$("upMake").children].forEach((b) => b.setAttribute("aria-pressed", !!make[b.dataset.k]));
   [...$("upAmount").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", +b.dataset.a === make.amount));
@@ -115,7 +128,10 @@ async function refresh() {
   $("upMakeBox").hidden = photoMode();
   renderSubjects(); step(1);
   panel("upForm"); renderMake(); renderPicked();
-  try { showUsage((await cloud.call("usage", {}, getLang())).usage); } catch (e) { error(message(e)); }
+  try {
+    showUsage((await cloud.call("usage", {}, getLang())).usage);
+    if (photoMode() && getCachedUsage() && !isPlusActive()) error(t("upload.err.plus_required"));
+  } catch (e) { error(message(e)); }
 }
 
 // The subject the files go into: one that exists, or a new one with a name.
@@ -215,6 +231,11 @@ function fileList(names) {
 async function runExams() {
   const into = target();
   if (busy || !into || !exams.length) return;
+  if (getCachedUsage() && !isPlusActive()) {
+    error(t("upload.err.plus_required"));
+    maybeOpenPlusForError("plus_required");
+    return;
+  }
   busy = true; error(""); panel("upWork");
   const setFile = fileList(exams.map((x) => x.name));
   exams.forEach((_, k) => setFile(k, "wait"));
@@ -255,6 +276,7 @@ async function runExams() {
       exams = exams.filter((_, k) => left.has(k));
       step(2); panel("upForm"); renderPicked();
       error(t("upload.partialExams", { done: added, failed: failed.map((f) => f.name).join(", "), reason: message(failed[0].error) }));
+      maybeOpenPlusForError(failed[0].code);
       return;
     }
     exams = [];
@@ -262,6 +284,7 @@ async function runExams() {
   } catch (e) {
     step(2); panel("upForm"); renderPicked();
     error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) && !e.code ? e.message : message(e));
+    maybeOpenPlusForError(e?.code);
   } finally {
     busy = false;
   }
@@ -270,6 +293,11 @@ async function runExams() {
 async function runTemplates() {
   const into = target();
   if (busy || !into || !exams.length) return;
+  if (getCachedUsage() && !isPlusActive()) {
+    error(t("upload.err.plus_required"));
+    maybeOpenPlusForError("plus_required");
+    return;
+  }
   busy = true; error(""); panel("upWork");
   const setFile = fileList(exams.map((x) => x.name));
   exams.forEach((_, k) => setFile(k, "wait"));
@@ -310,6 +338,7 @@ async function runTemplates() {
       exams = exams.filter((_, k) => left.has(k));
       step(2); panel("upForm"); renderPicked();
       error(t("upload.partialTemplates", { done: added, failed: failed.map((f) => f.name).join(", "), reason: message(failed[0].error) }));
+      maybeOpenPlusForError(failed[0].code);
       return;
     }
     exams = [];
@@ -317,6 +346,7 @@ async function runTemplates() {
   } catch (e) {
     step(2); panel("upForm"); renderPicked();
     error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) && !e.code ? e.message : message(e));
+    maybeOpenPlusForError(e?.code);
   } finally {
     busy = false;
   }
@@ -342,10 +372,11 @@ async function run() {
   $("upEta").textContent = "";
   try {
     const docs = [];
+    const maxPictures = !getCachedUsage() || isPlusActive() ? MAX_PICTURES : MAX_FREE_PICTURES;
     for (const [k, item] of picked.entries()) {
       progress((k / picked.length) * 10, t("upload.reading", { name: item.file.name }));
       setFile(k, "reading");
-      try { docs.push({ ...(await extractFile(item.file)), context: !!item.context }); }
+      try { docs.push({ ...(await extractFile(item.file, { maxPictures })), context: !!item.context }); }
       catch (e) { setFile(k, "failed"); throw new Error(item.file.name + ": " + message(e)); }
       setFile(k, "read");
     }
@@ -382,6 +413,7 @@ async function run() {
       step(2); panel("upForm"); renderSubjects(); renderPicked();
       const reason = message(failed[0].error);
       error(t("upload.partial", { done: saved.files.length - (into?.files?.length || 0), failed: failed.map((f) => f.name).join(", "), reason }));
+      maybeOpenPlusForError(failed[0].code);
       return;
     }
     picked = [];
@@ -389,6 +421,7 @@ async function run() {
   } catch (e) {
     step(2); panel("upForm"); renderPicked();
     error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) ? e.message : message(e));
+    maybeOpenPlusForError(e?.code);
   } finally {
     busy = false;
   }
@@ -439,6 +472,11 @@ function wire() {
   $("upPrev").onclick = () => { error(""); step(1); };
   $("upMake").onclick = (e) => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.k === "problems" && getCachedUsage() && !isPlusActive()) {
+      if (ctx?.openPlus) ctx.openPlus("problems");
+      else error(t("upload.err.plus_required"));
+      return;
+    }
     make[b.dataset.k] = !make[b.dataset.k]; renderMake(); renderPicked();
   };
   $("upAmount").onclick = (e) => {
@@ -446,6 +484,10 @@ function wire() {
     make.amount = +b.dataset.a; renderMake();
   };
   $("upGo").onclick = run;
+  $("upUpgrade").onclick = () => {
+    const info = limitInfo(getCachedUsage());
+    if (ctx?.openPlus) ctx.openPlus(info?.state === "full" ? "limit" : "");
+  };
   $("upOut").onclick = async () => {
     if (ctx && ctx.onSignOut) await ctx.onSignOut();
     else { await cloud.signOut(); refresh(); }

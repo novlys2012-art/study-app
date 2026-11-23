@@ -114,7 +114,7 @@ const api = createServer(async (req, res) => {
       tasks.push(body.task);
       const out = await handle(body, {
         user: token === "fake-token" ? { id: USER.id, email: USER.email } : null,
-        env: { USER_MONTHLY_LIMIT_USD: "1" }, ai: fakeAi,
+        env: { USER_MONTHLY_LIMIT_USD: "1", PLUS_EMAILS: USER.email }, ai: fakeAi,
         spend: async () => ({ month: ledger.reduce((s, r) => s + r.cost_usd, 0), today: 0, minute: 0 }),
         record: async (row) => { ledger.push(row); },
         cache: { get: async (k) => cache.get(k) ?? null, put: async (r) => { cache.set(r.key, r.result); } },

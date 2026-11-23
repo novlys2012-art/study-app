@@ -4,8 +4,32 @@
 import * as T from "../ai/tasks.js";
 
 // Defaults when the secrets are not set. USD, because that is what Anthropic bills.
+// freeMonthUsd: $0.15 (15 credits); plusMonthUsd: $1.50 (150 credits).
 // perMinute: AI tasks one account may run in a minute (answers from the cache count too).
-export const DEFAULT_LIMITS = { userMonthUsd: 1, dailyUsd: 5, perMinute: 60 };
+export const DEFAULT_LIMITS = {
+  freeMonthUsd: 0.15,
+  plusMonthUsd: 1.5,
+  userMonthUsd: 0.15,
+  dailyUsd: 5,
+  perMinute: 60,
+};
+
+// Tasks that require an active Lekto Plus plan (Past Exams, Worked Practice Problems, Worked-Example Templates).
+export const PLUS_TASKS = new Set(["exam", "group", "problems", "check_problems", "template", "template_problem"]);
+
+// Pre-call cost reservation & concurrency limits to prevent parallel TOCTOU bursts past monthly/daily caps.
+export const RESERVE_USD = { fast: 0.005, strong: 0.04 };
+export const MAX_CONCURRENT = { free: 6, plus: 10 };
+const inFlight = new Map();
+let inFlightTodayUsd = 0;
+
+// Non-PII SHA-256 identity key so spend persists even if an account is deleted and recreated.
+export async function accountKey(user) {
+  const raw = String(user?.email || user?.id || "").trim().toLowerCase();
+  if (!raw) return null;
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`lekto-acct:v1:${raw}`));
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // Part of every cache key. Raise it when a change outside the prompts (a parser, a model setting
 // the key does not cover) should stop old cached answers from being reused.
@@ -26,13 +50,28 @@ export class HttpError extends Error {
 
 export function limitsFrom(env = {}) {
   const num = (v, d) => (v != null && v !== "" && Number.isFinite(+v) ? +v : d);
-  const allowed = String(env.ALLOWED_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const list = (v) => String(v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allowed = list(env.ALLOWED_EMAILS);
+  const plus = list(env.PLUS_EMAILS);
+  const explicitUser = num(env.USER_MONTHLY_LIMIT_USD, null);
+  const freeMonthUsd = num(env.FREE_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.freeMonthUsd);
+  const plusMonthUsd = num(env.PLUS_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.plusMonthUsd);
   return {
-    userMonthUsd: num(env.USER_MONTHLY_LIMIT_USD, DEFAULT_LIMITS.userMonthUsd),
+    userMonthUsd: freeMonthUsd,
+    freeMonthUsd,
+    plusMonthUsd,
     dailyUsd: num(env.DAILY_LIMIT_USD, DEFAULT_LIMITS.dailyUsd),
     perMinute: num(env.USER_RATE_PER_MINUTE, DEFAULT_LIMITS.perMinute),
     allowed: allowed.length ? allowed : null,
+    plus: plus.length ? plus : null,
   };
+}
+
+export function isPlusUser(user, lim = {}) {
+  if (!user) return false;
+  if (user.plan === "plus" || user.plus === true) return true;
+  const email = String(user.email || "").toLowerCase();
+  return Boolean(lim.plus && (lim.plus.includes("*") || (email && lim.plus.includes(email))));
 }
 
 const text = (v, max = MAX_TEXT) => {
@@ -253,11 +292,11 @@ function aiFailure(e) {
   return e;
 }
 
-// body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId) -> {month, today, minute},
-// record(row), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, deleteUser?(userId), log? }.
+// body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId, accountKey) -> {month, today, minute},
+// record(row, reservedId?), reserve?(row) -> id, release?(id), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, deleteUser?(userId), log? }.
 // task "usage" returns the caller's spending without an AI call.
 // task "delete_account" deletes the caller's own account and cascades all user data (runs even over caps / off allowlist).
-export async function handle(body, { user, ai, spend, record, env, cache = null, deleteUser = null, log = console.error }) {
+export async function handle(body, { user, ai, spend, record, reserve = null, release = null, env, cache = null, deleteUser = null, log = console.error }) {
   if (!user) throw new HttpError(401, "auth", "Sign in first.");
   const { task, input = {}, lang: l } = body || {};
   if (task === "delete_account") {
@@ -268,17 +307,32 @@ export async function handle(body, { user, ai, spend, record, env, cache = null,
   }
   const lim = limitsFrom(env);
   if (lim.allowed && !lim.allowed.includes(String(user.email || "").toLowerCase())) throw new HttpError(403, "not_allowed", "This account is not on the test list.");
+  const plus = isPlusUser(user, lim);
+  const plan = plus ? "plus" : "free";
+  const limitUsd = plus ? lim.plusMonthUsd : lim.freeMonthUsd;
+  const maxConcurrent = plus ? MAX_CONCURRENT.plus : MAX_CONCURRENT.free;
   const lang = l === "cs" ? "cs" : "sk";
-  const s = await spend(user.id);
-  const usage = (extra = 0) => ({ monthUsd: +(s.month + extra).toFixed(4), limitUsd: lim.userMonthUsd });
+  const acctKey = await accountKey(user);
+  const flightKey = acctKey || String(user.id);
+  const s = await spend(user.id, acctKey);
+  const usage = (extra = 0) => ({ plan, monthUsd: +(s.month + extra).toFixed(4), limitUsd });
   if (task === "usage") return { usage: usage() };
   const def = TASKS[task];
   if (!def) throw new HttpError(400, "bad_task", `Unknown task "${task}".`);
-  if ((s.minute || 0) >= lim.perMinute) throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+  if (!plus && PLUS_TASKS.has(task)) throw new HttpError(402, "plus_required", "This feature requires Lekto Plus.");
+  const curFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
+  if ((s.minute || 0) + curFlight.count >= lim.perMinute || curFlight.count >= maxConcurrent) {
+    throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+  }
 
   const req = { tier: def.tier, effort: def.effort, maxTokens: def.maxTokens, ...def.build(input, lang) };
   const model = ai.models?.[req.tier] ?? "";
-  const row = (extra) => ({ user_id: user.id, task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false, ...extra });
+  const row = (extra) => ({
+    user_id: user.id,
+    ...(acctKey ? { account_key: acctKey } : {}),
+    task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false,
+    ...extra,
+  });
 
   // A stored answer costs nothing, so it is served even when a spending cap is reached.
   const key = cache ? await cacheKey(task, ai, req) : null;
@@ -295,13 +349,40 @@ export async function handle(body, { user, ai, spend, record, env, cache = null,
     }
   }
 
-  if (s.month >= lim.userMonthUsd) throw new HttpError(429, "user_limit", "Monthly limit reached.");
-  if (s.today >= lim.dailyUsd) throw new HttpError(429, "daily_limit", "The app's daily limit is reached.");
+  const latestFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
+  if ((s.minute || 0) + latestFlight.count >= lim.perMinute || latestFlight.count >= maxConcurrent) {
+    throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+  }
+  if (s.month + latestFlight.usd >= limitUsd) throw new HttpError(429, "user_limit", "Monthly limit reached.");
+  if (s.today + inFlightTodayUsd >= lim.dailyUsd) throw new HttpError(429, "daily_limit", "The app's daily limit is reached.");
 
+  const estUsd = RESERVE_USD[req.tier] ?? RESERVE_USD.fast;
+  inFlight.set(flightKey, { count: latestFlight.count + 1, usd: +(latestFlight.usd + estUsd).toFixed(6) });
+  inFlightTodayUsd = +(inFlightTodayUsd + estUsd).toFixed(6);
+
+  let reservedId = null;
   let res;
-  try { res = await ai.complete(req); } catch (e) { throw aiFailure(e); }
+  try {
+    if (typeof reserve === "function") reservedId = await reserve(row({ cost_usd: estUsd }));
+    res = await ai.complete(req);
+  } catch (e) {
+    if (reservedId != null && typeof release === "function") {
+      try { await release(reservedId); } catch (re) { log("ai_usage release failed", re); }
+    }
+    throw aiFailure(e);
+  } finally {
+    const after = inFlight.get(flightKey);
+    if (after) {
+      const nextCount = after.count - 1;
+      const nextUsd = Math.max(0, +(after.usd - estUsd).toFixed(6));
+      if (nextCount <= 0) inFlight.delete(flightKey);
+      else inFlight.set(flightKey, { count: nextCount, usd: nextUsd });
+    }
+    inFlightTodayUsd = Math.max(0, +(inFlightTodayUsd - estUsd).toFixed(6));
+  }
+
   const cost = res.costUsd ?? 0;
-  await record(row({ model: res.model || model, input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost }));
+  await record(row({ model: res.model || model, input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost }), reservedId);
   let result;
   try { result = def.parse(res.text); } catch (e) { throw new HttpError(502, "bad_reply", "The AI reply could not be read. Try again."); }
   // Only complete answers are kept: a cut-off one should be asked for again next time.

@@ -9,7 +9,7 @@ import { isProblem, correctAnswers, checkNumericAnswer } from "./problems.js";
 import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
-import { renderLimit } from "./limit.js";
+import { renderLimit, limitInfo, getCachedUsage, setCachedUsage, isPlusActive } from "./limit.js";
 import { openWelcome, syncAuthCopy } from "./welcome.js";
 import { ensureSampleSubject, SAMPLE_ID } from "./sample.js";
 import { clearPendingAuth } from "./auth-state.js";
@@ -986,6 +986,8 @@ $("tpGen").onclick = async () => {
     if (screen === "template" && tpId === tid) {
       $("tpErr").textContent = e && e.uiMsg ? e.uiMsg : templateErrorText(e);
       $("tpErr").hidden = false;
+      if (e?.code === "plus_required") openPlus("templates");
+      else if (e?.code === "user_limit" && !isPlusActive()) openPlus("limit");
     }
   } finally {
     tpBusy = false;
@@ -1542,6 +1544,63 @@ function setTheme(th) {
   try { localStorage.setItem(THEME_KEY, th); } catch (e) {}
   paintChrome();
 }
+let plusCycle = "annual";
+const PLUS_REASONS = {
+  exams: "profile.plusReasonExams",
+  problems: "profile.plusReasonProblems",
+  templates: "profile.plusReasonTemplates",
+  limit: "profile.plusReasonLimit",
+};
+function syncPlusSheet() {
+  const isMonthly = plusCycle === "monthly";
+  const cycleBox = $("plusCycle");
+  if (cycleBox) {
+    const btns = [...cycleBox.children];
+    btns.forEach((b) => b.setAttribute("aria-pressed", b.dataset.cycle === plusCycle ? "true" : "false"));
+    cycleBox.style.setProperty("--n", String(btns.length));
+    cycleBox.style.setProperty("--i", isMonthly ? "1" : "0");
+  }
+  if ($("plusPriceMain")) $("plusPriceMain").textContent = isMonthly ? t("profile.plusMonthlyPrice") : t("welcome.plusPrice");
+  if ($("plusSaveBadge")) {
+    $("plusSaveBadge").textContent = t("profile.plusSaveBadge");
+    $("plusSaveBadge").hidden = isMonthly;
+  }
+  if ($("plusPriceSub")) $("plusPriceSub").textContent = isMonthly ? t("profile.plusMonthlyNote") : t("profile.plusAnnualNote");
+  if ($("plusCta")) $("plusCta").textContent = isMonthly ? t("profile.plusCtaMonthly") : t("profile.plusCtaAnnual");
+}
+function openPlus(reason = "") {
+  const rKey = PLUS_REASONS[reason] || "";
+  const rEl = $("plusReason");
+  if (rEl) {
+    rEl.textContent = rKey ? t(rKey) : "";
+    rEl.hidden = !rKey;
+  }
+  if ($("plusWaitNote")) $("plusWaitNote").hidden = true;
+  syncPlusSheet();
+  if (!$("plusSheet").open) openSheet($("plusSheet"));
+}
+$("plusCycle").onclick = (e) => {
+  const b = e.target.closest("button[data-cycle]");
+  if (!b || b.dataset.cycle === plusCycle) return;
+  plusCycle = b.dataset.cycle;
+  syncPlusSheet();
+};
+$("plusCta").onclick = () => {
+  const url = String(plusCycle === "monthly"
+    ? (import.meta.env.VITE_PLUS_URL_MONTHLY || "")
+    : (import.meta.env.VITE_PLUS_URL_ANNUAL || "")).trim();
+  if (url && /^https:\/\/[^\s/$.?#].[^\s]*$/i.test(url)) {
+    window.location.assign(url);
+    return;
+  }
+  $("plusWaitNote").hidden = false;
+  toast(t("profile.plusWaitToast"));
+};
+$("pUpgrade").onclick = () => {
+  const info = limitInfo(getCachedUsage());
+  openPlus(info?.state === "full" ? "limit" : "");
+};
+
 function setLangUI(l) {
   setLang(l);
   const all = [...$("langs").children];
@@ -1549,6 +1608,7 @@ function setLangUI(l) {
   $("langs").style.setProperty("--n", all.length);
   $("langs").style.setProperty("--i", Math.max(0, all.findIndex((b) => b.dataset.lang === l)));
   syncAuthCopy();
+  syncPlusSheet();
 }
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
 $("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
@@ -1642,6 +1702,7 @@ async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
   clearLocal();
   clearEntered();
   clearPendingAuth();
+  setCachedUsage(null);
   try { localStorage.removeItem(LAST_KEY); } catch (e) {}
   SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
   list = []; wrong = []; stage = "quiz"; readerHint = null; tpId = null; tpIdx = 0; tpBusy = false;
@@ -1681,6 +1742,7 @@ $("delAcctConfirm").onclick = async () => {
     await cancelNativeReminders();
     clearReminderPrefs();
     clearPendingAuth();
+    setCachedUsage(null);
     clearLocal();
     clearEntered();
     try { localStorage.removeItem(LAST_KEY); } catch (e) {}
@@ -1760,6 +1822,7 @@ function showWelcome(openAuth = false, preferredMode = "login") {
     openAuthSheet: () => { if (!$("authSheet").open) openSheet($("authSheet")); },
     closeAuthSheet: () => { if ($("authSheet").open) closeSheet($("authSheet")); },
     openLegal,
+    openPlus,
     setLangUI,
     signOut: () => signOutAccount({ stayOnWelcome: true }),
     toast,
@@ -1790,6 +1853,7 @@ function showUpload(target, signIn, mode) {
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
     onSignOut: () => signOutAccount(),
     openLegal,
+    openPlus,
     toast,
   }));
 }

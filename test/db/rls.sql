@@ -87,13 +87,18 @@ do $$ declare gone int; begin
 end $$;
 commit;
 
--- The server: per-minute count and the cache.
-insert into public.ai_usage (user_id, task, model, input_tokens, output_tokens, cost_usd, cached)
-  values ('aaaaaaaa-0000-0000-0000-000000000001', 'summary', 'm', 10, 5, 0.01, false),
-         ('aaaaaaaa-0000-0000-0000-000000000001', 'summary', 'm', 0, 0, 0, true);
+-- The server: per-minute count, cache pruning and survival across account deletion.
+insert into public.ai_usage (user_id, account_key, task, model, input_tokens, output_tokens, cost_usd, cached, created_at)
+  values ('aaaaaaaa-0000-0000-0000-000000000001', repeat('e', 64), 'summary', 'm', 0, 0, 0, true, now() - interval '20 minutes');
+insert into public.ai_usage (user_id, account_key, task, model, input_tokens, output_tokens, cost_usd, cached)
+  values ('aaaaaaaa-0000-0000-0000-000000000001', repeat('e', 64), 'summary', 'm', 10, 5, 0.01, false),
+         ('aaaaaaaa-0000-0000-0000-000000000001', repeat('e', 64), 'summary', 'm', 0, 0, 0, true);
 begin;
 set local role service_role;
 do $$ declare r record; begin
+  if exists (select from public.ai_usage where cached = true and created_at < now() - interval '15 minutes') then
+    raise exception 'stale cached ai_usage row was not pruned';
+  end if;
   select * into r from public.ai_spend('aaaaaaaa-0000-0000-0000-000000000001');
   if r.user_minute <> 2 or r.user_month <> 0.01 then raise exception 'ai_spend gave % / %', r.user_minute, r.user_month; end if;
   insert into public.ai_cache (key, task, model, result) values (repeat('a', 64), 'summary', 'm', '{}');
@@ -102,9 +107,14 @@ do $$ declare r record; begin
 end $$;
 commit;
 
--- Deleting an account removes its answers.
+-- Deleting an account removes its answers, but keeps ai_usage so deleting/re-registering cannot reset spend caps.
 delete from auth.users where id = 'aaaaaaaa-0000-0000-0000-000000000001';
-do $$ begin
+begin;
+set local role service_role;
+do $$ declare r record; begin
   if exists (select from public.reviews where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') then raise exception 'reviews outlived the account'; end if;
+  select * into r from public.ai_spend('cccccccc-0000-0000-0000-000000000003', repeat('e', 64));
+  if r.user_month <> 0.01 or r.all_today <> 0.01 then raise exception 'ai_usage spend was lost after account deletion: % / %', r.user_month, r.all_today; end if;
 end $$;
+commit;
 \echo 'database access checks passed'

@@ -5,8 +5,11 @@ import { addStreamIteration } from "./polyfills.js";
 
 export const MIN_TEXT = 150;        // characters; a PDF page with less is read as a picture
 export const MAX_PAGES = 300;       // per file, for the free test
-export const MAX_PICTURES = 40;     // picture pages per file
+export const MAX_PICTURES = 40;     // picture pages per file (Lekto Plus)
+export const MAX_FREE_PICTURES = 6; // picture pages per file on the free tier
 export const MAX_BYTES = 60 * 1024 * 1024;
+const MAX_XML_CHARS = 2_000_000;
+const MAX_TOTAL_XML_CHARS = 20_000_000;
 export const TYPES = [".pdf", ".pptx", ".docx", ".txt", ".md"];
 // Photos of exam pages (past exam mode). HEIC opens in Safari, which is where iPhone photos come from.
 export const PHOTO_TYPES = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
@@ -54,9 +57,9 @@ async function render(page) {
 }
 
 // Short worked-example PDFs (<= 6 pages) can render every page as an image so formulas and tables stay intact.
-async function pdf(buf, { preferImages = false } = {}) {
+async function pdf(buf, { preferImages = false, maxPictures = MAX_PICTURES } = {}) {
   const lib = await loadPdf();
-  const task = lib.getDocument({ data: new Uint8Array(buf) });
+  const task = lib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false });
   const doc = await task.promise;
   if (doc.numPages > MAX_PAGES) throw new ExtractError("tooManyPages", { n: doc.numPages, max: MAX_PAGES });
   const raw = [];
@@ -66,11 +69,12 @@ async function pdf(buf, { preferImages = false } = {}) {
   }
   const pages = stripRepeated(raw);
   const renderAll = preferImages && pages.length <= 6;
+  const cap = Number.isInteger(maxPictures) && maxPictures >= 0 ? maxPictures : MAX_PICTURES;
   const images = [];
   let skipped = 0;
   for (let n = 1; n <= pages.length; n++) {
     if (!renderAll && words(pages[n - 1]).length >= MIN_TEXT) continue;
-    if (images.length >= MAX_PICTURES) { skipped++; continue; }
+    if (images.length >= cap) { skipped++; continue; }
     images.push({ page: n, mediaType: "image/jpeg", data: await render(await doc.getPage(n)) });
   }
   await task.destroy();
@@ -87,10 +91,22 @@ async function pptx(buf) {
     .map((p) => [...p[1].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((t) => t[1]).join(""))
     .filter(Boolean).join("\n");
   const pages = [];
+  let totalXml = 0;
+  const readXml = async (entry) => {
+    if (entry._data && entry._data.uncompressedSize > MAX_XML_CHARS) {
+      throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
+    }
+    const xml = await entry.async("string");
+    totalXml += xml.length;
+    if (xml.length > MAX_XML_CHARS || totalXml > MAX_TOTAL_XML_CHARS) {
+      throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
+    }
+    return xml;
+  };
   for (const s of slides) {
-    let page = text(await zip.file(s).async("string"));
+    let page = text(await readXml(zip.file(s)));
     const notes = zip.file(s.replace("slides/slide", "notesSlides/notesSlide"));
-    if (notes) { const n = text(await notes.async("string")); if (n) page += "\n[Poznámky] " + n; }
+    if (notes) { const n = text(await readXml(notes)); if (n) page += "\n[Poznámky] " + n; }
     pages.push(page);
   }
   return { pages: stripRepeated(pages), images: [], skipped: 0 };
@@ -136,14 +152,14 @@ export async function extractPhotos(files) {
 
 // file: a File from <input type="file">. Returns { name, pages: [text], images: [{ page, mediaType, data }], skipped }.
 // minChars: less text than this (and no picture pages) means the file is empty; an old exam can be short.
-export async function extractFile(file, { minChars = 200, preferImages = false } = {}) {
+export async function extractFile(file, { minChars = 200, preferImages = false, maxPictures = MAX_PICTURES } = {}) {
   const type = ext(file.name);
   if (!TYPES.includes(type)) throw new ExtractError("type", { types: TYPES.join(", ") });
   if (file.size > MAX_BYTES) throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
   const buf = await file.arrayBuffer();
   const name = file.name.replace(/\.[^.]+$/, "");
   let out;
-  if (type === ".pdf") out = await pdf(buf, { preferImages });
+  if (type === ".pdf") out = await pdf(buf, { preferImages, maxPictures });
   else if (type === ".pptx") out = await pptx(buf);
   else if (type === ".docx") out = await docx(buf);
   else out = { pages: splitPages(new TextDecoder().decode(buf)), images: [], skipped: 0 };

@@ -6,7 +6,7 @@ import { rankExams, rankedRound, matchTopic, examWeight, yearSpan, retagTopic, r
 import { parsePastExam, parseExamGroups, pastExamPrompt } from "../ai/tasks.js";
 
 const rejects = (p, code) => assert.rejects(p, (e) => e instanceof HttpError && e.code === code);
-const user = { id: "u1", email: "s@example.com" };
+const user = { id: "u1", email: "s@example.com", plan: "plus" };
 function deps(text) {
   const calls = [];
   return {

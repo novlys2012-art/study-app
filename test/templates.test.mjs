@@ -5,7 +5,7 @@ import { parseTemplates, parseTemplateProblem, templatePrompt, templateProblemPr
 import { readTemplates, generateSimilarProblem, TEMPLATE_IMAGES, MAX_PROBLEMS_PER_TEMPLATE } from "../src/upload/templates.js";
 
 const rejects = (p, code) => assert.rejects(p, (e) => e instanceof HttpError && e.code === code);
-const user = { id: "u1", email: "student@example.com" };
+const user = { id: "u1", email: "student@example.com", plan: "plus" };
 const img = (page) => ({ page, mediaType: "image/jpeg", data: "AAAA" });
 
 function memCache() {

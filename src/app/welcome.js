@@ -566,6 +566,8 @@ function wireWelcome() {
   $("wNavCta").onclick = () => openAuthDialog("login");
 
   $("wGuest").onclick = () => (signedIn ? hooks.enterApp() : hooks.trySample());
+  if ($("wFreeCta")) $("wFreeCta").onclick = () => (signedIn ? hooks.enterApp() : openAuthDialog("signup"));
+  if ($("wPlusCta")) $("wPlusCta").onclick = () => (signedIn && hooks.openPlus ? hooks.openPlus("") : openAuthDialog("signup"));
   $("wOffEnter").onclick = () => { hooks.closeAuthSheet(); hooks.trySample(); };
   $("wFootOpen").onclick = () => hooks.enterApp();
   $("wContinue").onclick = () => { hooks.closeAuthSheet(); hooks.enterApp(); };

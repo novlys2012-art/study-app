@@ -37,7 +37,7 @@ async function settled(promises) {
 // Worth another try: the connection, a busy AI, a server error, the per-minute limit, an unreadable reply (once).
 // Not worth it: the student's limits, sign-in, a refused or too large part. These codes stop the whole upload.
 const RETRY = { network: 4, server_error: 4, server: 4, ai_busy: 4, rate_limit: 5, bad_reply: 2 };
-export const STOP = new Set(["auth", "not_allowed", "user_limit", "daily_limit", "no_price", "network"]);
+export const STOP = new Set(["auth", "not_allowed", "user_limit", "daily_limit", "plus_required", "no_price", "network"]);
 const codeOf = (e) => (e && e.code) || "error";
 // Wait in ms before try number n (2, 3, ...): 2, 4, 8 s, or 15, 30, 45 s for the per-minute limit.
 export const backoff = (n, code, base = 2000) => (code === "rate_limit" ? base * 7.5 * (n - 1) : base * 2 ** (n - 2));
