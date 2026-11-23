@@ -244,7 +244,7 @@
     <div class="stack" id="tabTemplates" hidden></div>
     <div class="empty" id="sEmpty" hidden>
       <span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M13 12v6M10 15h6"/></svg></span>
-      <p data-i18n="subject.empty">Tento predmet je zatiaľ prázdny.</p>
+      <p data-i18n="subject.empty">Zatiaľ bez materiálov.</p>
       <button class="btn" id="sEmptyAdd" type="button" data-i18n="subject.emptyAdd">Pridať súbory</button>
       <div class="empty-more">
         <button class="btn ghost" id="sEmptyExams" type="button" data-i18n="exams.add">Pridať staré skúšky</button>
@@ -296,7 +296,7 @@
       <button type="button" data-v="1" aria-pressed="false" data-i18n="templates.var2">Príklad 2</button>
     </div>
     <div class="empty" id="tpEmpty" hidden>
-      <p data-i18n="templates.noneYet">Z tohto vzoru si ešte nevygeneroval žiadny príklad. Vytvoriť môžeš najviac 2 podobné príklady.</p>
+      <p data-i18n="templates.noneYet">Zatiaľ žiadny príklad – môžeš vygenerovať až 2.</p>
     </div>
     <div class="prob" id="tpProb" hidden>
       <p class="q is-prob" id="tpQ"></p>
@@ -328,7 +328,7 @@
     <p class="err" id="tpErr" role="alert" hidden></p>
     <div class="dock" id="tpDock">
       <button class="btn wide" id="tpGen" type="button"></button>
-      <p class="hint tpl-limit" id="tpDoneNote" hidden data-i18n="templates.maxReached">Vygenerované oba príklady (2 z 2). Zostávajú uložené aj offline.</p>
+      <p class="hint tpl-limit" id="tpDoneNote" hidden data-i18n="templates.maxReached">Máš oba príklady (2/2), uložené aj offline.</p>
     </div>
   </section>
 
@@ -341,7 +341,7 @@
     <div class="qbody" id="qBody">
       <div class="eyebrow" id="qtopic"></div>
       <p class="q" id="q"></p>
-      <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
+      <p class="multi" id="multi" hidden data-i18n="quiz.multi">Viac správnych odpovedí – označ všetky.</p>
       <div class="opts" id="opts"></div>
       <div class="prob" id="probBox" hidden>
         <div class="group" id="pCheckWrap" hidden>
@@ -373,7 +373,7 @@
         <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
         <button class="btn plain" id="idk" type="button" data-i18n="quiz.idk">Neviem</button>
       </div>
-      <p class="hint q-keys" id="qKeys" data-i18n="quiz.keys">Klávesy: 1–4 odpoveď · ? neviem · Enter ďalej · S zhrnutie · Esc koniec</p>
+      <p class="hint q-keys" id="qKeys" data-i18n="quiz.keys">1–4 odpoveď · ? neviem · Enter ďalej · S zhrnutie · Esc koniec</p>
     </div>
     <div class="fb" id="fb" role="status" hidden>
       <div class="fb-in">
@@ -447,12 +447,12 @@
         </div>
         <div class="group">
           <p class="label" id="upFilesLabel" data-i18n="upload.filesLabel">Súbory</p>
-          <label class="drop" for="upFiles" id="upDrop"><span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><b data-i18n="upload.pick">Vybrať súbory</b><span id="upFilesHint" data-i18n="upload.filesHint">PDF, PowerPoint (PPTX), Word (DOCX) alebo text. Najviac 10 súborov a 300 strán v jednom súbore.</span></label>
+          <label class="drop" for="upFiles" id="upDrop"><span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><b data-i18n="upload.pick">Vybrať súbory</b><span id="upFilesHint" data-i18n="upload.filesHint">PDF, PPTX, DOCX alebo TXT · max. 10 súborov, 300 str./súbor</span></label>
           <input id="upFiles" class="visually-hidden" type="file" multiple>
           <ul class="up-list" id="upList" hidden></ul>
           <div class="tip-wrap" id="upCtxWrap" hidden>
-            <button class="tip-trigger" id="upCtxTip" type="button" aria-expanded="false" aria-controls="upCtxPop"><span class="tip-q" aria-hidden="true">?</span><span data-i18n="upload.contextWhat">Čo znamená Kontext?</span></button>
-            <div class="tip-pop" id="upCtxPop" role="tooltip" data-i18n="upload.contextHint">Kontext (napr. vzorce či príklady) sa nezhrnie ani netestuje, ale pomôže pri spracovaní ostatných súborov.</div>
+            <button class="tip-trigger" id="upCtxTip" type="button" aria-expanded="false" aria-controls="upCtxPop"><span class="tip-q" aria-hidden="true">?</span><span data-i18n="upload.contextWhat">Čo je Kontext?</span></button>
+            <div class="tip-pop" id="upCtxPop" role="tooltip" data-i18n="upload.contextHint">Vzorce či podklady pre ostatné súbory – bez zhrnutia a kvízu.</div>
           </div>
         </div>
         <button class="btn wide" id="upNext" type="button" data-i18n="upload.next">Ďalej</button>
@@ -467,7 +467,7 @@
             <button type="button" data-k="problems" aria-pressed="false" data-i18n="upload.makeProblems">Príklady</button>
             <button type="button" data-k="topics" aria-pressed="true" data-i18n="upload.makeTopics">Témy a slabé miesta</button>
           </div>
-          <p class="hint" id="upProbHint" data-i18n="upload.problemsHint">Príklady vytvoria úlohy s nápovedou a postupom – ideálne pre matiku, štatistiku, fyziku či účtovníctvo.</p>
+          <p class="hint" id="upProbHint" data-i18n="upload.problemsHint">Príklady: výpočtové úlohy s nápovedou a postupom.</p>
           <div class="seg" id="upAmount">
             <span class="hint" data-i18n="upload.amountLabel">Množstvo:</span>
             <button type="button" data-a="0.5" aria-pressed="false" data-i18n="upload.amountFew">Menej</button>
@@ -489,7 +489,7 @@
             <span id="upUsage" data-limit-usage></span>
             <span data-limit-reset></span>
           </div>
-          <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov vystačí približne na 1 predmet (3–5 prednášok) mesačne. S Lekto Plus získaš 150 kreditov, staré skúšky, príklady a vzory.</p>
+          <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov ≈ 3–5 prednášok mesačne. Plus: 150 kreditov, skúšky, príklady a vzory.</p>
           <button class="btn ghost wide limit-upg" id="upUpgrade" type="button" data-limit-upgrade hidden data-i18n="profile.upgradeBtn">Prejsť na Lekto Plus</button>
         </div>
         <button class="btn wide" id="upGo" type="button" data-i18n="upload.go">Vytvoriť zhrnutia a kvíz</button>
@@ -527,7 +527,7 @@
           <span id="pUsage" data-limit-usage></span>
           <span data-limit-reset></span>
         </div>
-        <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov vystačí približne na 1 predmet (3–5 prednášok) mesačne. S Lekto Plus získaš 150 kreditov, staré skúšky, príklady a vzory.</p>
+        <p class="hint limit-note" data-limit-note data-i18n="upload.limitNote">15 kreditov ≈ 3–5 prednášok mesačne. Plus: 150 kreditov, skúšky, príklady a vzory.</p>
         <button class="btn ghost wide limit-upg" id="pUpgrade" type="button" data-limit-upgrade hidden data-i18n="profile.upgradeBtn">Prejsť na Lekto Plus</button>
       </div>
       <button class="chiprow" id="pLanding" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 14h5"/></svg><span class="grow" data-i18n="welcome.openLanding">Úvodná stránka</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -541,7 +541,7 @@
           <label class="hint" for="remTime" data-i18n="profile.remindersTime">Čas pripomienky</label>
           <input class="search rem-time" id="remTime" type="time" value="18:00">
         </div>
-        <p class="hint" id="remHint" data-i18n="profile.remindersHint">Pripomenie denný plán pred skúškou. Funguje priamo v zariadení.</p>
+        <p class="hint" id="remHint" data-i18n="profile.remindersHint">Pripomenie denný plán priamo v zariadení.</p>
       </div>
       <button class="btn wide plain danger" id="pDelete" type="button" hidden data-i18n="profile.deleteAccount">Odstrániť účet</button>
     </div>
@@ -615,7 +615,7 @@
   <div class="bsheet-in">
     <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 data-i18n="exam.label">Dátum skúšky</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <input class="search" id="examDate" type="date" data-i18n-label="exam.label">
-    <p class="hint" data-i18n="exam.hint">Predmet s najbližšou skúškou uvidíš na obrazovke Dnes ako prvý.</p>
+    <p class="hint" data-i18n="exam.hint">Najbližšia skúška sa zobrazí na Dnes ako prvá.</p>
     <div class="actions">
       <button class="btn wide" id="examDone" type="button" data-close data-i18n="exam.done">Hotovo</button>
       <button class="btn ghost danger" id="examClear" type="button" data-i18n="exam.clear">Odstrániť</button>
@@ -629,7 +629,7 @@
     <form class="group" id="newSubjForm" novalidate>
       <label class="label" for="newSubjName" data-i18n="upload.nameLabel">Názov predmetu</label>
       <input class="search" id="newSubjName" type="text" maxlength="80" autocomplete="off" enterkeyhint="done" data-i18n-placeholder="upload.namePlaceholder">
-      <p class="hint" data-i18n="subject.newHint">Materiály, staré skúšky aj vzory môžeš nahrať kedykoľvek neskôr.</p>
+      <p class="hint" data-i18n="subject.newHint">Materiály môžeš pridať kedykoľvek neskôr.</p>
       <p class="err" id="newSubjErr" role="alert" hidden></p>
       <button class="btn wide" id="newSubjSave" type="submit" data-i18n="subject.create">Vytvoriť predmet</button>
     </form>
@@ -673,7 +673,7 @@
     </div>
 
     <div class="group" id="wOffBox" hidden>
-      <p class="tipbox" id="wOffNote" data-i18n="welcome.offNote">Prihlásenie účtu v tejto ukážke nie je pripojené k serveru. Lekto si môžeš vyskúšať lokálne na ukážkovom predmete.</p>
+      <p class="tipbox" id="wOffNote" data-i18n="welcome.offNote">Prihlásenie nie je v tejto verzii pripojené k serveru.</p>
       <button class="btn wide" id="wOffEnter" type="button" data-i18n="welcome.offEnter">Otvoriť ukážkový predmet</button>
     </div>
 
@@ -740,7 +740,7 @@
 <dialog class="bsheet" id="signOutSheet">
   <div class="bsheet-in">
     <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 data-i18n="profile.unsyncedTitle">Neuložené zmeny</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <p class="hint" data-i18n="profile.unsyncedBody">Niektoré odpovede alebo zmeny sa ešte nestihli uložiť do účtu (pravdepodobne si offline). Ak sa teraz odhlásiš, v tomto zariadení sa stratia.</p>
+    <p class="hint" data-i18n="profile.unsyncedBody">Niektoré zmeny ešte nie sú uložené v účte (pravdepodobne si offline). Odhlásením sa v tomto zariadení stratia.</p>
     <div class="stack">
       <button class="btn wide ghost danger" id="signOutForce" type="button" data-i18n="profile.signOutAnyway">Odhlásiť sa a zahodiť zmeny</button>
       <button class="btn wide" type="button" data-close data-i18n="setup.no">Zrušiť</button>
@@ -784,7 +784,7 @@
       <li data-i18n="profile.plusF4">Vzorové príklady: nové podobné úlohy podľa cvičebnice alebo zošita</li>
       <li data-i18n="profile.plusF5">Až 40 skenovaných strán bez textu v jednom súbore</li>
     </ul>
-    <p class="tipbox" id="plusWaitNote" hidden data-i18n="profile.plusWaitNote">Online platby spúšťame čoskoro. Ak chceš Lekto Plus aktivovať už na toto skúškové, ozvi sa nám.</p>
+    <p class="tipbox" id="plusWaitNote" hidden data-i18n="profile.plusWaitNote">Online platby spúšťame čoskoro. Pre skorší prístup sa nám ozvi.</p>
     <button class="btn wide" id="plusCta" type="button" data-i18n="profile.plusCtaAnnual">Aktivovať Lekto Plus · 34,99 € / rok</button>
   </div>
 </dialog>
