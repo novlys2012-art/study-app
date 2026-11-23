@@ -169,6 +169,11 @@
         <span class="bar"><i id="sBar"></i></span>
       </div>
       <button class="chiprow" id="sExam" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="grow" id="sExamText"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      <div class="seg fill" id="sKind" role="group" data-i18n-label="setup.kind" hidden>
+        <button type="button" data-k="all" aria-pressed="true" data-i18n="setup.kindAll">Všetko</button>
+        <button type="button" data-k="quiz" aria-pressed="false" data-i18n="setup.kindQuiz">Kvíz</button>
+        <button type="button" data-k="problem" aria-pressed="false" data-i18n="setup.kindProblems">Príklady</button>
+      </div>
       <div class="actions" id="sActions">
         <button class="btn wide" id="learn" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 8 5.2z"/></svg><span data-i18n="subject.learn">Učiť sa</span></button>
         <button class="btn ghost" id="custom" type="button" data-i18n-label="subject.custom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.4"/><circle cx="8" cy="17" r="2.4"/></svg><span data-i18n="subject.custom">Vlastné kolo</span></button>
@@ -178,6 +183,7 @@
       <button type="button" role="tab" data-tab="overview" aria-selected="true" aria-pressed="true" data-i18n="subject.tabTopics">Témy</button>
       <button type="button" role="tab" data-tab="files" aria-selected="false" aria-pressed="false" data-i18n="study.files">Zhrnutia</button>
       <button type="button" role="tab" data-tab="exams" aria-selected="false" aria-pressed="false" data-i18n="subject.tabExams">Skúšky</button>
+      <button type="button" role="tab" data-tab="templates" aria-selected="false" aria-pressed="false" data-i18n="subject.tabTemplates">Vzory</button>
     </div>
     <div class="stack" id="tabOverview">
       <p class="label" data-i18n="subject.weakFirst">Od najslabšej</p>
@@ -197,6 +203,7 @@
       <p class="hint" id="checked" hidden></p>
     </div>
     <div class="stack" id="tabExams" hidden></div>
+    <div class="stack" id="tabTemplates" hidden></div>
     <div class="empty" id="sEmpty" hidden>
       <span class="empty-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M13 12v6M10 15h6"/></svg></span>
       <p data-i18n="subject.empty">Tento predmet je zatiaľ prázdny.</p>
@@ -216,6 +223,73 @@
     <div class="dock" id="rDock"><button class="btn wide" id="rPractise" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 8 5.2z"/></svg><span data-i18n="reader.practise">Precvičiť túto časť</span></button></div>
   </section>
 
+  <section class="screen" id="template" hidden>
+    <div class="topbar sticky">
+      <button class="iconbtn" id="tpBack" type="button" data-i18n-label="nav.back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="grow"><h1 class="title" id="tpTitle"></h1><p class="hint" id="tpMeta"></p></div>
+    </div>
+    <details class="sheet tpl-ref" id="tpRef">
+      <summary><span data-i18n="templates.refToggle">Vzorové zadanie a postup</span></summary>
+      <div class="group tpl-ref-body">
+        <p class="tpl-prompt" id="tpPrompt"></p>
+        <div class="group" id="tpMethodWrap" hidden>
+          <p class="label" data-i18n="templates.methodLabel">Postup zo vzoru</p>
+          <ol class="prob-steps compact" id="tpMethod"></ol>
+        </div>
+        <div class="group" id="tpExampleWrap" hidden>
+          <p class="label" data-i18n="templates.exampleLabel">Vzorové riešenie</p>
+          <p class="hint tpl-example" id="tpExample"></p>
+        </div>
+        <p class="tipbox" id="tpUnreadable" hidden></p>
+        <button class="btn ghost danger wide" id="tpDel" type="button" data-i18n="templates.delete">Odstrániť tento vzor</button>
+        <div class="confirm" id="tpDelConfirm" hidden>
+          <span data-i18n="templates.deleteConfirm">Odstrániť vzor aj s vygenerovanými príkladmi?</span>
+          <button class="tiny danger" id="tpDelYes" type="button" data-i18n="setup.yes">Vymazať</button>
+          <button class="tiny" id="tpDelNo" type="button" data-i18n="setup.no">Zrušiť</button>
+        </div>
+      </div>
+    </details>
+    <div class="seg fill" id="tpSwitch" role="group" data-i18n-label="templates.variants" hidden>
+      <button type="button" data-v="0" aria-pressed="true" data-i18n="templates.var1">Príklad 1</button>
+      <button type="button" data-v="1" aria-pressed="false" data-i18n="templates.var2">Príklad 2</button>
+    </div>
+    <div class="empty" id="tpEmpty" hidden>
+      <p data-i18n="templates.noneYet">Z tohto vzoru si ešte nevygeneroval žiadny príklad. Vytvoriť môžeš najviac 2 podobné príklady.</p>
+    </div>
+    <div class="prob" id="tpProb" hidden>
+      <p class="q is-prob" id="tpQ"></p>
+      <div class="group" id="tpCheckWrap" hidden>
+        <label class="label" for="tpInput" data-i18n="quiz.probInputLabel">Výsledok (voliteľné)</label>
+        <div class="prob-row">
+          <input class="search prob-input" id="tpInput" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-i18n-placeholder="quiz.probPlaceholder">
+          <span class="prob-unit" id="tpUnit" hidden></span>
+          <button class="btn ghost" id="tpCheck" type="button" data-i18n="quiz.check">Skontrolovať</button>
+        </div>
+        <p class="hint prob-note" id="tpCheckNote" role="status" hidden></p>
+      </div>
+      <div class="prob-hints" id="tpHints" hidden></div>
+      <div class="prob-actions" id="tpActions">
+        <button class="btn ghost" id="tpHintBtn" type="button" hidden></button>
+        <button class="btn ghost" id="tpStepBtn" type="button" hidden></button>
+        <button class="btn plain" id="tpRevealBtn" type="button" data-i18n="templates.revealAll">Zobraziť celý postup</button>
+      </div>
+      <div class="sheet prob-sol" id="tpSol" hidden>
+        <p class="label" data-i18n="quiz.probSteps">Postup riešenia</p>
+        <ol class="prob-steps" id="tpSteps"></ol>
+        <div class="prob-ans" id="tpAnsWrap" hidden>
+          <span class="label" data-i18n="quiz.probAnswer">Výsledok</span>
+          <p id="tpAns"></p>
+        </div>
+        <p class="hint" id="tpExplain" hidden></p>
+      </div>
+    </div>
+    <p class="err" id="tpErr" role="alert" hidden></p>
+    <div class="dock" id="tpDock">
+      <button class="btn wide" id="tpGen" type="button"></button>
+      <p class="hint tpl-limit" id="tpDoneNote" hidden data-i18n="templates.maxReached">Vygenerované oba príklady (2 z 2). Zostávajú uložené aj offline.</p>
+    </div>
+  </section>
+
   <section class="screen" id="quiz" hidden>
     <div class="topbar sticky">
       <button class="iconbtn" id="quit" type="button" data-i18n-label="quiz.quit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -227,6 +301,32 @@
       <p class="q" id="q"></p>
       <p class="multi" id="multi" hidden data-i18n="quiz.multi">Správnych odpovedí môže byť viac. Označ všetky a potom stlač Skontrolovať.</p>
       <div class="opts" id="opts"></div>
+      <div class="prob" id="probBox" hidden>
+        <div class="group" id="pCheckWrap" hidden>
+          <label class="label" for="pInput" data-i18n="quiz.probInputLabel">Výsledok (voliteľné)</label>
+          <div class="prob-row">
+            <input class="search prob-input" id="pInput" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-i18n-placeholder="quiz.probPlaceholder">
+            <span class="prob-unit" id="pUnit" hidden></span>
+            <button class="btn ghost" id="pCheck" type="button" data-i18n="quiz.check">Skontrolovať</button>
+          </div>
+          <p class="hint prob-note" id="pCheckNote" role="status" hidden></p>
+        </div>
+        <div class="prob-hints" id="pHints" hidden></div>
+        <div class="prob-actions" id="pActions">
+          <button class="btn wide" id="pReveal" type="button" data-i18n="quiz.probReveal">Zobraziť postup</button>
+          <button class="btn ghost" id="pHintBtn" type="button" hidden></button>
+        </div>
+        <div class="sheet prob-sol" id="pSol" hidden>
+          <p class="label" data-i18n="quiz.probSteps">Postup riešenia</p>
+          <ol class="prob-steps" id="pSteps"></ol>
+          <div class="prob-ans">
+            <span class="label" data-i18n="quiz.probAnswer">Výsledok</span>
+            <p id="pAns"></p>
+          </div>
+          <p class="hint" id="pExplain" hidden></p>
+          <div class="src" id="pSrc" hidden></div>
+        </div>
+      </div>
       <div class="qactions">
         <button class="btn wide" id="check" type="button" hidden data-i18n="quiz.check">Skontrolovať</button>
         <button class="btn plain" id="idk" type="button" data-i18n="quiz.idk">Neviem</button>
@@ -239,6 +339,8 @@
         <div class="more" id="more"></div>
         <div class="fb-actions">
           <button class="btn ghost" id="openSrc" type="button" hidden data-i18n="quiz.openSource">Pozrieť v zhrnutí</button>
+          <button class="btn ghost prob-no" id="pMissed" type="button" hidden data-i18n="quiz.probMissed">Zopakovať</button>
+          <button class="btn wide prob-ok" id="pGotIt" type="button" hidden data-i18n="quiz.probGotIt">Vyriešil som</button>
           <button class="btn wide" id="next" type="button"></button>
         </div>
       </div>
@@ -330,16 +432,18 @@
           <p class="label" data-i18n="upload.makeLabel">Čo chceš vytvoriť</p>
           <div class="chips" id="upMake">
             <button type="button" data-k="summary" aria-pressed="true" data-i18n="upload.makeSummary">Zhrnutia</button>
-            <button type="button" data-k="quiz" aria-pressed="true" data-i18n="upload.makeQuiz">Otázky na precvičenie</button>
+            <button type="button" data-k="quiz" aria-pressed="true" data-i18n="upload.makeQuiz">Kvíz</button>
+            <button type="button" data-k="problems" aria-pressed="false" data-i18n="upload.makeProblems">Príklady</button>
             <button type="button" data-k="topics" aria-pressed="true" data-i18n="upload.makeTopics">Témy a slabé miesta</button>
           </div>
+          <p class="hint" id="upProbHint" data-i18n="upload.problemsHint">Príklady vytvoria úlohy s nápovedou a postupom – ideálne pre matiku, štatistiku, fyziku či účtovníctvo.</p>
           <div class="seg" id="upAmount">
-            <span class="hint" data-i18n="upload.amountLabel">Počet otázok:</span>
+            <span class="hint" data-i18n="upload.amountLabel">Množstvo:</span>
             <button type="button" data-a="0.5" aria-pressed="false" data-i18n="upload.amountFew">Menej</button>
             <button type="button" data-a="1" aria-pressed="true" data-i18n="upload.amountNormal">Bežne</button>
             <button type="button" data-a="1.5" aria-pressed="false" data-i18n="upload.amountMany">Viac</button>
           </div>
-          <p class="hint" id="upMakeHint" hidden data-i18n="upload.makeNone">Vyber aspoň zhrnutia alebo otázky.</p>
+          <p class="hint" id="upMakeHint" hidden data-i18n="upload.makeNone">Vyber aspoň zhrnutia, kvíz alebo príklady.</p>
         </div>
         <div class="group limit" id="upLimit" hidden>
           <div class="limit-head">
@@ -436,6 +540,14 @@
 <dialog class="bsheet" id="roundSheet">
   <div class="bsheet-in">
     <div class="grab" aria-hidden="true"></div><div class="bsheet-head"><h2 data-i18n="subject.custom">Vlastné kolo</h2><button class="iconbtn" type="button" data-close data-i18n-label="nav.close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="group" id="kindWrap" hidden>
+      <p class="label" data-i18n="setup.kind">Typ precvičenia</p>
+      <div class="seg" id="kinds">
+        <button type="button" data-k="all" aria-pressed="true" data-i18n="setup.kindAll">Všetko</button>
+        <button type="button" data-k="quiz" aria-pressed="false" data-i18n="setup.kindQuiz">Kvíz</button>
+        <button type="button" data-k="problem" aria-pressed="false" data-i18n="setup.kindProblems">Príklady</button>
+      </div>
+    </div>
     <div class="group">
       <p class="label" data-i18n="setup.topic">Téma</p>
       <div class="topics" id="topics"></div>
@@ -443,6 +555,7 @@
     <div class="group">
       <p class="label" data-i18n="setup.count">Počet otázok</p>
       <div class="seg" id="counts">
+        <button type="button" data-n="5" aria-pressed="false">5</button>
         <button type="button" data-n="10" aria-pressed="false">10</button>
         <button type="button" data-n="20" aria-pressed="true">20</button>
         <button type="button" data-n="50" aria-pressed="false">50</button>

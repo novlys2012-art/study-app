@@ -200,6 +200,169 @@ export function parseChecks(reply) {
     .map((c) => ({ i: c.i, verdict: c.verdict, note: String(c.note || "") }));
 }
 
+function parseCheckSpec(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const num = Number(raw.num);
+  if (!Number.isFinite(num)) return null;
+  const tol = Number(raw.tol);
+  return {
+    num,
+    tol: Number.isFinite(tol) && tol >= 0 ? tol : Math.max(1e-4, +(Math.abs(num) * 0.01).toPrecision(2)),
+    unit: typeof raw.unit === "string" ? raw.unit.trim().slice(0, 24) : "",
+  };
+}
+
+// Worked practice problems for quantitative/procedural subjects (math, statistics, physics, accounting, econ, CS).
+export const problemSystem = (lang = "sk") => `You write university exam practice problems (worked exercises to solve step by step on paper) from the source only.
+Create concrete, solvable problems that train applying the formulas, theorems, statistical tests, accounting rules, or algorithms in the source (and reference context, when provided).
+When the source has worked examples, keep the same method and conventions (e.g. sample vs. population variance, notation) but invent fresh, clean numbers so the student practises solving rather than recalling the example's result. Always include every required input, parameter, or critical table value (e.g. z₀,₀₂₅ = 1,96) in the problem statement so it is self-contained.
+If the source is purely descriptive with nothing solvable to compute, derive, book, or work through, write fewer problems or return {"problems":[]}.
+Write in ${langName(lang)}. Use plain readable Unicode for math symbols (e.g. x², √, ∑, ∫, ≤, ≥, ≠, ≈, ±, ×, ÷, μ, σ, x̄, H₀, α), never raw LaTeX. Reply with one JSON object only:
+{"problems":[{"q":"problem statement with all given data","hints":["hint 1: which formula or method applies","hint 2: key setup or first substitution"],"steps":["step 1 with formula and substitution","step 2 with intermediate calculation","step 3 with final conclusion"],"ans":"concise final result","check":{"num":2.45,"tol":0.02,"unit":""},"e":"one or two sentences on why this method applies or the common trap","s":"exact short quote from the source","page":n}]}
+Set "check" to null unless the final answer is a single clear number (or number with a short unit); when set, "num" is a JSON number and "tol" covers sensible rounding. "page" is the number of the page marker like [3] where the quote is.`;
+
+export const problemPrompt = ({ title, text, count = 5, context = "" }) =>
+  `Source: ${title}\n\n<source>\n${text}\n</source>` +
+  (context && context.trim() ? `\n\n<context>\n${context.trim()}\n</context>\nUse formulas, notation, or tables from the context when designing and solving problems about the source.` : "") +
+  `\n\nWrite up to ${count} practice problems.`;
+
+export function parseProblems(reply) {
+  const data = parseJson(reply);
+  const all = Array.isArray(data.problems) ? data.problems : [];
+  const cleanList = (a, max) => (Array.isArray(a) ? a.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim()).slice(0, max) : []);
+  const problems = [];
+  for (const x of all) {
+    if (!x || typeof x.q !== "string" || !x.q.trim() || typeof x.ans !== "string" || !x.ans.trim()) continue;
+    const steps = cleanList(x.steps, 12);
+    if (!steps.length) continue;
+    problems.push({
+      q: x.q.trim(),
+      hints: cleanList(x.hints, 3),
+      steps,
+      ans: x.ans.trim(),
+      check: parseCheckSpec(x.check),
+      e: String(x.e || "").trim(),
+      s: String(x.s || "").trim(),
+      page: Number.isInteger(x.page) ? x.page : null,
+    });
+  }
+  return { problems, dropped: all.length - problems.length };
+}
+
+// Independent verification of worked problems by a stronger model: re-solve from scratch and flag or repair arithmetic slips.
+export const checkProblemSystem = (lang = "sk") => `You independently solve and verify university worked problems against the source.
+For each problem, re-compute the solution from scratch using the formulas and conventions in the source (and reference context, if any).
+Check that: (1) all inputs and critical values needed are given in "q", (2) the method matches the source, and (3) every step, "ans", and numeric "check" are mathematically accurate.
+Verdicts:
+- "ok": problem, steps, ans, and check are all accurate.
+- "wrong": the problem statement "q" is sound and grounded in the source, but the calculation, steps, ans, or check has an error — provide "fix":{"steps":[...],"ans":"...","check":{"num":0,"tol":0.01,"unit":""}|null} in ${langName(lang)} (plain Unicode math, never LaTeX).
+- "ambiguous" or "unsupported": missing data, ill-posed, or not supported by the source (set "fix":null).
+Reply with one JSON object only: {"checks":[{"i":0,"verdict":"ok|wrong|ambiguous|unsupported","note":"short reason in ${langName(lang)}","fix":null}]}`;
+
+export const checkProblemPrompt = ({ text, problems, context = "" }) =>
+  `<source>\n${text}\n</source>` +
+  (context && context.trim() ? `\n\n<context>\n${context.trim()}\n</context>` : "") +
+  `\n\n<problems>\n${JSON.stringify(problems.map(({ q, steps, ans, check }, i) => ({ i, q, steps, ans, check })))}\n</problems>`;
+
+export function parseProblemChecks(reply) {
+  const data = parseJson(reply);
+  return (Array.isArray(data.checks) ? data.checks : [])
+    .filter((c) => Number.isInteger(c.i) && ["ok", "wrong", "ambiguous", "unsupported"].includes(c.verdict))
+    .map((c) => {
+      let fix = null;
+      if (c.fix && typeof c.fix === "object" && typeof c.fix.ans === "string" && c.fix.ans.trim() && Array.isArray(c.fix.steps)) {
+        const steps = c.fix.steps.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim()).slice(0, 12);
+        if (steps.length) fix = { steps, ans: c.fix.ans.trim(), check: parseCheckSpec(c.fix.check) };
+      }
+      return { i: c.i, verdict: c.verdict, note: String(c.note || ""), fix };
+    });
+}
+
+// Worked-example templates: extract reusable problem templates from a student's workbook or own workings.
+export const templateSystem = (lang = "sk") => `You read university worked examples, exercise sheets, or a student's own workings and turn them into reusable problem templates for practising similar problems.
+Extract up to 12 distinct problem types found in the material, in order, written in ${langName(lang)}.
+Keep the course's notation, conventions, and solution method. If the upload contains handwritten workings with an obvious arithmetic slip, capture the intended valid method rather than repeating the slip.
+Use plain readable Unicode for math symbols (e.g. x², √, ∑, ∫, ≤, ≥, ≠, ≈, ±, ×, ÷, μ, σ, x̄, H₀, α), never raw LaTeX.
+Prefer a name from the known topics list when one fits. If part of a page is unreadable, say so in "unreadable" instead of guessing.
+Reply with one JSON object only:
+{"templates":[{"title":"short problem-type name (2 to 7 words)","topic":"short topic name (1 to 4 words)","prompt":"cleaned example problem statement with given data","method":["general step 1","general step 2"],"varies":"what numbers, entities or conditions can change in a new variant","example":"brief worked solution and result from the upload, or empty"}],"unreadable":""}`;
+
+export function templatePrompt({ title, text = "", knownTopics = [], pages = [], context = "" }) {
+  let out = `Material: ${title}\nKnown topics: ${knownTopics.length ? knownTopics.join("; ") : "none yet"}\n`;
+  if (context && context.trim()) out += `\n<context>\n${context.trim()}\n</context>\n`;
+  if (text.trim()) out += `\n<material_text>\n${text}\n</material_text>\n`;
+  if (pages.length) out += `\nPages ${pages.join(", ")} are in the attached images, in this order.\n`;
+  else if (!text.trim()) out += "\nThe material is in the attached page images.\n";
+  return out;
+}
+
+export function parseTemplates(reply) {
+  const data = parseJson(reply);
+  const all = Array.isArray(data.templates) ? data.templates : [];
+  const templates = all
+    .filter((x) => x && typeof x.title === "string" && x.title.trim() && typeof x.prompt === "string" && x.prompt.trim())
+    .slice(0, 12)
+    .map((x) => ({
+      title: x.title.trim().slice(0, 120),
+      topic: typeof x.topic === "string" ? x.topic.trim().slice(0, 80) : "",
+      prompt: x.prompt.trim().slice(0, 2000),
+      method: (Array.isArray(x.method) ? x.method : [])
+        .filter((s) => typeof s === "string" && s.trim())
+        .map((s) => s.trim().slice(0, 400))
+        .slice(0, 8),
+      varies: typeof x.varies === "string" ? x.varies.trim().slice(0, 300) : "",
+      example: typeof x.example === "string" ? x.example.trim().slice(0, 2000) : "",
+    }));
+  return { templates, unreadable: String(data.unreadable || "").slice(0, 400) };
+}
+
+// Generate ONE fresh similar problem from an extracted template (variant 1 or 2).
+// JSON field order puts "steps" before "ans" and "check" so arithmetic is computed before emitting the final answer.
+export const templateProblemSystem = (lang = "sk") => `You create one fresh, self-contained university practice problem modeled directly on a student's worked-example template, in ${langName(lang)}.
+Follow the template's exact problem structure, method, and conventions, but invent new clean numbers, entities, or scenario details so the student genuinely practises the method rather than recalling the example's result.
+Include every required input, parameter, and critical table value (e.g. z₀,₀₂₅ = 1,96) in "q" so the problem can be solved on paper without missing data.
+Work out every calculation carefully in "steps" and include a brief verification check in the final step before writing "ans" and "check".
+Use plain readable Unicode for math symbols (e.g. x², √, ∑, ∫, ≤, ≥, ≠, ≈, ±, ×, ÷, μ, σ, x̄, H₀, α), never raw LaTeX.
+Reply with one JSON object only:
+{"q":"new problem statement with all given data","hints":["hint 1: which rule or formula to start with","hint 2: key setup or substitution"],"steps":["step 1 with formula and substitution","step 2 with intermediate calculation","step 3 with final result and quick check"],"ans":"concise final result","check":{"num":2.45,"tol":0.02,"unit":""},"e":"one or two sentences on the common trap or why this method applies"}
+Set "check" to null unless the final answer is a single clear number (or number with a short unit); when set, "num" is a JSON number and "tol" covers sensible rounding.`;
+
+export function templateProblemPrompt({ template, variant = 1, avoid = "", context = "" }) {
+  const parts = [
+    `Title: ${template.title || ""}`,
+    template.topic ? `Topic: ${template.topic}` : "",
+    `Example problem:\n${template.prompt || ""}`,
+    template.method?.length ? `Method:\n${template.method.map((s, k) => `${k + 1}. ${s}`).join("\n")}` : "",
+    template.varies ? `What can vary: ${template.varies}` : "",
+    template.example ? `Reference example solution:\n${template.example}` : "",
+  ].filter(Boolean).join("\n\n");
+  let out = `<template>\n${parts}\n</template>\n`;
+  if (context && context.trim()) out += `\n<context>\n${context.trim()}\n</context>\n`;
+  out += `\nCreate fresh similar problem (variant ${variant} of 2).`;
+  if (variant === 2 && avoid && avoid.trim()) {
+    out += `\nUse noticeably different numbers/scenario from variant 1:\n<avoid>\n${avoid.trim()}\n</avoid>`;
+  }
+  return out;
+}
+
+export function parseTemplateProblem(reply) {
+  const data = parseJson(reply);
+  const cleanList = (a, max) => (Array.isArray(a) ? a.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim()).slice(0, max) : []);
+  if (!data || typeof data.q !== "string" || !data.q.trim() || typeof data.ans !== "string" || !data.ans.trim()) {
+    throw new Error("Missing problem statement or answer.");
+  }
+  const steps = cleanList(data.steps, 12);
+  if (!steps.length) throw new Error("Missing solution steps.");
+  return {
+    q: data.q.trim(),
+    hints: cleanList(data.hints, 3),
+    steps,
+    ans: data.ans.trim(),
+    check: parseCheckSpec(data.check),
+    e: String(data.e || "").trim(),
+  };
+}
+
 // The topic organiser: one subject's files and questions sorted into topics.
 export const topicSystem = (lang = "sk") => `You organise one subject's course files into study topics for a student, in ${langName(lang)}.
 Use 3 to 8 topics (fewer when there is little material), named the way a course syllabus would name them. Every question belongs to exactly one topic.

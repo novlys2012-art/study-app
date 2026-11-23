@@ -76,3 +76,20 @@ test("buildWrongStudyPack groups missed questions by summary file, extracts matc
   assert.equal(pack.sections[1].title, "Genetika");
   assert.deepEqual(pack.keyTerms.map((k) => k.term), ["Glykolýza"]);
 });
+
+test("buildWrongStudyPack formats missed worked problems with answer and steps", () => {
+  const files = [{ name: "Stat.pdf", title: "Testy", summary: "- **t-test** porovnáva výberový priemer s hodnotou μ₀.", keyTerms: [] }];
+  const wrong = [{
+    kind: "problem",
+    t: "t1",
+    q: "Vypočítaj t-štatistiku pre x̄ = 12, μ₀ = 10, s = 4, n = 16.",
+    steps: ["SE = 4 / √16 = 1", "t = (12 - 10) / 1 = 2"],
+    ans: "t = 2",
+    e: "Delí sa √n, nie n.",
+    s: "t-test porovnáva výberový priemer (Stat.pdf, s. 4)",
+  }];
+  const pack = buildWrongStudyPack(wrong, files, { t1: "Hypotézy" });
+  assert.equal(pack.fileCount, 1);
+  assert.deepEqual(pack.sections[0].items[0].correct, ["t = 2"]);
+  assert.deepEqual(pack.sections[0].items[0].steps, ["SE = 4 / √16 = 1", "t = (12 - 10) / 1 = 2"]);
+});

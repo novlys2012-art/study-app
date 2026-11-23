@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handle, HttpError, limitsFrom, cacheKey, needsStrongCheck } from "../server/generate.js";
 import { buildSubject, stepsFor, retrying, backoff, contextOf, citedForCheck } from "../src/upload/pipeline.js";
-import { parseQuiz, parseTopics, parseVision, parseChecks } from "../ai/tasks.js";
+import { parseQuiz, parseProblems, parseTopics, parseVision, parseChecks, parseProblemChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
 const user = { id: "u1", email: "simon@example.com" };
@@ -381,6 +381,101 @@ test("server: delete_account requires auth and confirm, and works even over limi
   const out = await handle({ task: "delete_account", input: { confirm: true } }, delDeps());
   assert.deepEqual(out, { deleted: true });
   assert.deepEqual(deleted, [user.id]);
+});
+
+test("server & parsers: problems run on fast tier and check_problems runs on strong tier with fix support", async () => {
+  const parsed = parseProblems(JSON.stringify({
+    problems: [
+      { q: "Vypočítaj 2x pre x = 5.", hints: ["Dosadz x = 5", ""], steps: ["2 × 5 = 10"], ans: "10", check: { num: 10, tol: 0.01, unit: "" }, e: "Jednoduché násobenie.", s: "2x", page: 1 },
+      { q: "Bez postupu", steps: [], ans: "1" },
+    ],
+  }));
+  assert.equal(parsed.problems.length, 1);
+  assert.equal(parsed.dropped, 1);
+  assert.deepEqual(parsed.problems[0].hints, ["Dosadz x = 5"]);
+  assert.deepEqual(parsed.problems[0].check, { num: 10, tol: 0.01, unit: "" });
+
+  const checks = parseProblemChecks(JSON.stringify({
+    checks: [
+      { i: 0, verdict: "ok", note: "", fix: null },
+      { i: 1, verdict: "wrong", note: "Chyba v sčítaní", fix: { steps: ["2 + 3 = 5"], ans: "5", check: { num: 5, tol: 0.01, unit: "" } } },
+      { i: 2, verdict: "ambiguous", note: "Chýba údaj", fix: null },
+    ],
+  }));
+  assert.equal(checks.length, 3);
+  assert.equal(checks[0].fix, null);
+  assert.deepEqual(checks[1].fix, { steps: ["2 + 3 = 5"], ans: "5", check: { num: 5, tol: 0.01, unit: "" } });
+
+  const d1 = deps({ text: '{"problems":[{"q":"Nájdi deriváciu x²","hints":["Mocninové pravidlo"],"steps":["(x²)′ = 2x"],"ans":"2x","check":null,"e":"","s":"derivácia","page":1}]}' });
+  const r1 = await handle({ task: "problems", input: { title: "Mat1", text: "[1]\nDerivácia x²", context: "Vzorec: (xⁿ)′ = n·xⁿ⁻¹" } }, d1);
+  assert.equal(d1.calls[0].tier, "fast");
+  assert.match(d1.calls[0].prompt, /<context>/);
+  assert.equal(r1.result.problems.length, 1);
+
+  const d2 = deps({ text: '{"checks":[{"i":0,"verdict":"ok","note":"","fix":null}]}' });
+  await handle({ task: "check_problems", input: { text: "[1]\nDerivácia x²", problems: r1.result.problems } }, d2);
+  assert.equal(d2.calls[0].tier, "strong");
+  assert.equal(d2.calls[0].effort, "medium");
+  await rejects(handle({ task: "check_problems", input: { text: "[1]\nA", problems: [] } }, d2), "bad_input");
+});
+
+test("pipeline: generates, verifies, repairs, drops and preserves worked practice problems", async () => {
+  const docs = [
+    { name: "Stat_01.pdf", pages: ["Výberový priemer x̄ = ∑xᵢ / n a t-test pre strednú hodnotu. ".repeat(15)], images: [] },
+    { name: "Vzorce.pdf", pages: ["t = (x̄ - μ₀) / (s / √n)"], images: [], context: true },
+  ];
+  const log = [];
+  const call = async (task, input) => {
+    log.push(task);
+    if (task === "problems") {
+      assert.match(input.context, /t = \(x̄/);
+      return {
+        problems: [
+          { q: "Vypočítaj priemer z 2, 4, 6.", hints: ["Sčítaj a vydeľ počtom."], steps: ["(2+4+6)/3 = 4"], ans: "4", check: { num: 4, tol: 0.01, unit: "" }, e: "Definícia priemeru.", s: "Výberový priemer", page: 1 },
+          { q: "Vypočítaj priemer z 10, 20.", hints: ["Vydeľ 2."], steps: ["(10+20)/2 = 16"], ans: "16", check: { num: 16, tol: 0.01, unit: "" }, e: "", s: "Výberový priemer", page: 1 },
+          { q: "Neriešiteľný príklad bez dát.", hints: [], steps: ["?"], ans: "?", check: null, e: "", s: "", page: 1 },
+        ],
+      };
+    }
+    if (task === "check_problems") {
+      assert.match(input.context, /t = \(x̄/);
+      return [
+        { i: 0, verdict: "ok", note: "", fix: null },
+        { i: 1, verdict: "wrong", note: "Chyba výpočtu", fix: { steps: ["(10+20)/2 = 15"], ans: "15", check: { num: 15, tol: 0.01, unit: "" } } },
+        { i: 2, verdict: "ambiguous", note: "Chýbajú dáta", fix: null },
+      ];
+    }
+    if (task === "topics") {
+      return { topics: [{ name: "Štatistika", files: ["Stat_01.pdf"], summary: "Priemer a testy.", questions: input.questions.map((x) => x.id), weakSpots: [] }] };
+    }
+    throw new Error("unexpected task: " + task);
+  };
+  const make = { summary: false, quiz: false, problems: true, topics: true };
+  assert.equal(stepsFor(docs, make), 3);
+  const steps = [];
+  const sj = await buildSubject({ name: "Štatistika", docs, call, make, onStep: (d, n) => steps.push([d, n]) });
+  assert.deepEqual(log, ["problems", "check_problems", "topics"]);
+  assert.deepEqual(steps.at(-1), [3, 3]);
+  assert.equal(sj.checkedOut, 1);
+  assert.equal(sj.questions.length, 2);
+  assert.equal(sj.questions[0].kind, "problem");
+  assert.equal(sj.questions[0].ans, "4");
+  assert.equal(sj.questions[1].ans, "15", "repaired by check_problems fix");
+  assert.deepEqual(sj.questions[1].steps, ["(10+20)/2 = 15"]);
+  assert.equal(sj.questions[1].check.num, 15);
+  assert.match(sj.questions[0].s, /\(Stat_01\.pdf, s\. 1\)$/);
+
+  // Adding another file keeps existing problems' kind, steps, ans, check and ids intact.
+  const prevId = sj.questions[0].id;
+  const sj2 = await buildSubject({
+    name: "", existing: sj, docs: [{ name: "Stat_02.pdf", pages: ["Rozptyl s² = ∑(xᵢ-x̄)²/(n-1). ".repeat(15)], images: [] }],
+    make: { summary: false, quiz: false, problems: false, topics: false },
+    call: async () => { throw new Error("no AI calls expected"); },
+  });
+  const kept = sj2.questions.find((x) => x.id === prevId);
+  assert.equal(kept.kind, "problem");
+  assert.deepEqual(kept.steps, ["(2+4+6)/3 = 4"]);
+  assert.equal(kept.ans, "4");
 });
 
 

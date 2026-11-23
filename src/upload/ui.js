@@ -7,6 +7,7 @@ import * as cloud from "../cloud/supabase.js";
 import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, ext } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
+import { readTemplates } from "./templates.js";
 import { icon } from "../app/icons.js";
 import { renderLimit } from "../app/limit.js";
 import { authMessage } from "../app/welcome.js";
@@ -17,11 +18,13 @@ const MAX_FILES = 10;
 const $ = (id) => document.getElementById(id);
 const PANELS = ["upOff", "upLogin", "upConsent", "upForm", "upWork"];
 
-// Picked course files: [{ file: File, context: boolean }]. Past exam mode: [{ files: [File], photos: bool, name, year }].
+// Picked course files: [{ file: File, context: boolean }]. Past exam / template mode: [{ files: [File], photos: bool, name, year }].
 let ctx, picked = [], busy = false, make = { ...DEFAULT_MAKE };
 let exams = [];
 const examMode = () => !!(ctx && ctx.mode === "exams");
-const onlyContext = () => !examMode() && picked.length > 0 && picked.every((x) => x.context);
+const templateMode = () => !!(ctx && ctx.mode === "templates");
+const photoMode = () => examMode() || templateMode();
+const onlyContext = () => !photoMode() && picked.length > 0 && picked.every((x) => x.context);
 try { make = { ...make, ...JSON.parse(localStorage.getItem(MAKE_KEY)) }; } catch (e) {}
 
 // The subject the files go into, when adding to one that exists.
@@ -58,6 +61,7 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 function message(e) {
   if (e instanceof ExtractError) return t("upload.err." + e.code, e.vars);
   if (e && e.code === "no_questions") return t("upload.err.no_questions");
+  if (e && e.code === "no_templates") return t("upload.err.no_templates");
   if (e instanceof cloud.CloudError) {
     const k = "upload.err." + e.code;
     return t(k) === k ? t("upload.err.server", { msg: e.message }) : t(k, { msg: e.message });
@@ -68,13 +72,23 @@ function message(e) {
 // The monthly limit as a structured quota meter. The plan counts pages later; for now the cap is in dollars.
 function showUsage(u) { renderLimit($("upLimit"), u, t); }
 
+function goLabel() {
+  if (examMode()) return t("upload.goExams");
+  if (templateMode()) return t("upload.goTemplates");
+  if (ctx?.target) return t("upload.goAdd");
+  if (onlyContext()) return t("upload.goContext");
+  if (make.problems && !make.quiz) return t("upload.goProblems");
+  return t("upload.go");
+}
+
 function renderMake() {
   const onlyCtx = onlyContext();
+  const hasPractice = !!(make.quiz || make.problems);
   [...$("upMake").children].forEach((b) => b.setAttribute("aria-pressed", !!make[b.dataset.k]));
   [...$("upAmount").querySelectorAll("button")].forEach((b) => b.setAttribute("aria-pressed", +b.dataset.a === make.amount));
-  $("upMakeBox").hidden = examMode() || onlyCtx;
-  $("upAmount").hidden = !make.quiz;
-  $("upMakeHint").hidden = make.summary || make.quiz || onlyCtx;
+  $("upMakeBox").hidden = photoMode() || onlyCtx;
+  $("upAmount").hidden = !hasPractice;
+  $("upMakeHint").hidden = make.summary || hasPractice || onlyCtx;
   try { localStorage.setItem(MAKE_KEY, JSON.stringify(make)); } catch (e) {}
 }
 
@@ -89,7 +103,7 @@ async function refresh() {
   removeSamples();
   if (ctx.target && !loadSubjects().some((x) => x.id === ctx.target)) {
     ctx.target = null;
-    if (examMode()) ctx.mode = "files";
+    if (photoMode()) ctx.mode = "files";
     $("upTitle").textContent = t("upload.title");
     $("upLede").textContent = t("upload.lede");
   }
@@ -98,9 +112,9 @@ async function refresh() {
   let agreed = false; try { agreed = localStorage.getItem(CONSENT_KEY) === "1"; } catch (e) {}
   if (!agreed) { panel("upConsent"); return; }
   $("upWho").textContent = t("upload.signedIn", { email: s.user.email || "" });
-  $("upFiles").accept = examMode() ? ACCEPT_EXAMS : ACCEPT_FILES;
-  $("upFilesHint").textContent = t(examMode() ? "upload.examsHint" : "upload.filesHint");
-  $("upMakeBox").hidden = examMode();
+  $("upFiles").accept = photoMode() ? ACCEPT_EXAMS : ACCEPT_FILES;
+  $("upFilesHint").textContent = t(examMode() ? "upload.examsHint" : templateMode() ? "upload.templatesHint" : "upload.filesHint");
+  $("upMakeBox").hidden = photoMode();
   renderSubjects(); step(1);
   panel("upForm"); renderMake(); renderPicked();
   try { showUsage((await cloud.call("usage", {}, getLang())).usage); } catch (e) { error(message(e)); }
@@ -112,26 +126,31 @@ function renderSubjects() {
   if (ctx.target && !all.some((x) => x.id === ctx.target)) ctx.target = null;
   sel.replaceChildren(...all.map((x) => new Option(x.name, x.id)), new Option(t("upload.newSubject"), ""));
   sel.value = ctx.target || "";
-  $("upSubjectBox").hidden = !all.length || examMode();
+  $("upSubjectBox").hidden = !all.length || photoMode();
   $("upNameBox").hidden = !!ctx.target;
-  $("upGo").textContent = t(examMode() ? "upload.goExams" : ctx.target ? "upload.goAdd" : "upload.go");
+  $("upGo").textContent = goLabel();
 }
 
-// Each exam to read, with its year (guessed from the file name, the student can change it).
+// Each exam (with year) or worked-example template source to read.
 function renderExams() {
   const ul = $("upList"); ul.innerHTML = "";
+  const isExam = examMode();
   exams.forEach((x, k) => {
     const li = el("li", "up-file");
-    const year = el("input", "search year");
-    Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, placeholder: t("upload.year"), value: x.year || "" });
-    year.setAttribute("aria-label", t("upload.yearOf", { name: x.name }));
-    year.oninput = () => { const y = parseInt(year.value, 10); x.year = y >= 1990 && y <= 2100 ? y : null; };
     const name = x.photos ? t("upload.photoExam", { name: x.name, n: x.files.length }) : x.name;
     const rm = el("button", "iconbtn small"); rm.type = "button";
     rm.setAttribute("aria-label", t("upload.remove") + ": " + name); rm.appendChild(icon("x"));
     rm.onclick = () => { exams.splice(k, 1); renderPicked(); };
     const art = el("span", "file-art"); art.appendChild(icon("doc"));
-    li.append(art, el("span", "grow", name), year, rm);
+    li.append(art, el("span", "grow", name));
+    if (isExam) {
+      const year = el("input", "search year");
+      Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, placeholder: t("upload.year"), value: x.year || "" });
+      year.setAttribute("aria-label", t("upload.yearOf", { name: x.name }));
+      year.oninput = () => { const y = parseInt(year.value, 10); x.year = y >= 1990 && y <= 2100 ? y : null; };
+      li.appendChild(year);
+    }
+    li.appendChild(rm);
     ul.appendChild(li);
   });
   $("upCtxWrap").hidden = true;
@@ -144,7 +163,7 @@ function renderExams() {
 }
 
 function renderPicked() {
-  if (examMode()) { renderExams(); return; }
+  if (photoMode()) { renderExams(); return; }
   const ul = $("upList"); ul.innerHTML = "";
   const tip = t("upload.contextHint");
   picked.forEach((item, k) => {
@@ -168,9 +187,9 @@ function renderPicked() {
     $("upCtxTip").setAttribute("aria-expanded", "false");
   }
   const onlyCtx = onlyContext();
-  $("upGo").textContent = t(ctx?.target ? "upload.goAdd" : onlyCtx ? "upload.goContext" : "upload.go");
+  $("upGo").textContent = goLabel();
   const ready = picked.length && (ctx.target || $("upName").value.trim());
-  const ok = ready && (make.summary || make.quiz || onlyCtx);
+  const ok = ready && (make.summary || make.quiz || make.problems || onlyCtx);
   $("upNext").disabled = !ready;
   $("upGo").disabled = !ok;
 }
@@ -243,13 +262,69 @@ async function runExams() {
   }
 }
 
+async function runTemplates() {
+  const into = target();
+  if (busy || !into || !exams.length) return;
+  busy = true; error(""); panel("upWork");
+  const setFile = fileList(exams.map((x) => x.name));
+  exams.forEach((_, k) => setFile(k, "wait"));
+  const progress = (pct, label) => {
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    $("upBar").style.width = pct + "%"; $("upPct").textContent = pct + " %";
+    if (label) $("upStep").textContent = label;
+  };
+  $("upEta").textContent = "";
+  try {
+    const items = [];
+    for (const [k, x] of exams.entries()) {
+      progress((k / exams.length) * 10, t("upload.reading", { name: x.name }));
+      setFile(k, "reading");
+      let doc;
+      try { doc = x.photos ? await extractPhotos(x.files) : await extractFile(x.files[0], { minChars: 40, preferImages: true }); }
+      catch (e) { setFile(k, "failed"); throw new Error(x.name + ": " + message(e)); }
+      setFile(k, "read");
+      items.push({ doc, name: x.name });
+    }
+    const call = async (task, input) => {
+      const out = await cloud.call(task, input, getLang());
+      showUsage(out.usage);
+      return out.result;
+    };
+    const knownTopics = Object.keys(into.topics || {}).filter((k) => k !== "t0").map((k) => into.topics[k]);
+    const { templates: all, added, failed } = await readTemplates({
+      items, knownTopics, earlier: into.templates || [], context: contextOf(into.files), call,
+      onFile: (k, phase) => setFile(k, phase),
+      onRetry: () => { $("upStep").textContent = t("upload.retrying"); },
+      onStep: (done, total) => progress(10 + (done / total) * 90, t(done === total ? "upload.finishing" : "upload.templatesWorking", { done, total })),
+    });
+    saveSubjects(loadSubjects().map((x) => (x.id === into.id ? { ...x, templates: all } : x)));
+    progress(100);
+    $("upFiles").value = "";
+    if (failed.length) {
+      const left = new Set(failed.map((f) => f.index));
+      exams = exams.filter((_, k) => left.has(k));
+      step(2); panel("upForm"); renderPicked();
+      error(t("upload.partialTemplates", { done: added, failed: failed.map((f) => f.name).join(", "), reason: message(failed[0].error) }));
+      return;
+    }
+    exams = [];
+    ctx.opened(into.id, "templates");
+  } catch (e) {
+    step(2); panel("upForm"); renderPicked();
+    error(e instanceof Error && !(e instanceof cloud.CloudError) && !(e instanceof ExtractError) && !e.code ? e.message : message(e));
+  } finally {
+    busy = false;
+  }
+}
+
 async function run() {
   if (examMode()) return runExams();
+  if (templateMode()) return runTemplates();
   if (busy) return;
   const into = target();
   const name = into ? into.name : $("upName").value.trim();
   const onlyCtx = onlyContext();
-  if (!name || !picked.length || !(make.summary || make.quiz || onlyCtx)) return;
+  if (!name || !picked.length || !(make.summary || make.quiz || make.problems || onlyCtx)) return;
   busy = true; error(""); panel("upWork");
   const setFile = fileList(picked.map((x) => x.file.name));
   picked.forEach((_, k) => setFile(k, "wait"));
@@ -342,8 +417,8 @@ function wire() {
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
     error("");
-    if (examMode()) {
-      // Every file is one exam; photos picked together are the pages of one exam, in name order.
+    if (photoMode()) {
+      // Every file is one exam/workbook; photos picked together are the pages of one item, in name order.
       const files = [...$("upFiles").files];
       const photos = files.filter((f) => PHOTO_TYPES.includes(ext(f.name))).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       files.filter((f) => !photos.includes(f)).forEach((f) => {

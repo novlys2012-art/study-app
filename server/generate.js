@@ -15,7 +15,10 @@ const MAX_TEXT = 60_000;          // characters per request, about 15k tokens
 const MAX_IMAGES = 6;             // pages per vision request
 const MAX_IMAGE_CHARS = 1_500_000; // base64 per page, about 1.1 MB
 const MAX_QUESTIONS = 40;
+const MAX_PROBLEMS = 20;
 const MAX_CONTEXT = 30_000;
+const MAX_TEMPLATE_CONTEXT = 6_000;
+const MAX_AVOID = 800;
 
 export class HttpError extends Error {
   constructor(status, code, message) { super(message || code); this.status = status; this.code = code; }
@@ -117,6 +120,13 @@ const TASKS = {
       prompt: T.quizPrompt({ title: title(input.title), text: text(input.text), count: Math.min(15, Math.max(1, input.count | 0 || 10)), context: ctxText(input.context) }),
     }),
   },
+  problems: {
+    tier: "fast", maxTokens: 12000, parse: T.parseProblems,
+    build: (input, lang) => ({
+      system: T.problemSystem(lang),
+      prompt: T.problemPrompt({ title: title(input.title), text: text(input.text), count: Math.min(10, Math.max(1, input.count | 0 || 5)), context: ctxText(input.context) }),
+    }),
+  },
   check: {
     tier: "fast", maxTokens: 4000, parse: T.parseChecks,
     build(input, lang) {
@@ -129,6 +139,64 @@ const TASKS = {
         ...(strong ? { effort: "medium" } : {}),
         system: T.checkSystem(lang),
         prompt: text(T.checkPrompt({ text: src, questions: qs, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000),
+      };
+    },
+  },
+  check_problems: {
+    tier: "strong", effort: "medium", maxTokens: 8000, parse: T.parseProblemChecks,
+    build(input, lang) {
+      const ps = input.problems;
+      if (!Array.isArray(ps) || !ps.length || ps.length > MAX_PROBLEMS) throw new HttpError(400, "bad_input", "Bad problems.");
+      const src = text(input.text);
+      return {
+        system: T.checkProblemSystem(lang),
+        prompt: text(T.checkProblemPrompt({ text: src, problems: ps, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 25_000),
+      };
+    },
+  },
+  // Worked-example templates: extract reusable problem templates from a workbook or student's workings.
+  template: {
+    tier: "strong", effort: "medium", maxTokens: 12000, parse: T.parseTemplates,
+    build(input, lang) {
+      const images = pictures(input.images ?? []);
+      const body = typeof input.text === "string" ? input.text : "";
+      if (body.length > MAX_TEXT) throw new HttpError(413, "too_large", `Text over ${MAX_TEXT} characters.`);
+      if (!body.trim() && !images.length) throw new HttpError(400, "bad_input", "No template text or pages.");
+      return {
+        system: T.templateSystem(lang),
+        prompt: T.templatePrompt({ title: title(input.title), text: body, knownTopics: names(input.knownTopics), pages: images.length && body.trim() ? images.map((im) => im.page) : [], context: ctxText(input.context) }),
+        images: images.map((im) => ({ mediaType: im.mediaType, data: im.data })),
+      };
+    },
+  },
+  // Generate one fresh similar problem from an extracted template (strictly capped at variant 1 or 2).
+  template_problem: {
+    tier: "fast", maxTokens: 6000, parse: T.parseTemplateProblem,
+    build(input, lang) {
+      const variant = input.variant;
+      if (variant !== 1 && variant !== 2) throw new HttpError(400, "bad_input", "Variant must be 1 or 2.");
+      const raw = input.template;
+      if (!raw || typeof raw !== "object" || typeof raw.prompt !== "string" || !raw.prompt.trim()) {
+        throw new HttpError(400, "bad_input", "Missing template.");
+      }
+      const tpl = {
+        title: String(raw.title || "").trim().slice(0, 120),
+        topic: String(raw.topic || "").trim().slice(0, 80),
+        prompt: raw.prompt.trim().slice(0, 2000),
+        method: (Array.isArray(raw.method) ? raw.method : []).filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim().slice(0, 400)).slice(0, 8),
+        varies: String(raw.varies || "").trim().slice(0, 300),
+        example: String(raw.example || "").trim().slice(0, 2000),
+      };
+      const avoid = variant === 2 && typeof input.avoid === "string" ? input.avoid.trim().slice(0, MAX_AVOID) : "";
+      const context = ctxText(input.context).slice(0, MAX_TEMPLATE_CONTEXT);
+      const joined = [tpl.title, tpl.prompt, ...tpl.method, tpl.example].join("\n");
+      const strong = needsStrongCheck({ text: joined, questions: [{ q: joined, o: [] }] }) ||
+        /\d+(?:[.,]\d+)?\s*(?:%|€|\$|Kč|EUR|CZK)\b|\b(?:zaúčtuj|účtuj|odpis|úrok|elasticit|rozptyl|odchýlk|odchylk|pravdepodobn|pravděpodobn)/i.test(joined);
+      return {
+        tier: strong ? "strong" : "fast",
+        ...(strong ? { effort: "medium" } : {}),
+        system: T.templateProblemSystem(lang),
+        prompt: T.templateProblemPrompt({ template: tpl, variant, avoid, context }),
       };
     },
   },

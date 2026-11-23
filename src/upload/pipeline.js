@@ -57,6 +57,7 @@ export function retrying(call, { base = 2000, sleep = (ms) => new Promise((r) =>
 }
 const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, k) => a.slice(k * n, k * n + n));
 const questionCount = (text) => Math.max(3, Math.min(12, Math.round(text.length / 3000)));
+const problemCount = (text) => Math.max(2, Math.min(6, Math.round(text.length / 5000)));
 
 const normQuote = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -101,12 +102,12 @@ export function contextOf(files = [], max = CONTEXT_MAX) {
     .slice(0, max);
 }
 
-// What the student chose to make. Questions are checked whenever they are made.
-export const DEFAULT_MAKE = { summary: true, quiz: true, topics: true, amount: 1 };
+// What the student chose to make. Questions and problems are checked whenever they are made.
+export const DEFAULT_MAKE = { summary: true, quiz: true, problems: false, topics: true, amount: 1 };
 const AMOUNT = { 0.5: 0.5, 1: 1, 1.5: 1.5 };
 
 export function stepsFor(docs, make = DEFAULT_MAKE) {
-  const perSection = (make.summary ? 1 : 0) + (make.quiz ? 2 : 0);
+  const perSection = (make.summary ? 1 : 0) + (make.quiz ? 2 : 0) + (make.problems ? 2 : 0);
   const hasMain = docs.some((d) => !d.context);
   return docs.reduce((s, d) => s + Math.ceil(d.images.length / VISION_BATCH) + (d.context ? 0 : toSections(d.pages).length * perSection), 0) + (make.topics && hasMain ? 1 : 0);
 }
@@ -156,20 +157,43 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
     const sections = toSections(pages);
     const parts = await each(sections, PARALLEL, async (sec) => {
       const label = sections.length > 1 ? `${d.name} (${sec.from}–${sec.to})` : d.name;
-      const [sum, quiz] = await settled([
+      const [sum, quiz, probs] = await settled([
         make.summary ? call("summary", { title: label, text: sec.text, ...ctxArg }).finally(step) : null,
         make.quiz ? call("quiz", { title: label, text: sec.text, count: Math.max(2, Math.round(questionCount(sec.text) * factor)), ...ctxArg }).finally(step) : { questions: [] },
+        make.problems ? call("problems", { title: label, text: sec.text, count: Math.max(1, Math.min(10, Math.round(problemCount(sec.text) * factor))), ...ctxArg }).finally(step) : { problems: [] },
       ]);
-      let qs = quiz.questions, out = 0;
-      if (qs.length) {
-        const cited = citedForCheck(sec, pages, qs, visionPages);
-        const checks = await call("check", { text: cited.text, questions: qs, ...(cited.fromVision ? { fromVision: true } : {}), ...ctxArg });
-        const bad = new Set(checks.filter((c) => c.verdict !== "ok").map((c) => c.i));
-        out = qs.filter((_, i) => bad.has(i)).length;
-        qs = qs.filter((_, i) => !bad.has(i));
-      }
-      if (make.quiz) step();
-      return { sum: sum || { title: "", summary: "", keyTerms: [] }, qs, out };
+      const [quizRes, probRes] = await settled([
+        (async () => {
+          let qs = quiz.questions || [], out = 0;
+          if (qs.length) {
+            const cited = citedForCheck(sec, pages, qs, visionPages);
+            const checks = await call("check", { text: cited.text, questions: qs, ...(cited.fromVision ? { fromVision: true } : {}), ...ctxArg });
+            const bad = new Set(checks.filter((c) => c.verdict !== "ok").map((c) => c.i));
+            out = qs.filter((_, i) => bad.has(i)).length;
+            qs = qs.filter((_, i) => !bad.has(i));
+          }
+          if (make.quiz) step();
+          return { qs, out };
+        })(),
+        (async () => {
+          const raw = probs.problems || [];
+          let ps = [], out = 0;
+          if (raw.length) {
+            const cited = citedForCheck(sec, pages, raw, visionPages);
+            const checks = await call("check_problems", { text: cited.text, problems: raw, ...ctxArg });
+            const byIdx = new Map(checks.map((c) => [c.i, c]));
+            raw.forEach((p, i) => {
+              const c = byIdx.get(i);
+              if (!c || c.verdict === "ok") ps.push({ ...p, kind: "problem" });
+              else if (c.verdict === "wrong" && c.fix) ps.push({ ...p, kind: "problem", steps: c.fix.steps, ans: c.fix.ans, check: c.fix.check });
+              else out++;
+            });
+          }
+          if (make.problems) step();
+          return { ps, out };
+        })(),
+      ]);
+      return { sum: sum || { title: "", summary: "", keyTerms: [] }, qs: [...quizRes.qs, ...probRes.ps], out: quizRes.out + probRes.out };
     });
 
     const summary = parts.map((p) => p.sum.summary.trim()).filter(Boolean).join("\n\n");
@@ -249,7 +273,18 @@ export async function buildSubject({ name, docs, call, onStep = () => {}, onFile
   // A question keeps the id it was made with; only new questions get one.
   const used = new Set(prev.map((x) => x.id).filter(Boolean));
   const fresh = () => { let id; do id = questionId(); while (used.has(id)); used.add(id); return id; };
-  const questions = both.map(({ q, o, a, e, x, s, ref, id }) => ({ t: of.get(ref) || "t0", q, o, a, e, x, s, id: id || fresh() }));
+  const questions = both.map((item) => {
+    const t = of.get(item.ref) || "t0";
+    const id = item.id || fresh();
+    if (item.kind === "problem") {
+      return {
+        t, kind: "problem", q: item.q, hints: item.hints || [], steps: item.steps || [],
+        ans: item.ans || "", check: item.check ?? null, e: item.e || "", s: item.s || "", id,
+      };
+    }
+    const { q, o, a, e, x, s } = item;
+    return { t, q, o, a, e, x, s, id };
+  });
   if (existing) {
     return {
       ...existing, topics: topicNames, topicInfo, files: allFiles, questions,

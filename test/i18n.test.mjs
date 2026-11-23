@@ -19,7 +19,7 @@ test("every UI string key is defined in sk.json, and every sk.json key is used",
   const plurals = [...code.matchAll(/\bplural\("([^"]+)"/g)].map((m) => m[1]);
   plurals.forEach((b) => ["one", "few", "many"].forEach((f) => used.add(b + "." + f)));
   // Keys picked at runtime from a list, e.g. t(k) over ["setup.statSeen", ...] or t(cond ? "a" : "b").
-  for (const m of code.matchAll(/"((?:home|subject|setup|quiz|end|upload|study|today|exams?|nav|profile|reader)\.[A-Za-z_.]*[A-Za-z_])"/g)) used.add(m[1]);
+  for (const m of code.matchAll(/"((?:home|subject|setup|quiz|end|upload|study|today|exams?|templates|nav|profile|reader)\.[A-Za-z_.]*[A-Za-z_])"/g)) used.add(m[1]);
   // Keys built from an error code, t("upload.err." + e.code): the prefix is skipped, every key under it counts as used.
   for (const k of Object.keys(sk)) if (k.startsWith("upload.err.")) used.add(k);
   plurals.forEach((b) => used.delete(b));

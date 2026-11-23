@@ -1,5 +1,7 @@
 // The small part of Markdown the summaries use (## headings, - bullets, **bold**), built as DOM nodes
 // with textContent, so AI text can never inject markup.
+import { isProblem, correctAnswers } from "./problems.js";
+
 function inline(parent, text) {
   text.split(/(\*\*[^*]+\*\*)/g).forEach((part) => {
     if (!part) return;
@@ -71,9 +73,8 @@ export function summaryBlocks(src) {
   return out;
 }
 
-// Builds an ephemeral, zero-AI study summary referencing missed quiz questions and their matching summary excerpts.
+// Builds an ephemeral, zero-AI study summary referencing missed quiz questions or problems and their matching summary excerpts.
 export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
-  const corrOf = (x) => (Array.isArray(x.a) ? x.a : [x.a]);
   const sectionsMap = new Map();
   const blockCache = new Map();
   const matchedFiles = new Set();
@@ -88,7 +89,7 @@ export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
       sec = { fi, title: f ? (f.title || f.name) : (topics[x.t] || ""), fileName: f ? f.name : "", items: [] };
       sectionsMap.set(key, sec);
     }
-    const correct = corrOf(x).map((k) => x.o?.[k]).filter(Boolean);
+    const correct = correctAnswers(x);
     const quote = stripSourceMeta(x.s);
     const extras = [x.e, x.q, ...correct].filter(Boolean);
     let excerpt = "", phrase = "";
@@ -102,6 +103,7 @@ export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
     sec.items.push({
       q: x.q || "",
       correct,
+      steps: isProblem(x) && Array.isArray(x.steps) ? x.steps : [],
       explanation: x.e || "",
       example: x.x || "",
       topicName: topics[x.t] || "",

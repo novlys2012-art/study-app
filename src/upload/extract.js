@@ -53,7 +53,8 @@ async function render(page) {
   return canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
 }
 
-async function pdf(buf) {
+// Short worked-example PDFs (<= 6 pages) can render every page as an image so formulas and tables stay intact.
+async function pdf(buf, { preferImages = false } = {}) {
   const lib = await loadPdf();
   const task = lib.getDocument({ data: new Uint8Array(buf) });
   const doc = await task.promise;
@@ -64,10 +65,11 @@ async function pdf(buf) {
     raw.push(content.items.map((it) => (it.str || "") + (it.hasEOL ? "\n" : "")).join(""));
   }
   const pages = stripRepeated(raw);
+  const renderAll = preferImages && pages.length <= 6;
   const images = [];
   let skipped = 0;
   for (let n = 1; n <= pages.length; n++) {
-    if (words(pages[n - 1]).length >= MIN_TEXT) continue;
+    if (!renderAll && words(pages[n - 1]).length >= MIN_TEXT) continue;
     if (images.length >= MAX_PICTURES) { skipped++; continue; }
     images.push({ page: n, mediaType: "image/jpeg", data: await render(await doc.getPage(n)) });
   }
@@ -134,14 +136,14 @@ export async function extractPhotos(files) {
 
 // file: a File from <input type="file">. Returns { name, pages: [text], images: [{ page, mediaType, data }], skipped }.
 // minChars: less text than this (and no picture pages) means the file is empty; an old exam can be short.
-export async function extractFile(file, { minChars = 200 } = {}) {
+export async function extractFile(file, { minChars = 200, preferImages = false } = {}) {
   const type = ext(file.name);
   if (!TYPES.includes(type)) throw new ExtractError("type", { types: TYPES.join(", ") });
   if (file.size > MAX_BYTES) throw new ExtractError("tooBig", { mb: MAX_BYTES / 1048576 });
   const buf = await file.arrayBuffer();
   const name = file.name.replace(/\.[^.]+$/, "");
   let out;
-  if (type === ".pdf") out = await pdf(buf);
+  if (type === ".pdf") out = await pdf(buf, { preferImages });
   else if (type === ".pptx") out = await pptx(buf);
   else if (type === ".docx") out = await docx(buf);
   else out = { pages: splitPages(new TextDecoder().decode(buf)), images: [], skipped: 0 };

@@ -5,6 +5,7 @@ import { t, getLang, setLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
+import { isProblem, correctAnswers, checkNumericAnswer } from "./problems.js";
 import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
 import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
@@ -24,6 +25,7 @@ const THEME_KEY = "studyapp-theme";
 const LAST_KEY = "studyapp-last-subject";
 const ENTERED_KEY = "studyapp-entered";
 const ROUND = 20;      // questions in a "learn" round
+const PROBLEM_ROUND = 6; // worked problems in a problem-only round
 const SEARCH_FROM = 4; // summaries before the search box shows
 const L = "ABCD";
 // Options that refer to other options ("none of the above", "a) and b)") keep their order.
@@ -36,9 +38,10 @@ const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLo
 let SUBJECTS = [];
 let CUR = null, QUESTIONS = [], TOPICS = {}, LOG = [];
 let picked = new Set();
-let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", order = [];
+let list = [], i = 0, score = 0, wrong = [], answered = false, count = "20", topic = "all", mode = "all", kind = "all", order = [];
+let probRevealed = false, probHintsShown = 0, probNumOk = null;
 let P = {};
-let tab = "overview", sortBy = "order", query = "", openTopic = null;
+let tab = "overview", sortBy = "order", query = "", openTopic = null, subjectKind = "all";
 let roundOf = null;   // what "next round" repeats: a topic key, RANKED, or null for the whole subject
 const RANKED = "@exams"; // a round in the order of the past exam ranking
 let stage = "quiz";   // the quiz entry shows a question ("quiz") or the result ("end")
@@ -48,6 +51,13 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 function button(cls, text, onclick) { const b = el("button", cls, text); b.type = "button"; b.onclick = onclick; return b; }
 // Slovak and Czech plurals: base.one (1), base.few (2 to 4), base.many (0, 5 and more).
 const plural = (base, n, vars) => t(base + (n === 1 ? ".one" : n >= 2 && n <= 4 ? ".few" : ".many"), { n, ...vars });
+const filterKind = (qs, k) => (k === "quiz" ? qs.filter((x) => !isProblem(x)) : k === "problem" ? qs.filter(isProblem) : qs);
+const hasBothKinds = (qs) => qs.some(isProblem) && qs.some((x) => !isProblem(x));
+const roundLimit = (qs) => (qs.length && qs.every(isProblem) ? PROBLEM_ROUND : ROUND);
+function itemCountText(qs) {
+  const p = qs.filter(isProblem).length, q = qs.length - p;
+  return [q ? plural("exams.q", q) : "", p ? plural("subject.problems", p) : ""].filter(Boolean).join(" · ");
+}
 function bar(pct) { const b = el("span", "bar"), fill = el("i"); fill.style.width = pct + "%"; b.appendChild(fill); return b; }
 initNativeShell();
 trackKeyboardViewport();
@@ -59,10 +69,11 @@ registerServiceWorker();
 // "<subject>/read/<file number>", "<subject>/quiz". history.state.d counts the steps taken inside the app,
 // so back() knows whether there is somewhere to go back to. An open bottom sheet is an entry too.
 
-const SCREENS = ["welcome", "today", "home", "subject", "reader", "quiz", "end", "upload", "profile"];
+const SCREENS = ["welcome", "today", "home", "subject", "reader", "template", "quiz", "end", "upload", "profile"];
 const TAB_OF = { today: "today", home: "home", subject: "home", profile: "profile" };
 const scrolls = new Map();
 let dir = "fade", shown = null, screen = null, skipPop = false, booted = false, readerHint = null, readerFocus = null;
+let tpId = null, tpIdx = 0, tpHintsShown = 0, tpStepsShown = 0, tpAllRevealed = false, tpBusy = false;
 const hasEntered = () => {
   if (/[?&]autostart=1\b/.test(location.search)) return true;
   try { return localStorage.getItem(ENTERED_KEY) === "1"; } catch (e) { return false; }
@@ -124,6 +135,7 @@ function route() {
   else if (h === "signin" || h === "signup") showWelcome(true);
   else if (h.startsWith("upload/")) showUpload(h.slice(7));
   else if (h.startsWith("exams/")) showUpload(h.slice(6), false, "exams");
+  else if (h.startsWith("templates/")) showUpload(h.slice(10), false, "templates");
   else if (h === "upload" || code) { markEntered(); showUpload(); }
   else if (h === "subjects") { markEntered(); showHome(); }
   else if (h === "profile") { markEntered(); showProfile(); }
@@ -132,10 +144,12 @@ function route() {
     const [, sub, arg] = h.slice(sj.id.length).split("/");
     enter(sj);
     const file = sub === "read" ? (sj.files || [])[+arg] : null;
+    const tpl = sub === "template" ? (sj.templates || []).find((x) => x.id === arg) : null;
     if (sub === "quiz" && !list.length) { go(sj.id, true); return; }
     if (sub === "review" && !wrong.length) { go(sj.id, true); return; }
     if (sub === "quiz") { if (stage === "end") showEnd(); else showQuiz(); }
     else if (sub === "review") showWrongReview();
+    else if (tpl) showTemplate(tpl);
     else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
     else showSubject();
   } else if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome(false);
@@ -177,7 +191,7 @@ onHardwareBack(() => {
   if (screen === "quiz") { $("quit").click(); return; }
   if (screen === "end") { leaveQuiz(); return; }
   if (depth() > 0) { history.back(); return; }
-  if (screen === "reader" || screen === "upload") { go(CUR ? CUR.id : "", true); return; }
+  if (screen === "reader" || screen === "template" || screen === "upload") { go(CUR ? CUR.id : "", true); return; }
   if (screen === "subject") { go("subjects", true); return; }
   if (screen === "home" || screen === "profile") { go("", true); return; }
   minimizeApp();
@@ -281,7 +295,7 @@ function renderToday() {
   const soon = withQ.filter((r) => r.d != null && r.d >= 0).sort((a, b) => a.d - b.d)[0];
   const hero = soon || withQ.find((r) => r.sj.id === last) || withQ[0];
   if (hero) {
-    const plan = dailyPlan(hero.sj.questions, hero.log, hero.sj.exam, { roundSize: ROUND });
+    const plan = dailyPlan(hero.sj.questions, hero.log, hero.sj.exam, { roundSize: roundLimit(hero.sj.questions) });
     const c = el("div", "sheet hero");
     const open = button("hero-open", null, () => go(hero.sj.id));
     const names = el("span", "grow");
@@ -374,7 +388,7 @@ function showHome() {
 // ===== One subject
 
 function enter(sj) {
-  if (!CUR || CUR.id !== sj.id) { topic = "all"; mode = "all"; list = []; query = ""; tab = "overview"; openTopic = null; }
+  if (!CUR || CUR.id !== sj.id) { topic = "all"; mode = "all"; kind = "all"; subjectKind = "all"; list = []; query = ""; tab = "overview"; openTopic = null; }
   CUR = sj; QUESTIONS = sj.questions; TOPICS = sj.topics;
   LOG = readLog(sj);
   P = readProgress(sj);
@@ -387,19 +401,34 @@ const topicKeys = () => Object.keys(TOPICS).filter((k) => {
 });
 
 function renderSubject() {
-  const st = stats(QUESTIONS, LOG), files = summaries().length, fc = subjectFileCounts(CUR.files);
+  const mixed = hasBothKinds(QUESTIONS);
+  if (!mixed) subjectKind = "all";
+  const activeQs = filterKind(QUESTIONS, subjectKind);
+  const st = stats(activeQs, LOG), files = summaries().length, fc = subjectFileCounts(CUR.files);
   $("sName").textContent = CUR.name;
+  const templates = CUR.templates || [];
   $("sMeta").textContent = [
-    st.total ? plural("exams.q", st.total) : "",
+    itemCountText(QUESTIONS),
     fc.summaries ? t("subject.summaries", { n: fc.summaries }) : "",
     fc.context ? t("subject.contextCount", { n: fc.context }) : "",
+    templates.length ? plural("templates.count", templates.length) : "",
   ].filter(Boolean).join(" · ");
   // Only the tabs that have something to show.
   const exams = CUR.exams || [];
-  const has = { overview: topicKeys().length > 0, files: files > 0, exams: st.total > 0 || exams.length > 0 };
+  const hasAny = QUESTIONS.length > 0 || files > 0 || exams.length > 0 || templates.length > 0;
+  const has = { overview: topicKeys().length > 0, files: files > 0, exams: QUESTIONS.length > 0 || exams.length > 0, templates: hasAny };
   const open = Object.keys(has).filter((k) => has[k]);
   $("sCard").hidden = !open.length;
-  $("sStat").hidden = !st.total; $("sActions").hidden = !st.total;
+  $("sStat").hidden = !QUESTIONS.length; $("sActions").hidden = !QUESTIONS.length;
+  $("sKind").hidden = !mixed;
+  if (mixed) {
+    const btns = [...$("sKind").children];
+    btns.forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === subjectKind));
+    $("sKind").style.setProperty("--n", btns.length);
+    $("sKind").style.setProperty("--i", Math.max(0, btns.findIndex((b) => b.dataset.k === subjectKind)));
+  }
+  const onlyProbs = subjectKind === "problem" || (QUESTIONS.length > 0 && QUESTIONS.every(isProblem));
+  $("learn").lastElementChild.textContent = t(onlyProbs ? "subject.learnProblems" : "subject.learn");
   $("sPct").textContent = pctLabel(st);
   $("sDue").textContent = dueText(st);
   $("sBar").style.width = st.pct + "%";
@@ -418,11 +447,14 @@ function renderSubject() {
   $("tabOverview").hidden = tab !== "overview" || !has.overview;
   $("tabFiles").hidden = tab !== "files" || !has.files;
   $("tabExams").hidden = tab !== "exams" || !has.exams;
+  $("tabTemplates").hidden = tab !== "templates" || !has.templates;
   if (!$("tabOverview").hidden) renderOverview();
   if (!$("tabFiles").hidden) renderFiles();
   if (!$("tabExams").hidden) renderExams();
+  if (!$("tabTemplates").hidden) renderTemplates();
 }
 function showSubject() { renderSubject(); show("subject"); }
+$("sKind").onclick = (e) => { const b = e.target.closest("button"); if (b && b.dataset.k !== subjectKind) { subjectKind = b.dataset.k; renderSubject(); } };
 $("sTabs").onclick = (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderSubject(); } };
 $("sBack").onclick = () => back("subjects");
 $("sEmptyAdd").onclick = () => openUpload(CUR.id);
@@ -430,9 +462,11 @@ $("sEmptyAdd").onclick = () => openUpload(CUR.id);
 // Topics from the weakest. A topic opens to its summary, weak spots and a button that practises it.
 function renderOverview() {
   const info = CUR.topicInfo || {};
-  const rows = topicKeys().map((k) => ({ k, st: stats(QUESTIONS.filter((x) => x.t === k), LOG), it: info[k] || {} }))
-    .sort((a, b) => (a.st.total ? a.st.pct : 101) - (b.st.total ? b.st.pct : 101));
-  $("tbars").replaceChildren(...rows.map(({ k, st, it }) => {
+  const rows = topicKeys().map((k) => {
+    const tQs = filterKind(QUESTIONS.filter((x) => x.t === k), subjectKind);
+    return { k, tQs, st: stats(tQs, LOG), it: info[k] || {} };
+  }).sort((a, b) => (a.st.total ? a.st.pct : 101) - (b.st.total ? b.st.pct : 101));
+  $("tbars").replaceChildren(...rows.map(({ k, tQs, st, it }) => {
     const c = el("div", "tcard" + (openTopic === k ? " open" : ""));
     const head = button("tbar", null, () => {
       openTopic = openTopic === k ? null : k;
@@ -443,7 +477,7 @@ function renderOverview() {
     if (st.total) top.append(el("span", "pct", st.pct + " %"));
     top.append(icon("down", "chev"));
     head.appendChild(top);
-    if (st.total) head.append(bar(st.pct), el("span", "hint", plural("exams.q", st.total) + " · " + dueText(st)));
+    if (st.total) head.append(bar(st.pct), el("span", "hint", itemCountText(tQs) + " · " + dueText(st)));
     const body = el("div", "tbody"), inner = el("div", "tbody-in");
     if (it.summary) inner.appendChild(el("p", null, it.summary));
     const weak = it.weakSpots || [];
@@ -639,6 +673,285 @@ function openPastExam(id) {
   pastSheet(ex.name, nodes);
 }
 
+// ===== Worked-example templates: upload a workbook or own workings, generate up to 2 similar problems
+
+const MAX_TPL_PROBLEMS = 2;
+
+function saveTemplates(templates, msg) {
+  CUR.templates = templates;
+  saveSubjects(loadSubjects().map((x) => (x.id === CUR.id ? { ...x, templates } : x)));
+  if (msg) toast(t(msg));
+}
+
+function addTemplatesButton(label, cls) {
+  const b = button(cls, null, () => openUpload(CUR.id, "templates"));
+  b.append(icon("plus"), el("span", null, t(label)));
+  return b;
+}
+
+function renderTemplates() {
+  const box = $("tabTemplates"), templates = CUR.templates || [];
+  if (!templates.length) {
+    const c = el("div", "empty");
+    const art = el("span", "empty-art"); art.appendChild(icon("doc"));
+    c.append(art, el("p", null, t("templates.emptyText")), addTemplatesButton("templates.add", "btn"));
+    box.replaceChildren(c);
+    return;
+  }
+  const listBox = el("div", "list");
+  templates.forEach((tpl) => {
+    const count = (tpl.problems || []).length;
+    const b = button("rowcard file", null, () => go(CUR.id + "/template/" + tpl.id));
+    const g = el("span", "grow"), art = el("span", "file-art");
+    art.appendChild(icon("doc"));
+    const meta = [tpl.topic, tpl.source, t("templates.generated", { n: count, max: MAX_TPL_PROBLEMS })].filter(Boolean).join(" · ");
+    g.append(el("span", "rc-title", tpl.title), el("span", "hint", meta));
+    b.append(art, g, icon("chev", "chev"));
+    listBox.appendChild(b);
+  });
+  box.replaceChildren(el("p", "label", t("templates.listLabel")), listBox, addTemplatesButton("templates.addMore", "btn wide ghost"));
+}
+
+function currentTemplate() {
+  return (CUR && (CUR.templates || []).find((x) => x.id === tpId)) || null;
+}
+
+function resetTemplateProgress() {
+  tpHintsShown = 0; tpStepsShown = 0; tpAllRevealed = false;
+  $("tpInput").value = ""; $("tpInput").disabled = false; $("tpInput").removeAttribute("aria-invalid");
+  $("tpCheck").disabled = false;
+  $("tpCheckNote").hidden = true; $("tpCheckNote").textContent = ""; $("tpCheckNote").className = "hint prob-note";
+  $("tpHints").innerHTML = ""; $("tpHints").hidden = true;
+}
+
+function renderTemplateProblem(tpl) {
+  const probs = tpl.problems || [];
+  const hasProbs = probs.length > 0;
+  const sw = $("tpSwitch");
+  sw.hidden = probs.length < 2;
+  if (probs.length >= 2) {
+    const btns = [...sw.children];
+    btns.forEach((b, k) => b.setAttribute("aria-pressed", k === tpIdx ? "true" : "false"));
+    sw.style.setProperty("--n", btns.length);
+    sw.style.setProperty("--i", Math.max(0, Math.min(tpIdx, btns.length - 1)));
+  }
+  $("tpEmpty").hidden = hasProbs;
+  $("tpProb").hidden = !hasProbs;
+
+  const genBtn = $("tpGen");
+  const atMax = probs.length >= MAX_TPL_PROBLEMS;
+  genBtn.hidden = atMax;
+  $("tpDoneNote").hidden = !atMax;
+  if (!atMax) {
+    genBtn.disabled = tpBusy;
+    const nextN = probs.length + 1;
+    genBtn.textContent = tpBusy
+      ? t("templates.generating")
+      : nextN === 1
+        ? t("templates.genFirst", { max: MAX_TPL_PROBLEMS })
+        : t("templates.genSecond", { n: nextN, max: MAX_TPL_PROBLEMS });
+  }
+
+  if (!hasProbs) return;
+  const p = probs[tpIdx] || probs[0];
+  $("tpQ").textContent = p.q;
+  const hasCheck = Boolean(p.check && typeof p.check.num === "number" && Number.isFinite(p.check.num));
+  $("tpCheckWrap").hidden = !hasCheck;
+  $("tpUnit").textContent = p.check?.unit || "";
+  $("tpUnit").hidden = !(p.check && p.check.unit);
+
+  const hints = Array.isArray(p.hints) ? p.hints : [];
+  const hintBtn = $("tpHintBtn");
+  const canHint = !tpAllRevealed && hints.length > 0 && tpHintsShown < hints.length;
+  hintBtn.hidden = !canHint;
+  if (canHint) {
+    hintBtn.textContent = tpHintsShown === 0
+      ? t("quiz.probHint", { n: hints.length })
+      : t("quiz.probNextHint", { i: tpHintsShown + 1, n: hints.length });
+  }
+
+  const steps = Array.isArray(p.steps) ? p.steps : [];
+  const stepBtn = $("tpStepBtn");
+  const revealBtn = $("tpRevealBtn");
+  const moreSteps = !tpAllRevealed && tpStepsShown < steps.length;
+  stepBtn.hidden = !moreSteps;
+  if (moreSteps) {
+    stepBtn.textContent = t("templates.nextStep", { i: tpStepsShown + 1, n: steps.length });
+  }
+  revealBtn.hidden = tpAllRevealed;
+  $("tpActions").hidden = hintBtn.hidden && stepBtn.hidden && revealBtn.hidden;
+
+  const shownSteps = tpAllRevealed ? steps : steps.slice(0, tpStepsShown);
+  const ol = $("tpSteps"); ol.innerHTML = "";
+  shownSteps.forEach((s) => ol.appendChild(el("li", null, s)));
+  $("tpAns").textContent = p.ans || "";
+  $("tpAnsWrap").hidden = !tpAllRevealed;
+  $("tpExplain").textContent = p.e || "";
+  $("tpExplain").hidden = !tpAllRevealed || !p.e;
+  $("tpSol").hidden = !shownSteps.length && !tpAllRevealed;
+}
+
+function showTemplate(tpl) {
+  const changedTpl = tpId !== tpl.id;
+  tpId = tpl.id;
+  const probs = tpl.problems || [];
+  if (changedTpl) {
+    tpIdx = Math.max(0, probs.length - 1);
+    resetTemplateProgress();
+  } else if (tpIdx >= probs.length) {
+    tpIdx = Math.max(0, probs.length - 1);
+  }
+  $("tpTitle").textContent = tpl.title;
+  $("tpMeta").textContent = [tpl.topic, tpl.source].filter(Boolean).join(" · ");
+  $("tpPrompt").textContent = tpl.prompt || "";
+  const method = tpl.method || [];
+  $("tpMethod").replaceChildren(...method.map((s) => el("li", null, s)));
+  $("tpMethodWrap").hidden = !method.length;
+  $("tpExample").textContent = tpl.example || "";
+  $("tpExampleWrap").hidden = !tpl.example;
+  $("tpUnreadable").textContent = tpl.unreadable ? t("exams.unreadable", { what: tpl.unreadable }) : "";
+  $("tpUnreadable").hidden = !tpl.unreadable;
+  $("tpRef").open = !probs.length;
+  $("tpDel").hidden = false;
+  $("tpDelConfirm").hidden = true;
+  $("tpErr").hidden = true; $("tpErr").textContent = "";
+  renderTemplateProblem(tpl);
+  show("template");
+}
+
+function templateErrorText(e) {
+  if (e && e.code) {
+    const k = "upload.err." + e.code;
+    if (t(k) !== k) return t(k, { msg: e.message || "" });
+  }
+  return t("upload.err.server", { msg: (e && e.message) || String(e) });
+}
+
+$("tpBack").onclick = () => back(CUR ? CUR.id : "subjects");
+$("tpSwitch").onclick = (e) => {
+  const b = e.target.closest("button");
+  const tpl = currentTemplate();
+  if (!b || !tpl) return;
+  const next = +b.dataset.v;
+  if (next === tpIdx || next < 0 || next >= (tpl.problems || []).length) return;
+  tpIdx = next;
+  resetTemplateProgress();
+  renderTemplateProblem(tpl);
+};
+$("tpHintBtn").onclick = () => {
+  const tpl = currentTemplate();
+  const p = tpl && (tpl.problems || [])[tpIdx];
+  if (!p || tpAllRevealed) return;
+  const hints = Array.isArray(p.hints) ? p.hints : [];
+  if (tpHintsShown >= hints.length) return;
+  const row = el("div", "prob-hint");
+  row.append(el("span", "label", t("quiz.probHintN", { n: tpHintsShown + 1 })), el("p", null, hints[tpHintsShown]));
+  $("tpHints").appendChild(row);
+  $("tpHints").hidden = false;
+  tpHintsShown++;
+  renderTemplateProblem(tpl);
+};
+$("tpStepBtn").onclick = () => {
+  const tpl = currentTemplate();
+  const p = tpl && (tpl.problems || [])[tpIdx];
+  if (!p || tpAllRevealed) return;
+  const steps = Array.isArray(p.steps) ? p.steps : [];
+  tpStepsShown = Math.min(steps.length, tpStepsShown + 1);
+  if (tpStepsShown >= steps.length) tpAllRevealed = true;
+  renderTemplateProblem(tpl);
+};
+$("tpRevealBtn").onclick = () => {
+  const tpl = currentTemplate();
+  const p = tpl && (tpl.problems || [])[tpIdx];
+  if (!p) return;
+  tpStepsShown = (p.steps || []).length;
+  tpAllRevealed = true;
+  renderTemplateProblem(tpl);
+};
+$("tpCheck").onclick = () => {
+  const tpl = currentTemplate();
+  const p = tpl && (tpl.problems || [])[tpIdx];
+  if (!p || !p.check) return;
+  const raw = $("tpInput").value.trim();
+  if (!raw) { $("tpRevealBtn").click(); return; }
+  const res = checkNumericAnswer(raw, p.check);
+  if (res == null) {
+    $("tpInput").setAttribute("aria-invalid", "true");
+    $("tpCheckNote").textContent = t("quiz.probInvalidNum");
+    $("tpCheckNote").className = "hint prob-note bad";
+    $("tpCheckNote").hidden = false;
+    $("tpInput").focus();
+    return;
+  }
+  $("tpCheckNote").textContent = t(res ? "quiz.probMatch" : "quiz.probMismatch");
+  $("tpCheckNote").className = "hint prob-note " + (res ? "good" : "bad");
+  $("tpCheckNote").hidden = false;
+  haptic(res ? "success" : "error");
+};
+$("tpInput").oninput = () => { $("tpInput").removeAttribute("aria-invalid"); $("tpCheckNote").hidden = true; };
+$("tpInput").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("tpCheck").click(); } };
+$("tpDel").onclick = () => { $("tpDel").hidden = true; $("tpDelConfirm").hidden = false; };
+$("tpDelNo").onclick = () => { $("tpDel").hidden = false; $("tpDelConfirm").hidden = true; };
+$("tpDelYes").onclick = () => {
+  if (!CUR || !tpId) return;
+  const next = (CUR.templates || []).filter((x) => x.id !== tpId);
+  saveTemplates(next, "templates.deletedToast");
+  tab = "templates";
+  back(CUR.id);
+};
+$("tpGen").onclick = async () => {
+  const tpl = currentTemplate();
+  if (!tpl || tpBusy || (tpl.problems || []).length >= MAX_TPL_PROBLEMS) return;
+  const sid = CUR.id, tid = tpl.id;
+  tpBusy = true;
+  $("tpErr").hidden = true; $("tpErr").textContent = "";
+  renderTemplateProblem(tpl);
+  try {
+    const [cloud, mod, pipe] = await Promise.all([
+      import("../cloud/supabase.js"),
+      import("../upload/templates.js"),
+      import("../upload/pipeline.js"),
+    ]);
+    if (!cloud.configured) throw Object.assign(new Error(t("upload.off")), { uiMsg: t("upload.off") });
+    const s = await cloud.session();
+    if (!s) throw Object.assign(new Error(t("templates.needSignIn")), { uiMsg: t("templates.needSignIn") });
+    const call = async (task, input) => (await cloud.call(task, input, getLang())).result;
+    const prob = await mod.generateSimilarProblem({ tpl, context: pipe.contextOf(CUR.files), call });
+    // Save against latest subject snapshot so navigating back mid-request never loses the generated problem.
+    const all = loadSubjects();
+    const updated = all.map((sj) => sj.id !== sid ? sj : {
+      ...sj,
+      templates: (sj.templates || []).map((x) => x.id !== tid ? x : {
+        ...x,
+        problems: (x.problems || []).concat(prob).slice(0, MAX_TPL_PROBLEMS),
+      }),
+    });
+    saveSubjects(updated);
+    if (CUR && CUR.id === sid) {
+      CUR = updated.find((x) => x.id === sid) || CUR;
+      if (screen === "template" && tpId === tid) {
+        const fresh = currentTemplate();
+        if (fresh) {
+          tpIdx = Math.max(0, (fresh.problems || []).length - 1);
+          resetTemplateProgress();
+          $("tpRef").open = false;
+          renderTemplateProblem(fresh);
+          haptic("success");
+        }
+      }
+    }
+  } catch (e) {
+    if (screen === "template" && tpId === tid) {
+      $("tpErr").textContent = e && e.uiMsg ? e.uiMsg : templateErrorText(e);
+      $("tpErr").hidden = false;
+    }
+  } finally {
+    tpBusy = false;
+    const latest = currentTemplate();
+    if (screen === "template" && latest) renderTemplateProblem(latest);
+  }
+};
+
 // ===== Summary reader
 
 function showReader(f, fileIndex = -1) {
@@ -672,7 +985,7 @@ function showReader(f, fileIndex = -1) {
   const qs = QUESTIONS.filter((x) => x.s && x.s.includes("(" + f.name));
   $("rDock").hidden = !qs.length;
   $("rPractise").lastElementChild.textContent = t("reader.practise");
-  $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, LOG)); };
+  $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, LOG, roundLimit(qs))); };
   $("rProg").style.width = "0";
   show("reader");
 }
@@ -710,6 +1023,11 @@ function showWrongReview() {
       const ans = el("p", "rev-a");
       ans.append(el("strong", null, t("end.rightAnswer")), document.createTextNode(it.correct.join(" · ")));
       card.appendChild(ans);
+      if (it.steps && it.steps.length) {
+        const ol = el("ol", "prob-steps compact");
+        it.steps.forEach((s) => ol.appendChild(el("li", null, s)));
+        card.appendChild(ol);
+      }
       if (it.explanation) card.appendChild(el("p", "rev-e", it.explanation));
       if (it.example) {
         const ex = el("p", "rev-e");
@@ -755,20 +1073,24 @@ window.addEventListener("scroll", () => {
 
 // ===== Rounds: "learn" and the custom round sheet
 
-function learn(topicKey = null, n = ROUND) {
+function learn(topicKey = null, n = null) {
   roundOf = topicKey;
+  const base = filterKind(QUESTIONS, subjectKind);
   if (topicKey === RANKED) {
-    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), QUESTIONS, P, n);
+    const src = base.length ? base : QUESTIONS;
+    const qs = rankedRound(rankExams(CUR.exams || [], TOPICS), src, P, n || roundLimit(src));
     if (qs.length) start(qs);
     return;
   }
-  const qs = topicKey ? QUESTIONS.filter((x) => x.t === topicKey) : QUESTIONS;
-  if (qs.length) start(smartRound(qs, LOG, n, topicKey ? [] : examTopicOrder(CUR)));
+  const qs = topicKey ? base.filter((x) => x.t === topicKey) : base;
+  const src = qs.length ? qs : (topicKey ? QUESTIONS.filter((x) => x.t === topicKey) : QUESTIONS);
+  if (src.length) start(smartRound(src, LOG, n || roundLimit(src), topicKey ? [] : examTopicOrder(CUR)));
 }
 $("learn").onclick = () => learn();
 
 function pool() {
-  let l = topic === "all" ? QUESTIONS : QUESTIONS.filter((x) => x.t === topic);
+  const byKind = filterKind(QUESTIONS, kind);
+  let l = topic === "all" ? byKind : byKind.filter((x) => x.t === topic);
   if (mode === "new") l = l.filter((x) => !P[x.id]);
   if (mode === "wrong") l = l.filter((x) => P[x.id] && P[x.id].l === 0);
   return l;
@@ -780,10 +1102,12 @@ function updAvail() {
     : t(mode === "wrong" ? "setup.noWrong" : "setup.allSeen");
   $("go").disabled = !n;
 }
-$("custom").onclick = () => {
+function renderCustomTopics() {
+  const base = filterKind(QUESTIONS, kind);
+  if (topic !== "all" && !base.some((x) => x.t === topic)) topic = "all";
   const box = $("topics"); box.innerHTML = "";
-  const rows = [["all", t("setup.allTopics"), QUESTIONS.length]]
-    .concat(Object.keys(TOPICS).map((k) => [k, TOPICS[k], QUESTIONS.filter((x) => x.t === k).length]).filter((r) => r[2]));
+  const rows = [["all", t("setup.allTopics"), base.length]]
+    .concat(Object.keys(TOPICS).map((k) => [k, TOPICS[k], base.filter((x) => x.t === k).length]).filter((r) => r[2]));
   rows.forEach(([k, name, n]) => {
     const lab = el("label", "topic");
     const inp = document.createElement("input"); inp.type = "radio"; inp.name = "topic"; inp.value = k; inp.id = "topic-" + k; inp.checked = k === topic;
@@ -791,8 +1115,22 @@ $("custom").onclick = () => {
     lab.append(inp, el("span", null, name), el("span", "n", n));
     box.appendChild(lab);
   });
+}
+$("custom").onclick = () => {
+  const mixed = hasBothKinds(QUESTIONS);
+  kind = mixed ? subjectKind : "all";
+  $("kindWrap").hidden = !mixed;
+  [...$("kinds").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.k === kind));
+  renderCustomTopics();
   [...$("modes").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === mode));
   updAvail(); openSheet($("roundSheet"));
+};
+$("kinds").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  kind = b.dataset.k;
+  [...$("kinds").children].forEach((x) => x.setAttribute("aria-pressed", x === b));
+  renderCustomTopics();
+  updAvail();
 };
 $("modes").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
@@ -877,23 +1215,69 @@ function showQuiz() {
 // Back to where the round was started from: the subject, a summary or Today.
 function leaveQuiz() { list = []; back(CUR.id); }
 function setPos() { $("pos").textContent = t("quiz.pos", { i: i + 1, n: list.length }); }
+function updateHintBtn(x) {
+  const hints = Array.isArray(x.hints) ? x.hints : [];
+  const btn = $("pHintBtn");
+  if (!hints.length || probHintsShown >= hints.length) { btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.textContent = probHintsShown === 0
+    ? t("quiz.probHint", { n: hints.length })
+    : t("quiz.probNextHint", { i: probHintsShown + 1, n: hints.length });
+}
+
+function showNextHint() {
+  const x = list[i];
+  if (!isProblem(x) || probRevealed || answered) return;
+  const hints = Array.isArray(x.hints) ? x.hints : [];
+  if (probHintsShown >= hints.length) return;
+  const row = el("div", "prob-hint");
+  row.append(el("span", "label", t("quiz.probHintN", { n: probHintsShown + 1 })), el("p", null, hints[probHintsShown]));
+  $("pHints").appendChild(row);
+  $("pHints").hidden = false;
+  probHintsShown++;
+  updateHintBtn(x);
+}
+
 function render() {
   const x = list[i]; answered = false;
-  $("qtopic").textContent = TOPICS[x.t] || "";
+  const prob = isProblem(x);
+  $("qtopic").textContent = [TOPICS[x.t] || "", prob ? t("quiz.problemBadge") : ""].filter(Boolean).join(" · ");
   setPos();
   $("pg").style.width = (i / list.length) * 100 + "%";
   $("q").textContent = x.q;
-  const multi = Array.isArray(x.a); picked = new Set();
-  $("multi").hidden = !multi; $("check").hidden = !multi; $("check").disabled = true; $("idk").hidden = false;
-  order = x.o.map((_, k) => k);
-  if (!x.o.some((o) => PIN.test(o))) order = shuffle(order);
-  const box = $("opts"); box.innerHTML = "";
-  order.forEach((oi, k) => {
-    const b = el("button", "opt"); b.type = "button";
-    if (multi) b.setAttribute("aria-pressed", "false");
-    b.append(el("span", "k", L[k]), el("span", "t", x.o[oi]));
-    b.onclick = () => answer(k); box.appendChild(b);
-  });
+  $("q").classList.toggle("is-prob", prob);
+  $("qKeys").textContent = t(prob ? "quiz.probKeys" : "quiz.keys");
+  const qActions = $("qBody").querySelector(".qactions");
+  if (prob) {
+    probRevealed = false; probHintsShown = 0; probNumOk = null;
+    $("multi").hidden = true; $("opts").hidden = true; $("opts").innerHTML = "";
+    $("check").hidden = true; $("idk").hidden = true; qActions.hidden = true;
+    $("probBox").hidden = false;
+    const hasCheck = Boolean(x.check && typeof x.check.num === "number" && Number.isFinite(x.check.num));
+    $("pCheckWrap").hidden = !hasCheck;
+    $("pInput").value = ""; $("pInput").disabled = false; $("pInput").removeAttribute("aria-invalid");
+    $("pCheck").disabled = false;
+    $("pUnit").textContent = x.check?.unit || ""; $("pUnit").hidden = !(x.check && x.check.unit);
+    $("pCheckNote").hidden = true; $("pCheckNote").textContent = ""; $("pCheckNote").className = "hint prob-note";
+    $("pHints").innerHTML = ""; $("pHints").hidden = true;
+    updateHintBtn(x);
+    $("pActions").hidden = false;
+    $("pSol").hidden = true;
+  } else {
+    $("probBox").hidden = true; $("opts").hidden = false; qActions.hidden = false;
+    const multi = Array.isArray(x.a); picked = new Set();
+    $("multi").hidden = !multi; $("check").hidden = !multi; $("check").disabled = true; $("idk").hidden = false;
+    order = x.o.map((_, k) => k);
+    if (!x.o.some((o) => PIN.test(o))) order = shuffle(order);
+    const box = $("opts"); box.innerHTML = "";
+    order.forEach((oi, k) => {
+      const b = el("button", "opt"); b.type = "button";
+      if (multi) b.setAttribute("aria-pressed", "false");
+      b.append(el("span", "k", L[k]), el("span", "t", x.o[oi]));
+      b.onclick = () => answer(k); box.appendChild(b);
+    });
+  }
+  $("pMissed").hidden = true; $("pGotIt").hidden = true; $("next").hidden = false;
   $("fb").hidden = true; $("quiz").style.paddingBottom = "";
   // The new question slides in.
   const body = $("qBody"); body.classList.remove("swap"); void body.offsetWidth; body.classList.add("swap");
@@ -914,8 +1298,70 @@ const sourceFile = (x) => sourceFileIndex(x, CUR ? CUR.files : []);
 function openQuestionSource(x) {
   const fi = sourceFile(x);
   if (fi < 0) return;
-  readerHint = { fi, quote: stripSourceMeta(x.s), extras: [x.e, x.q, ...corr(x).map((k) => x.o[k])].filter(Boolean) };
+  readerHint = { fi, quote: stripSourceMeta(x.s), extras: [x.e, x.q, ...correctAnswers(x)].filter(Boolean) };
   go(CUR.id + "/read/" + fi);
+}
+function checkProblemInput() {
+  const x = list[i];
+  if (!isProblem(x) || probRevealed || answered) return;
+  const raw = $("pInput").value.trim();
+  if (!raw) { revealProblem(); return; }
+  const res = checkNumericAnswer(raw, x.check);
+  if (res == null) {
+    $("pInput").setAttribute("aria-invalid", "true");
+    $("pCheckNote").textContent = t("quiz.probInvalidNum");
+    $("pCheckNote").className = "hint prob-note bad";
+    $("pCheckNote").hidden = false;
+    $("pInput").focus();
+    return;
+  }
+  probNumOk = res;
+  $("pInput").disabled = true; $("pCheck").disabled = true;
+  $("pCheckNote").textContent = t(res ? "quiz.probMatch" : "quiz.probMismatch");
+  $("pCheckNote").className = "hint prob-note " + (res ? "good" : "bad");
+  $("pCheckNote").hidden = false;
+  haptic(res ? "success" : "error");
+  revealProblem();
+}
+function revealProblem() {
+  const x = list[i];
+  if (!isProblem(x) || probRevealed || answered) return;
+  probRevealed = true;
+  $("pActions").hidden = true;
+  const steps = $("pSteps"); steps.innerHTML = "";
+  (x.steps || []).forEach((s) => steps.appendChild(el("li", null, s)));
+  $("pAns").textContent = x.ans || "";
+  $("pExplain").textContent = x.e || "";
+  $("pExplain").hidden = !x.e;
+  $("pSrc").textContent = x.s ? t("quiz.source") + x.s : "";
+  $("pSrc").hidden = !x.s;
+  $("pSol").hidden = false;
+
+  const fb = $("fb");
+  fb.className = "fb " + (probNumOk === true ? "good" : probNumOk === false ? "bad" : "grade");
+  $("verdict").textContent = t(probNumOk === true ? "quiz.probNumOk" : probNumOk === false ? "quiz.probNumBad" : "quiz.probRate");
+  $("more").innerHTML = ""; $("more").hidden = true;
+  const fi = sourceFile(x);
+  $("openSrc").hidden = fi < 0;
+  $("openSrc").onclick = fi >= 0 ? () => openQuestionSource(x) : null;
+  $("next").hidden = true;
+  $("pMissed").hidden = false;
+  $("pGotIt").hidden = false;
+  fb.hidden = false;
+  $("quiz").style.paddingBottom = fb.offsetHeight + 16 + "px";
+  (probNumOk === false ? $("pMissed") : $("pGotIt")).focus({ preventScroll: true });
+}
+function gradeProblem(ok) {
+  if (answered || !probRevealed) return;
+  answered = true;
+  const x = list[i];
+  if (ok) score++; else wrong.push(x);
+  const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
+  logAnswer(CUR, x.id, ok);
+  LOG = readLog(CUR);
+  haptic(ok ? "success" : "error");
+  i++;
+  i < list.length ? render() : finish();
 }
 function grade(sel) {
   answered = true;
@@ -954,6 +1400,12 @@ function grade(sel) {
 }
 $("check").onclick = () => { if (!answered && picked.size) grade(new Set(picked)); };
 $("idk").onclick = () => { if (!answered) grade(new Set()); };
+$("pHintBtn").onclick = showNextHint;
+$("pCheck").onclick = checkProblemInput;
+$("pInput").oninput = () => { $("pInput").removeAttribute("aria-invalid"); $("pCheckNote").hidden = true; };
+$("pReveal").onclick = revealProblem;
+$("pGotIt").onclick = () => gradeProblem(true);
+$("pMissed").onclick = () => gradeProblem(false);
 $("next").onclick = () => { i++; i < list.length ? render() : finish(); };
 // ✕ ends the round: with answers it shows the result so far, without any it just leaves.
 $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.length ? finish() : leaveQuiz(); };
@@ -974,7 +1426,7 @@ function showEnd() {
   wrong.forEach((x) => {
     const li = el("li");
     if (TOPICS[x.t]) li.appendChild(el("span", "eyebrow", TOPICS[x.t]));
-    li.append(el("div", "miss-q", x.q), el("div", "a", t("end.rightAnswer") + corr(x).map((k) => x.o[k]).join(" · ")));
+    li.append(el("div", "miss-q", x.q), el("div", "a", t("end.rightAnswer") + correctAnswers(x).join(" · ")));
     if (x.e) li.appendChild(el("p", "hint", x.e));
     if (sourceFile(x) >= 0) li.appendChild(button("link miss-src", t("quiz.openSource"), () => openQuestionSource(x)));
     ul.appendChild(li);
@@ -1004,6 +1456,22 @@ $("endBack").onclick = leaveQuiz;
 $("endTopBack").onclick = leaveQuiz;
 document.addEventListener("keydown", (e) => {
   if ($("quiz").hidden || e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
+  const x = list[i];
+  if (document.activeElement === $("pInput")) {
+    if (e.key === "Enter") { e.preventDefault(); checkProblemInput(); }
+    else if (e.key === "Escape") { e.preventDefault(); $("pInput").blur(); }
+    return;
+  }
+  if (isProblem(x)) {
+    const onBtn = Boolean(e.target && e.target.closest && e.target.closest("button"));
+    if (!probRevealed && e.key.toLowerCase() === "h" && !$("pHintBtn").hidden) { e.preventDefault(); showNextHint(); }
+    else if (!probRevealed && e.key === "Enter" && !onBtn) { e.preventDefault(); revealProblem(); }
+    else if (probRevealed && !answered && e.key === "Enter" && !onBtn) { e.preventDefault(); gradeProblem(probNumOk !== false); }
+    else if (probRevealed && !answered && e.key.toLowerCase() === "r") { e.preventDefault(); gradeProblem(false); }
+    else if (probRevealed && e.key.toLowerCase() === "s" && !$("openSrc").hidden) { e.preventDefault(); $("openSrc").click(); }
+    else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
+    return;
+  }
   const n = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());
   if (!answered && n >= 0 && n < order.length) { e.preventDefault(); answer(n); }
   else if (!answered && e.key === "?") { e.preventDefault(); $("idk").click(); }
@@ -1133,7 +1601,7 @@ async function signOutAccount({ stayOnWelcome = false, force = false } = {}) {
   clearPendingAuth();
   try { localStorage.removeItem(LAST_KEY); } catch (e) {}
   SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
-  list = []; wrong = []; stage = "quiz"; readerHint = null;
+  list = []; wrong = []; stage = "quiz"; readerHint = null; tpId = null; tpIdx = 0; tpBusy = false;
   toast(t("profile.signedOutToast"));
   if (stayOnWelcome) showWelcome(false);
   else go("welcome", true);
@@ -1174,7 +1642,7 @@ $("delAcctConfirm").onclick = async () => {
     clearEntered();
     try { localStorage.removeItem(LAST_KEY); } catch (e) {}
     SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
-    list = []; wrong = []; stage = "quiz"; readerHint = null;
+    list = []; wrong = []; stage = "quiz"; readerHint = null; tpId = null; tpIdx = 0; tpBusy = false;
     if ($("deleteAccountSheet").open) {
       if (history.state && history.state.sheet) { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
       $("deleteAccountSheet").close();
@@ -1257,22 +1725,24 @@ function showWelcome(openAuth = false) {
 
 // ===== Upload
 
-// With a subject id the files go into that subject instead of a new one; mode "exams" adds old exams to it.
+// With a subject id the files go into that subject instead of a new one; mode "exams" or "templates" targets those tabs.
 function openUpload(target, mode) {
-  go(typeof target === "string" ? (mode === "exams" ? "exams/" : "upload/") + target : "upload");
+  const prefix = mode === "exams" ? "exams/" : mode === "templates" ? "templates/" : "upload/";
+  go(typeof target === "string" ? prefix + target : "upload");
 }
 // The upload screen loads its code (pdf.js, Supabase) only when opened. It is also where the student signs in;
 // opened from Profile (signIn) it asks only for that and goes back.
 function showUpload(target, signIn, mode) {
   const into = target ? SUBJECTS.find((x) => x.id === target) : null;
   const exams = mode === "exams" && !!into;
-  $("upTitle").textContent = t(signIn ? "upload.verify" : exams ? "upload.examsTitle" : into ? "upload.addTitle" : "upload.title");
-  $("upLede").textContent = t(signIn ? "profile.signedOut" : exams ? "upload.examsLede" : into ? "upload.addLede" : "upload.lede");
+  const templates = mode === "templates" && !!into;
+  $("upTitle").textContent = t(signIn ? "upload.verify" : exams ? "upload.examsTitle" : templates ? "upload.templatesTitle" : into ? "upload.addTitle" : "upload.title");
+  $("upLede").textContent = t(signIn ? "profile.signedOut" : exams ? "upload.examsLede" : templates ? "upload.templatesLede" : into ? "upload.addLede" : "upload.lede");
   $("upClose").onclick = () => back(signIn ? "profile" : into ? into.id : "");
   show("upload");
   import("../upload/ui.js").then((m) => m.open({
-    target: into ? into.id : null, signIn: !!signIn, mode: exams ? "exams" : "files",
-    // tabName: the subject tab to open on ("exams" after reading old exams).
+    target: into ? into.id : null, signIn: !!signIn, mode: exams ? "exams" : templates ? "templates" : "files",
+    // tabName: the subject tab to open on ("exams" or "templates").
     opened: (id, tabName) => { CUR = null; resyncReminders(); go(id, true); if (tabName) { tab = tabName; refresh(); } },
     done: () => { go("profile", true); toast(t("profile.signedInToast")); },
     onSignOut: () => signOutAccount(),
