@@ -60,6 +60,9 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run cap:sync
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_PROJECT_REF && format('https://{0}.supabase.co', vars.SUPABASE_PROJECT_REF) || '' }}
+          VITE_SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
       - run: ./gradlew assembleDebug
         working-directory: android
       - uses: actions/upload-artifact@v4
