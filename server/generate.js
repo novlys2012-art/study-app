@@ -54,7 +54,9 @@ export function limitsFrom(env = {}) {
   const list = (v) => String(v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   const allowed = list(env.ALLOWED_EMAILS);
   const plus = [...new Set([...DEFAULT_LIMITS.plusEmails, ...list(env.PLUS_EMAILS)])];
-  const explicitUser = num(env.USER_MONTHLY_LIMIT_USD, null);
+  // Ignore legacy USER_MONTHLY_LIMIT_USD=1 from the initial setup guide so Free (0.15) and Plus (1.5) apply automatically.
+  const rawLegacy = num(env.USER_MONTHLY_LIMIT_USD, null);
+  const explicitUser = rawLegacy != null && rawLegacy !== 1 ? rawLegacy : null;
   const freeMonthUsd = num(env.FREE_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.freeMonthUsd);
   const plusMonthUsd = num(env.PLUS_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.plusMonthUsd);
   return {

@@ -68,7 +68,7 @@ export function renderLimit(box, u, t, now) {
   const resetEl = box.querySelector("[data-limit-reset]");
   if (resetEl) resetEl.textContent = t("upload.limitReset", { date: nextResetDate(now) });
   const noteEl = box.querySelector("[data-limit-note]");
-  if (noteEl) noteEl.textContent = t(isPlus ? "upload.limitNotePlus" : "upload.limitNote");
+  if (noteEl) noteEl.textContent = t(isPlus ? "upload.limitNotePlus" : "upload.limitNote", { limit: info.limit });
   const upgEl = box.querySelector("[data-limit-upgrade]");
   if (upgEl) upgEl.hidden = isPlus;
   box.hidden = false;

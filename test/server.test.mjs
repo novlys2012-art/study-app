@@ -48,7 +48,7 @@ test("server: stops at the monthly and daily caps before calling the AI", async 
 });
 
 test("server: free vs plus tier limits and paywalled tasks", async () => {
-  const lim = limitsFrom({ PLUS_EMAILS: "Plus@Example.com, vip@skola.sk" });
+  const lim = limitsFrom({ PLUS_EMAILS: "Plus@Example.com, vip@skola.sk", USER_MONTHLY_LIMIT_USD: "1" });
   assert.equal(lim.freeMonthUsd, 0.15);
   assert.equal(lim.plusMonthUsd, 1.5);
   assert.equal(isPlusUser(user, lim), false);
