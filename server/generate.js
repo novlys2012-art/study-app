@@ -12,6 +12,7 @@ export const DEFAULT_LIMITS = {
   userMonthUsd: 0.15,
   dailyUsd: 5,
   perMinute: 60,
+  plusEmails: ["novlys2012@gmail.com"],
 };
 
 // Tasks that require an active Lekto Plus plan (Past Exams, Worked Practice Problems, Worked-Example Templates).
@@ -52,7 +53,7 @@ export function limitsFrom(env = {}) {
   const num = (v, d) => (v != null && v !== "" && Number.isFinite(+v) ? +v : d);
   const list = (v) => String(v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   const allowed = list(env.ALLOWED_EMAILS);
-  const plus = list(env.PLUS_EMAILS);
+  const plus = [...new Set([...DEFAULT_LIMITS.plusEmails, ...list(env.PLUS_EMAILS)])];
   const explicitUser = num(env.USER_MONTHLY_LIMIT_USD, null);
   const freeMonthUsd = num(env.FREE_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.freeMonthUsd);
   const plusMonthUsd = num(env.PLUS_MONTHLY_LIMIT_USD, explicitUser ?? DEFAULT_LIMITS.plusMonthUsd);

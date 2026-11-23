@@ -52,6 +52,7 @@ test("server: free vs plus tier limits and paywalled tasks", async () => {
   assert.equal(lim.freeMonthUsd, 0.15);
   assert.equal(lim.plusMonthUsd, 1.5);
   assert.equal(isPlusUser(user, lim), false);
+  assert.equal(isPlusUser({ id: "u-owner", email: "novlys2012@gmail.com" }, limitsFrom({})), true);
   assert.equal(isPlusUser({ id: "u2", email: "plus@example.com" }, lim), true);
   assert.equal(isPlusUser({ id: "u3", email: "a@b.c", plan: "plus" }, lim), true);
 
