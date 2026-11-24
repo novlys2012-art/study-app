@@ -484,7 +484,7 @@
   "legal.termsBody2": "Vytvořená shrnutí a otázky jsou studijní pomůcka a nemusí pokrýt celou zkoušku – vždy se řiď oficiálními podklady vyučujícího.",
   "legal.privacyTitle": "Ochrana soukromí",
   "legal.privacyBody1": "Pro fungování účtu ukládáme tvou e-mailovou adresu, tvoje předměty a historii odpovědí v zabezpečené databázi přístupné jen tvému účtu.",
-  "legal.privacyBody2": "Při nahrávání souborů se text a obrázky stran bez textu zpracovávají přes službu Claude (Anthropic) bez použití k trénování modelů. Původní soubory se na server neukládají; shodné výstupy se mohou dočasně znovu použít ve sdílené cache bez tvých osobních údajů.",
+  "legal.privacyBody2": "Při nahrávání souborů se text a obrázky stran bez textu zpracovávají přes službu Claude (Anthropic) bez použití k trénování modelů. Původní soubory se na server neukládají; shodné výstupy se mohou bez tvých osobních údajů dočasně znovu použít ve sdílené cache nejvýše 90 dní (protože neobsahují vazbu na účet, při smazání účtu vyprší automaticky).",
   "subject.tabTemplates": "Vzory",
   "upload.templatesTitle": "Vzorové příklady",
   "upload.templatesLede": "Z cvičebnice či fotky postupu si vygeneruješ až 2 podobné příklady.",

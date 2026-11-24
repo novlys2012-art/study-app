@@ -7,7 +7,7 @@ import { parseQuiz, parseProblems, parseTopics, parseVision, parseChecks, parseP
 import { getProvider } from "../ai/index.js";
 
 const user = { id: "u1", email: "simon@example.com" };
-function deps({ month = 0, today = 0, freeToday = today, minute = 0, vision = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null, user: u = user } = {}) {
+function deps({ month = 0, today = 0, freeToday = today, minute = 0, vision = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null, user: u = user, delayMs = 0 } = {}) {
   const rows = [], calls = [];
   return {
     rows, calls, user: u, env, cache, log: () => {},
@@ -17,6 +17,7 @@ function deps({ month = 0, today = 0, freeToday = today, minute = 0, vision = 0,
       name: "fake", models: { fast: "m", strong: "m2" },
       complete: async (req) => {
         calls.push(req);
+        if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
         if (fail) throw fail;
         return { text, truncated, usage: { inputTokens: 1000, outputTokens: 100 }, model: "m", costUsd: 0.01 };
       },
@@ -88,19 +89,19 @@ test("server: pre-call cost reservation & concurrency cap block parallel TOCTOU 
 
   // Two parallel requests when only 1 fast reservation ($0.005) fits under the $0.15 free cap:
   // the first enters ai.complete, the second sees the reserved spend and is rejected before calling AI.
-  const nearCap = deps({ month: 0.146, user: { id: "u-race", email: "race@example.com" } });
+  const nearCap = deps({ month: 0.146, delayMs: 25, user: { id: "u-race", email: "race@example.com" } });
   const [r1, r2] = await Promise.allSettled([
     handle({ task: "summary", input: { text: "one" } }, nearCap),
     handle({ task: "summary", input: { text: "two" } }, nearCap),
   ]);
-  assert.equal(r1.status, "fulfilled");
-  assert.equal(r2.status, "rejected");
-  assert.equal(r2.reason.code, "user_limit");
+  const statuses = [r1, r2];
+  assert.equal(statuses.filter((x) => x.status === "fulfilled").length, 1);
+  assert.deepEqual(statuses.filter((x) => x.status === "rejected").map((x) => x.reason.code), ["user_limit"]);
   assert.equal(nearCap.calls.length, 1, "only one parallel call reached the AI");
   assert.equal(nearCap.rows[0].account_key, await accountKey({ id: "u-race", email: "race@example.com" }));
 
   // Firing more than MAX_CONCURRENT.free parallel requests triggers rate_limit on the excess.
-  const burst = deps({ month: 0, user: { id: "u-burst", email: "burst@example.com" } });
+  const burst = deps({ month: 0, delayMs: 25, user: { id: "u-burst", email: "burst@example.com" } });
   const batch = await Promise.allSettled(
     Array.from({ length: MAX_CONCURRENT.free + 2 }, (_, k) => handle({ task: "summary", input: { text: `part ${k}` } }, burst)),
   );
