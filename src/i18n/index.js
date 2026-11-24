@@ -40,6 +40,7 @@ export function t(key, vars) {
 
 export function applyI18n(root) {
   document.documentElement.lang = lang;
+  if (root === document) document.title = "Lekto – " + t("welcome.title").replace(/\.$/, "");
   root.querySelectorAll("[data-i18n]").forEach((el) => {
     const v = t(el.dataset.i18n);
     if (el.textContent !== v) el.textContent = v;

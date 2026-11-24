@@ -13,7 +13,7 @@ import { renderLimit, limitInfo, getCachedUsage, setCachedUsage, isPlusActive } 
 import { openWelcome, syncAuthCopy } from "./welcome.js";
 import { clearPendingAuth } from "./auth-state.js";
 
-const SAMPLE_ID = "sample-mikro";
+const SAMPLE_ID = "sample-biochem";
 const CLOUD_CONFIGURED = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_KEY);
 import {
   initNativeShell, isNative, syncNativeChrome, haptic, minimizeApp,
@@ -113,7 +113,7 @@ function show(id) {
     const s = $(id);
     s.classList.remove("in-fwd", "in-back", "in-fade"); void s.offsetWidth; s.classList.add("in-" + dir);
   }
-  if (screen !== id) document.querySelectorAll("dialog[open]").forEach((d) => d.close());
+  if (screen !== id) document.querySelectorAll("dialog[open]").forEach((d) => { d.dataset.noPop = "1"; d.close(); });
   screen = id;
 }
 
@@ -130,7 +130,7 @@ function route() {
     try { if (localStorage.getItem(LAST_KEY) === SAMPLE_ID) localStorage.removeItem(LAST_KEY); } catch (e) {}
   }
   SUBJECTS = loadSubjects();
-  const h = here();
+  let h = here();
   const y = dir === "none" ? window.scrollY : dir === "back" ? scrolls.get(h) || 0 : 0;
   const sj = SUBJECTS.find((x) => h === x.id || h.startsWith(x.id + "/"));
   booted = true;
@@ -144,19 +144,29 @@ function route() {
   else if (h === "profile") { markEntered(); showProfile(); }
   else if (sj) {
     markEntered();
-    const [, sub, arg] = h.slice(sj.id.length).split("/");
+    const [, sub, arg, extra] = h.slice(sj.id.length).split("/");
     enter(sj);
-    const file = sub === "read" ? (sj.files || [])[+arg] : null;
-    const tpl = sub === "template" ? (sj.templates || []).find((x) => x.id === arg) : null;
+    const fi = sub === "read" && /^\d+$/.test(arg || "") && !extra ? +arg : -1;
+    const file = fi >= 0 ? (sj.files || [])[fi] : null;
+    const tpl = sub === "template" && !extra ? (sj.templates || []).find((x) => x.id === arg) : null;
     if (sub === "quiz" && !list.length) { go(sj.id, true); return; }
     if (sub === "review" && !wrong.length) { go(sj.id, true); return; }
     if (sub === "quiz") { if (stage === "end") showEnd(); else showQuiz(); }
     else if (sub === "review") showWrongReview();
     else if (tpl) showTemplate(tpl);
-    else if (file && (file.summary || (file.context && file.text))) showReader(file, +arg);
-    else showSubject();
-  } else if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome(false);
-  else showToday();
+    else if (file && (file.summary || (file.context && file.text))) showReader(file, fi);
+    else {
+      if (h !== sj.id) { go(sj.id, true); return; }
+      showSubject();
+    }
+  } else {
+    if (location.hash) {
+      try { history.replaceState({ d: depth() }, "", location.pathname + location.search); } catch (e) {}
+      h = "";
+    }
+    if (!SUBJECTS.length && !hasEntered() && !hasSessionToken()) showWelcome(false);
+    else showToday();
+  }
   shown = h; dir = "fade";
   window.scrollTo(0, y);
   if (readerFocus) {
@@ -170,8 +180,8 @@ function refresh() { dir = "none"; route(); }
 
 window.addEventListener("popstate", () => {
   if (skipPop) { skipPop = false; return; }
-  const open = document.querySelector("dialog[open]");
-  if (open) { open.close(); return; }
+  const open = [...document.querySelectorAll("dialog[open]")].pop();
+  if (open) { open.dataset.noPop = "1"; open.close(); return; }
   dir = "back"; route();
 });
 // A hash typed into the address bar.
@@ -210,16 +220,17 @@ onOpenSubject((subjectId) => {
 // ===== Bottom sheets and the toast
 
 function openSheet(d) {
+  delete d.dataset.noPop;
   d.classList.remove("closing");
-  d.showModal();
-  try { history.pushState({ d: depth() + 1, sheet: true }, ""); } catch (e) {}
+  if (!d.open) d.showModal();
+  try { history.pushState({ d: depth() + 1, sheet: d.id }, ""); } catch (e) {}
 }
 // Slides the sheet down, then closes it.
 function closeSheet(d) {
   if (!d.open || d.classList.contains("closing")) return;
   if (matchMedia("(prefers-reduced-motion:reduce)").matches) { d.close(); return; }
   d.classList.add("closing");
-  setTimeout(() => { if (d.open) d.close(); }, 170);
+  setTimeout(() => { if (d.open && d.classList.contains("closing")) d.close(); }, 170);
 }
 document.querySelectorAll("dialog.bsheet").forEach((d) => {
   // A sheet closes with its ✕ button, a tap outside, swipe down on touch, Esc or the back button.
@@ -227,9 +238,16 @@ document.querySelectorAll("dialog.bsheet").forEach((d) => {
   d.addEventListener("cancel", (e) => { e.preventDefault(); closeSheet(d); });
   d.addEventListener("close", () => {
     d.classList.remove("closing");
-    if (history.state && history.state.sheet) { skipPop = true; history.back(); }
+    const noPop = d.dataset.noPop === "1";
+    delete d.dataset.noPop;
+    if (!noPop && history.state && history.state.sheet === d.id) { skipPop = true; history.back(); }
   });
   enableSheetSwipe(d, closeSheet);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.defaultPrevented) return;
+  const open = [...document.querySelectorAll("dialog.bsheet[open]")].pop();
+  if (open) { e.preventDefault(); closeSheet(open); }
 });
 
 let toastTimer = 0;
@@ -711,9 +729,23 @@ function openPastExam(id) {
   const year = el("input", "search");
   Object.assign(year, { type: "number", inputMode: "numeric", min: 1990, max: new Date().getFullYear() + 1, value: ex.year || "", placeholder: t("upload.year") });
   year.id = "xYear";
+  year.oninput = () => year.removeAttribute("aria-invalid");
   year.onchange = () => {
-    const y = parseInt(year.value, 10);
-    saveExams(CUR.exams.map((x) => (x.id === id ? { ...x, year: y >= 1990 && y <= 2100 ? y : null } : x)), "exams.yearToast");
+    const raw = year.value.trim();
+    const cur = (CUR.exams || []).find((x) => x.id === id);
+    if (!cur) return;
+    if (!raw && !year.validity.badInput) {
+      year.removeAttribute("aria-invalid");
+      if (cur.year != null) saveExams(CUR.exams.map((x) => (x.id === id ? { ...x, year: null } : x)));
+      return;
+    }
+    const y = /^\d{4}$/.test(raw) ? +raw : NaN;
+    if (y >= 1990 && y <= 2100) {
+      year.removeAttribute("aria-invalid");
+      saveExams(CUR.exams.map((x) => (x.id === id ? { ...x, year: y } : x)), "exams.yearToast");
+    } else {
+      year.setAttribute("aria-invalid", "true");
+    }
   };
   const lab = el("label", "label", t("exams.year")); lab.htmlFor = "xYear";
   const nodes = [lab, year];
@@ -1163,10 +1195,11 @@ function pool() {
 }
 function updAvail() {
   const n = pool().length;
+  const badCustom = $("customN").getAttribute("aria-invalid") === "true";
   $("avail").textContent = n
-    ? (count !== "all" && n > +count ? t("setup.availCut", { n, count }) : t("setup.avail", { n }))
+    ? (!badCustom && count !== "all" && n > +count ? t("setup.availCut", { n, count }) : t("setup.avail", { n }))
     : t(mode === "wrong" ? "setup.noWrong" : "setup.allSeen");
-  $("go").disabled = !n;
+  $("go").disabled = !n || badCustom;
 }
 function renderCustomTopics() {
   const base = filterKind(QUESTIONS, kind);
@@ -1189,6 +1222,10 @@ $("custom").onclick = () => {
   [...$("kinds").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.k === kind));
   renderCustomTopics();
   [...$("modes").children].forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === mode));
+  if ($("customN").getAttribute("aria-invalid") === "true") {
+    $("customN").value = ""; $("customN").removeAttribute("aria-invalid"); $("customN").classList.remove("on");
+    count = "20"; pressCount($("counts").querySelector('[data-n="20"]'));
+  }
   updAvail(); openSheet($("roundSheet"));
 };
 $("kinds").onclick = (e) => {
@@ -1205,12 +1242,18 @@ $("modes").onclick = (e) => {
 function pressCount(b) { [...$("counts").querySelectorAll("button")].forEach((x) => x.setAttribute("aria-pressed", x === b)); }
 $("counts").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  count = b.dataset.n; pressCount(b); $("customN").value = ""; $("customN").classList.remove("on"); updAvail();
+  count = b.dataset.n; pressCount(b); $("customN").value = ""; $("customN").classList.remove("on"); $("customN").removeAttribute("aria-invalid"); updAvail();
 };
 $("customN").oninput = () => {
-  const v = parseInt($("customN").value, 10);
-  if (v >= 1) { count = String(v); pressCount(null); $("customN").classList.add("on"); }
-  else { count = "20"; pressCount($("counts").querySelector('[data-n="20"]')); $("customN").classList.remove("on"); }
+  const inp = $("customN"), raw = inp.value.trim();
+  const v = /^\d+$/.test(raw) ? +raw : NaN;
+  if (v >= 1 && v <= 9999) {
+    count = String(v); pressCount(null); inp.classList.add("on"); inp.removeAttribute("aria-invalid");
+  } else if (raw || inp.validity.badInput) {
+    pressCount(null); inp.classList.remove("on"); inp.setAttribute("aria-invalid", "true");
+  } else {
+    count = "20"; pressCount($("counts").querySelector('[data-n="20"]')); inp.classList.remove("on"); inp.removeAttribute("aria-invalid");
+  }
   updAvail();
 };
 $("go").onclick = () => {
@@ -1470,7 +1513,7 @@ $("pInput").oninput = () => { $("pInput").removeAttribute("aria-invalid"); $("pC
 $("pReveal").onclick = revealProblem;
 $("pGotIt").onclick = () => gradeProblem(true);
 $("pMissed").onclick = () => gradeProblem(false);
-$("next").onclick = () => { i++; i < list.length ? render() : finish(); };
+$("next").onclick = () => { if (!answered) return; answered = false; i++; i < list.length ? render() : finish(); };
 // ✕ ends the round: with answers it shows the result so far, without any it just leaves.
 $("quit").onclick = () => { list = list.slice(0, answered ? i + 1 : i); list.length ? finish() : leaveQuiz(); };
 
@@ -1536,11 +1579,12 @@ document.addEventListener("keydown", (e) => {
     else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
     return;
   }
+  const onActiveBtn = Boolean(e.target && e.target.closest && e.target.closest('button:not([aria-disabled="true"])'));
   const n = "1234".indexOf(e.key) >= 0 ? "1234".indexOf(e.key) : "abcd".indexOf(e.key.toLowerCase());
   if (!answered && n >= 0 && n < order.length) { e.preventDefault(); answer(n); }
   else if (!answered && e.key === "?") { e.preventDefault(); $("idk").click(); }
-  else if (!answered && e.key === "Enter" && !$("check").hidden && picked.size) { e.preventDefault(); $("check").click(); }
-  else if (answered && e.key === "Enter") { e.preventDefault(); $("next").click(); }
+  else if (!answered && e.key === "Enter" && !onActiveBtn && !$("check").hidden && picked.size) { e.preventDefault(); $("check").click(); }
+  else if (answered && e.key === "Enter" && !onActiveBtn) { e.preventDefault(); $("next").click(); }
   else if (answered && e.key.toLowerCase() === "s" && !$("openSrc").hidden) { e.preventDefault(); $("openSrc").click(); }
   else if (e.key === "Escape") { e.preventDefault(); $("quit").click(); }
 });
@@ -1631,9 +1675,16 @@ function syncLangUI(l) {
   syncAuthCopy();
   syncPlusSheet();
 }
+async function syncSampleLang(l) {
+  if (!loadSubjects().some((x) => x.id === SAMPLE_ID && x.sample && x.lang !== l)) return;
+  const { ensureSampleSubject } = await import("./sample.js");
+  ensureSampleSubject(l);
+  SUBJECTS = loadSubjects();
+}
 async function setLangUI(l) {
   await setLang(l);
   syncLangUI(l);
+  await syncSampleLang(l);
 }
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
 $("langs").onclick = async (e) => { const b = e.target.closest("button"); if (b) { await setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
@@ -1739,7 +1790,8 @@ $("signOutForce").onclick = async () => {
   const opts = pendingSignOutOpts || {};
   pendingSignOutOpts = null;
   if ($("signOutSheet").open) {
-    if (history.state && history.state.sheet) { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+    if (history.state && history.state.sheet === "signOutSheet") { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+    $("signOutSheet").dataset.noPop = "1";
     $("signOutSheet").close();
   }
   await signOutAccount({ ...opts, force: true });
@@ -1774,7 +1826,8 @@ $("delAcctConfirm").onclick = async () => {
     SUBJECTS = []; CUR = null; QUESTIONS = []; TOPICS = {}; LOG = [];
     list = []; wrong = []; stage = "quiz"; readerHint = null; tpId = null; tpIdx = 0; tpBusy = false;
     if ($("deleteAccountSheet").open) {
-      if (history.state && history.state.sheet) { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+      if (history.state && history.state.sheet === "deleteAccountSheet") { try { history.replaceState({ d: depth() }, ""); } catch (e) {} }
+      $("deleteAccountSheet").dataset.noPop = "1";
       $("deleteAccountSheet").close();
     }
     toast(t("profile.deletedToast"));
@@ -1858,6 +1911,10 @@ function openLegal(kind) {
 function showWelcome(openAuth = false, preferredMode = "login") {
   CUR = null;
   show("welcome");
+  if (!openAuth && $("authSheet").open) {
+    $("authSheet").dataset.noPop = "1";
+    $("authSheet").close();
+  }
   openWelcome({
     enterApp: () => { markEntered(); go(""); },
     trySample: async () => {
@@ -1908,7 +1965,14 @@ function showUpload(target, signIn, mode) {
 
 route();
 if (getLang() === "cs") {
-  ensureLang("cs").then(() => { applyI18n(document); syncLangUI("cs"); refresh(); });
+  ensureLang("cs").then(async () => {
+    if (getLang() !== "cs") return;
+    applyI18n(document);
+    syncLangUI("cs");
+    await syncSampleLang("cs");
+    refresh();
+    if (screen === "profile") renderAccount();
+  });
 }
 resyncReminders();
 

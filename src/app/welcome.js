@@ -19,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 // step: "login" | "signup" | "forgot" | "verify" | "newpass"
-let welcomeWired = false, authWired = false;
+let welcomeWired = false, authWired = false, authSeq = 0;
 let step = "login", pendingEmail = "", pendingKind = "signup", unconfirmedResent = false;
 let busy = false, busyKind = "", signedIn = false, resendLeft = 0, resendTimer = 0;
 let hooks = null, activeMount = null;
@@ -135,6 +135,7 @@ function syncButtons() {
 
   const tabs = $("wModeTabs");
   if (tabs) [...tabs.children].forEach((b) => { b.disabled = busy; });
+  ["wForgot", "wBackLogin", "wChangeEmail"].forEach((id) => { const b = $(id); if (b) b.disabled = busy; });
   updateResend();
 }
 
@@ -273,6 +274,7 @@ function mountInto(host, opts) {
 }
 
 export function mountAuth(host, opts) {
+  authSeq++;
   mountInto(host, opts);
   setBusy(false);
   $("wAuthForms").hidden = false;
@@ -504,6 +506,7 @@ function syncLangButtons() {
 }
 
 async function refreshAuthState(preferredMode = "login") {
+  const seq = ++authSeq;
   err("");
   mountInto($("wAuthCard"), {
     openLegal: hooks?.openLegal,
@@ -521,7 +524,7 @@ async function refreshAuthState(preferredMode = "login") {
     $("wNavCta").textContent = t("welcome.navCta");
     $("wGuest").textContent = t("welcome.guest");
     syncHeaderCopy();
-    return;
+    return true;
   }
   $("wOffBox").hidden = true;
   // Skip downloading @supabase/supabase-js on guest landing visits until a session token exists or the user submits auth.
@@ -532,11 +535,13 @@ async function refreshAuthState(preferredMode = "login") {
     $("wNavCta").textContent = t("welcome.navCta");
     $("wGuest").textContent = t("welcome.guest");
     restorePendingIfFresh(preferredMode === "signup" ? "signup" : "login");
-    return;
+    return true;
   }
   const cloud = await import("../cloud/supabase.js");
   let s = null;
   try { s = await cloud.session(); } catch (e) {}
+  // Ignore stale async checks if the user navigated away (e.g. to #upload) before session() resolved.
+  if (seq !== authSeq || $("welcome")?.hidden) return false;
   if (s && s.user) {
     signedIn = true;
     removeSamples();
@@ -557,6 +562,7 @@ async function refreshAuthState(preferredMode = "login") {
     $("wGuest").textContent = t("welcome.guest");
     restorePendingIfFresh(preferredMode === "signup" ? "signup" : "login");
   }
+  return true;
 }
 
 function wireWelcome() {
@@ -611,7 +617,7 @@ function wireWelcome() {
 
 export async function openAuthDialog(preferredMode = "login") {
   if (!hooks) return;
-  await refreshAuthState(preferredMode);
+  if (!(await refreshAuthState(preferredMode)) || $("welcome")?.hidden) return;
   hooks.openAuthSheet();
   requestAnimationFrame(() => focusStepField());
 }
@@ -621,8 +627,8 @@ export function openWelcome(nextHooks, openAuth = false, preferredMode = "login"
   wireWelcome();
   syncLangButtons();
   setBusy(false);
-  refreshAuthState(preferredMode).then(() => {
-    if (openAuth) {
+  refreshAuthState(preferredMode).then((ok) => {
+    if (ok && openAuth && !$("welcome")?.hidden) {
       hooks.openAuthSheet();
       requestAnimationFrame(() => focusStepField());
     }

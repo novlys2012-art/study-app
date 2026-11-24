@@ -96,6 +96,8 @@ const after = await page.locator("#tabExams .tbar .tbar-top span:first-child").a
 check(after.join("|") === "1. Téma A|2. Téma B", "a topic not in the materials is linked to a subject topic");
 await page.locator("#tabExams .rowcard").first().click();
 check((await page.textContent("#xTitle")) === "Skúška 2024", "an uploaded exam opens, newest first");
+await page.fill("#xYear", "0"); await page.press("#xYear", "Tab");
+check((await page.getAttribute("#xYear", "aria-invalid")) === "true" && (await page.evaluate(() => JSON.parse(localStorage.getItem("studyapp-subjects-v1"))[0].exams[0].year)) === 2024, "invalid exam year is flagged without overwriting");
 await page.fill("#xYear", "2021"); await page.press("#xYear", "Tab");
 await page.goBack();
 await page.locator("#pastSheet").waitFor({ state: "hidden" });
@@ -107,14 +109,25 @@ await page.click("#quit");
 await page.goto(base + "#test");
 check((await page.evaluate(() => JSON.parse(localStorage.getItem("studyapp-subjects-v1"))[0].exams[0].year)) === 2021, "exam changes are saved in the subject");
 
+await page.goto(base + "#test/read/999");
+check(await page.locator("#subject").isVisible() && page.url().endsWith("#test"), "invalid reader deep-link normalises back to the subject");
+
+await page.click("#custom");
+await page.fill("#customN", "0");
+check((await page.getAttribute("#customN", "aria-invalid")) === "true" && await page.locator("#go").isDisabled(), "invalid custom round count marks invalid and disables start");
+await page.keyboard.press("Escape");
+await page.locator("#roundSheet").waitFor({ state: "hidden" });
+check(await page.locator("#subject").isVisible(), "Esc closes the custom round sheet");
 await page.click("#custom");
 await page.click('#counts [data-n="all"]');
 await page.click("#go");
 for (let n = 0; n < SUBJECT.questions.length; n++) {
+  check((await page.textContent("#pos")) === `${n + 1} / ${SUBJECT.questions.length}`, "quiz stands on question " + (n + 1));
   await page.locator("#opts .opt").first().click();
   if (await page.locator("#check").isVisible()) await page.click("#check");
   check(await page.locator("#fb").isVisible() && await page.locator("#tabbar").isHidden(), "the verdict slides up on question " + (n + 1));
-  await page.click("#next");
+  if (n === 0) await page.keyboard.press("Enter");
+  else await page.click("#next");
 }
 check(await page.locator("#end").isVisible(), "a full round ends on the result screen");
 await page.click("#endBack");
@@ -129,6 +142,14 @@ await page.click("#sMore");
 await page.goBack();
 await page.locator("#moreSheet").waitFor({ state: "hidden" });
 check(await page.locator("#subject").isVisible(), "the back button closes a sheet and stays on the screen");
+await page.click("#sMore");
+await page.evaluate(() => { location.hash = "#signin"; });
+await page.locator("#authSheet").waitFor({ state: "visible" });
+await page.waitForTimeout(250);
+check(await page.locator("#authSheet").isVisible() && page.url().endsWith("#signin"), "navigating to #signin from an open sheet keeps #authSheet open");
+await page.keyboard.press("Escape");
+await page.locator("#authSheet").waitFor({ state: "hidden" });
+await page.goto(base + "#test");
 await page.click('#tabbar [data-go="home"]');
 check((await page.locator("#subjects .sj").count()) === 1 && await page.locator("#homeAdd").isVisible(), "subjects screen lists the subject and shows the add button");
 await page.click('#tabbar .tab[data-go="today"]');
@@ -140,8 +161,14 @@ check(await page.locator("#today").isVisible(), "leaving a round started on Toda
 await page.click('#tabbar [data-go="profile"]');
 await page.click('#themes [data-th="dark"]');
 check((await page.evaluate(() => document.documentElement.dataset.theme)) === "dark", "profile switches to dark");
+await page.click('#langs [data-lang="cs"]');
+await page.waitForFunction(() => document.title.includes("zkoušce") && document.getElementById("pWho").textContent.includes("Tato verze"));
+check(true, "switching to Czech updates title and profile account copy");
+await page.reload();
+await page.waitForFunction(() => document.title.includes("zkoušce") && document.getElementById("pWho").textContent.includes("Tato verze"));
+check(true, "Czech cold reload translates profile account block");
 await page.goto(base + "#%E0");
-check(await page.locator("#today").isVisible(), "malformed URL hash falls back cleanly to Today");
+check(await page.locator("#today").isVisible() && !page.url().includes("#"), "malformed URL hash falls back cleanly to Today and clears hash");
 
 await browser.close();
 server.close();

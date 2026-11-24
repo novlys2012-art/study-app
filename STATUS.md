@@ -172,6 +172,14 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
   - **Faster cold boot & smaller initial bundle**: Lazy-loaded `cs.json` (31 KB) and `sample.js` (23 KB), skipped importing `@supabase/supabase-js` (~150 KB) on logged-out `#welcome` and `#profile`, removed the duplicate `applyI18n()` pass at boot (and skipped no-op text writes), inlined `@font-face` rules + `<link rel="preload">` for `Source Sans 3` in `index.html`, precached both primary `.woff2` fonts in `public/sw.js` (`lekto-shell-v3`), and dropped `text-rendering: optimizeLegibility`.
   - **Snappier UI, Profile/Upload & sync**: Instant top-level tab switches without forced `offsetWidth` reflow, zero `getComputedStyle()` at boot in `paintChrome()`, `rAF` + GPU `transform: scaleX()` reader scroll bar, immediate stale-while-revalidate quota display on `#profile` and `#upload`, `visibilitychange` sync guarded by `!document.hidden` + 15s focus cooldown, and background `preloadPdf()` when picking a PDF on Upload Step 1.
 
+### 1.20 Adversarial Live QA Bug-Fix Pass (11 Confirmed Fixes)
+- **Files**: `src/app/{app.js,welcome.js}`, `src/i18n/index.js`, `src/styles/app.css`, `index.html`, `test/{smoke.mjs,welcome.test.mjs}`
+- **How it works**:
+  - **Quiz keyboard double-advance fix (`app.js`)**: Guarded `$("next").onclick` with `if (!answered) return; answered = false;` and guarded MCQ `Enter` shortcuts with `!onActiveBtn` so pressing `Enter` on focused `#next` advances strictly 1 question (and never hijacks `#openSrc` / `#quit`).
+  - **Sheet navigation, `Esc`, & auth mount races (`app.js`, `welcome.js`)**: Tagged sheet history entries with `sheet: d.id`, suppressed stray `history.back()` when dialogs close for route changes or `popstate` (`dataset.noPop`), prevented stale `closeSheet` timeouts after reopen, added a document `Escape` fallback for `dialog.bsheet[open]`, added an `authSeq` guard in `welcome.js` so in-flight `refreshAuthState()` never races `#upload` mounts, and disabled `#wForgot`/`#wBackLogin`/`#wChangeEmail` while auth requests are busy.
+  - **Czech i18n, sample sync & `SAMPLE_ID` (`i18n/index.js`, `app.js`)**: Fixed `SAMPLE_ID` (`"sample-biochem"`), updated `document.title` in `applyI18n()`, re-rendered `#profile` account block after lazy `cs.json` cold boot, and synced existing built-in sample subjects across `sk <-> cs` switches.
+  - **Layout, validation & deep-link cleanup (`app.css`, `app.js`, `index.html`)**: Bounded `.topics` inside `#roundSheet` so the sticky dock never covers `Ktoré otázky` pills, centered `.empty > .btn`, rejected invalid exam years and `#customN` counts (`aria-invalid` + disabling `#go`) instead of silently overwriting/accepting them, and normalised invalid subject/root deep-link hashes via `replaceState`.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)

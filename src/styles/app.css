@@ -125,7 +125,7 @@ kbd{font:500 .75rem var(--f-mono);border:1px solid var(--rule);border-radius:4px
   transition:background-color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease);
 }
 .btn:active,.iconbtn:active,.play:active,.chiprow:active,.drop:active,.tiny:active,.hero-chip:active,.seg button:active,.chips button:active,.opt:active:not([aria-disabled="true"]){transform:scale(.985)}
-.btn:disabled,.seg button:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled,.seg button:disabled,.link:disabled{opacity:.45;cursor:not-allowed}
 .btn:disabled:active,.seg button:disabled:active{transform:none}
 
 .btn{
@@ -218,6 +218,7 @@ select.search{appearance:auto}
   border:var(--bw) solid var(--input-border);border-radius:var(--r-ctl);
 }
 .custom input.on{border-color:var(--ink)}
+.custom input[aria-invalid="true"]{border-color:var(--no)}
 
 /* 3px flat progress hairline (the single progress indicator across Lekto) */
 .bar{display:block;height:3px;background:var(--subtle);border-radius:999px;overflow:hidden}
@@ -351,6 +352,7 @@ select.search{appearance:auto}
 .drop .empty-art svg{width:20px;height:20px}
 
 .empty{display:grid;justify-items:center;text-align:center;gap:12px;padding:28px 12px;color:var(--muted);font-size:1rem}
+.empty>.btn{justify-self:center}
 .empty h2{font:700 1.375rem/1.2 var(--f-sans);letter-spacing:-.02em;color:var(--ink);margin:4px 0 0;text-wrap:balance}
 .empty p{margin:0;max-width:44ch}
 .empty-art{
@@ -628,8 +630,9 @@ body.kb-open .tabbar{display:none}
 .bsheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .bsheet-head h2{font:600 1.25rem/1.25 var(--f-sans);letter-spacing:-.015em;margin:0;min-width:0;overflow-wrap:anywhere}
 
-.topics{display:grid;gap:0;border:var(--bw) solid var(--rule);border-radius:var(--r-ctl);overflow:hidden}
-.topic{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:50px;border-top:var(--bw) solid var(--rule);cursor:pointer}
+#roundSheet .bsheet-in{gap:14px}
+.topics{display:grid;gap:0;max-height:min(200px,28dvh);overflow-y:auto;overscroll-behavior:contain;border:var(--bw) solid var(--rule);border-radius:var(--r-ctl)}
+.topic{display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:46px;border-top:var(--bw) solid var(--rule);cursor:pointer}
 .topic:first-child{border-top:0}
 .topic:has(input:checked){background:var(--ledger-soft)}
 .topic span{flex:1;min-width:0}

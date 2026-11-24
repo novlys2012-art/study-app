@@ -62,6 +62,14 @@ test("sample subject stays local-only: never marks sync metadata, never appears 
   assert.equal(hasUnsynced(), false);
   assert.equal(changeEvents, 0);
 
+  // Switching language updates the sample in place while keeping its exam date and local progress.
+  saveSubjects([{ ...sj, exam: "2027-01-15" }]);
+  ensureSampleSubject("cs");
+  const csSj = loadSubjects()[0];
+  assert.equal(csSj.lang, "cs");
+  assert.equal(csSj.exam, "2027-01-15");
+  assert.equal(readProgress(csSj)[csSj.questions[0].id].c, 1);
+
   resetProgress(sj);
   assert.deepEqual(readProgress(sj), {});
   assert.equal(unsent().length, 0);
