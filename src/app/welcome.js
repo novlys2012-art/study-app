@@ -1,9 +1,10 @@
 // Landing + shared Email/Password Sign In, Sign Up (with email verification), and Password Reset controller.
 // Lazy-loads Supabase so first paint stays fast when opening directly into the app.
 import { t, getLang } from "../i18n/index.js";
-import { syncNow } from "./autosync.js";
+import { syncNow, hasSessionToken } from "./autosync.js";
 import { removeSamples } from "./subjects.js";
 import { icon } from "./icons.js";
+const CLOUD_CONFIGURED = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_KEY);
 import {
   OTP_LENGTH,
   isPasswordValid,
@@ -512,8 +513,7 @@ async function refreshAuthState(preferredMode = "login") {
       hooks.enterApp();
     },
   });
-  const cloud = await import("../cloud/supabase.js");
-  if (!cloud.configured) {
+  if (!CLOUD_CONFIGURED) {
     signedIn = false;
     $("wOffBox").hidden = false;
     $("wSignedBox").hidden = true;
@@ -524,6 +524,17 @@ async function refreshAuthState(preferredMode = "login") {
     return;
   }
   $("wOffBox").hidden = true;
+  // Skip downloading @supabase/supabase-js on guest landing visits until a session token exists or the user submits auth.
+  if (!hasSessionToken() && !/[?&]code=/.test(location.search)) {
+    signedIn = false;
+    $("wSignedBox").hidden = true;
+    $("wAuthForms").hidden = false;
+    $("wNavCta").textContent = t("welcome.navCta");
+    $("wGuest").textContent = t("welcome.guest");
+    restorePendingIfFresh(preferredMode === "signup" ? "signup" : "login");
+    return;
+  }
+  const cloud = await import("../cloud/supabase.js");
   let s = null;
   try { s = await cloud.session(); } catch (e) {}
   if (s && s.user) {
@@ -585,10 +596,10 @@ function wireWelcome() {
 
   $("welcome").addEventListener("click", handleLegalClick);
 
-  $("wLangs").onclick = (e) => {
+  $("wLangs").onclick = async (e) => {
     const b = e.target.closest("button[data-lang]");
     if (!b || b.dataset.lang === getLang()) return;
-    hooks.setLangUI(b.dataset.lang);
+    await hooks.setLangUI(b.dataset.lang);
     syncLangButtons();
     syncAuthCopy();
     if (signedIn) {

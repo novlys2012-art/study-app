@@ -122,4 +122,9 @@ test("dueRound prioritizes higher-yield exam topics within wrong, overdue, and u
   ];
   const order = dueRound(items, log, { limit: 6, now, topicOrder: ["t1", "t2"] }).map((x) => x.id);
   assert.deepEqual(order, ["topWrong", "lowWrong", "topOverdue", "midOverdue", "topFresh", "lowFresh"]);
+  // Precomputed memoryStates Map matches raw log output for stats, dueRound, and dailyPlan.
+  const states = memoryStates(log);
+  assert.deepEqual(questionStats(items, states, now), questionStats(items, log, now));
+  assert.deepEqual(dueRound(items, states, { limit: 6, now, topicOrder: ["t1", "t2"] }).map((x) => x.id), order);
+  assert.deepEqual(dailyPlan(items, states, "2026-05-20", { roundSize: 6, now }), dailyPlan(items, log, "2026-05-20", { roundSize: 6, now }));
 });

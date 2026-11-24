@@ -1,9 +1,10 @@
 // Decides when to sync with the account: at start, after each change (a moment later, so a quiz round
 // goes up as a few requests), when the app comes back to the front or goes online, and after sign-in.
 // Supabase's code loads only for a signed-in student, so the first page load stays light.
-import { onLocalChange } from "./subjects.js";
+import { onLocalChange, hasUnsynced } from "./subjects.js";
 
-let onPulled = () => {}, timer = 0;
+let onPulled = () => {}, timer = 0, lastSyncAt = 0;
+const FOCUS_COOLDOWN_MS = 15_000;
 
 // Supabase keeps the session in localStorage under "sb-<project>-auth-token".
 export function hasSessionToken() {
@@ -17,18 +18,25 @@ export function cancelSync() { clearTimeout(timer); timer = 0; }
 export async function syncNow(force) {
   cancelSync();
   if (!force && !hasSessionToken()) return;
+  lastSyncAt = Date.now();
   try {
     const { sync } = await import("../cloud/sync.js");
     if (await sync()) onPulled();
   } catch (e) { /* offline or the server is down: the changes stay marked and go up next time */ }
 }
 
+function syncOnFocus() {
+  if (typeof document !== "undefined" && document.hidden) return;
+  if (!hasUnsynced() && Date.now() - lastSyncAt < FOCUS_COOLDOWN_MS) return;
+  syncNow();
+}
+
 // pulled() runs when a sync changed what is on the device, so the screen can show it.
 export function startSync(pulled) {
   onPulled = pulled;
   onLocalChange(() => { clearTimeout(timer); timer = setTimeout(syncNow, 1500); });
-  document.addEventListener("visibilitychange", () => syncNow());
+  document.addEventListener("visibilitychange", syncOnFocus);
   window.addEventListener("online", () => syncNow());
-  window.addEventListener("lekto:resume", () => syncNow());
+  window.addEventListener("lekto:resume", syncOnFocus);
   syncNow();
 }

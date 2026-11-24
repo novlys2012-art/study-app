@@ -54,6 +54,7 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base);
 check(await page.locator("#welcome").isVisible() && await page.locator("#tabbar").isHidden(), "first visit opens the landing screen");
 await page.click("#wGuest");
+await page.locator("#subject").waitFor();
 check(await page.locator("#subject").isVisible() && await page.locator("#tabbar").isVisible(), "trying without an account opens the built-in sample subject");
 await page.click('#sTabs [data-tab="exams"]');
 check((await page.textContent("#tabExams")).includes("v 4 z 5 skúšok"), "sample subject includes ranked past-exam topics");

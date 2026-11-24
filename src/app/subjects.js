@@ -53,15 +53,42 @@ function keys(prefix) {
   return out;
 }
 
+// Raw-string-keyed caches avoid repeated synchronous JSON.parse on every screen switch and answer
+// while invalidating automatically if tests or another script touch localStorage directly.
+let subjectsRaw = null, subjectsCache = null, subjectJson = new Map();
+const logCache = new Map();
+
 function rawSubjects() {
-  const list = read(STORE, []);
-  return Array.isArray(list) ? list.filter((sj) => sj && sj.id && Array.isArray(sj.questions)) : [];
+  let raw = null;
+  try { raw = localStorage.getItem(STORE); } catch (e) {}
+  if (raw === subjectsRaw && subjectsCache) return subjectsCache;
+  subjectsRaw = raw;
+  let list = [];
+  try { const v = JSON.parse(raw); if (Array.isArray(v)) list = v; } catch (e) {}
+  subjectsCache = list.filter((sj) => sj && sj.id && Array.isArray(sj.questions));
+  subjectJson = new Map();
+  return subjectsCache;
 }
+function writeSubjects(list, nextJson = null) {
+  const raw = JSON.stringify(list);
+  try { localStorage.setItem(STORE, raw); } catch (e) {}
+  subjectsRaw = raw;
+  subjectsCache = list.filter((sj) => sj && sj.id && Array.isArray(sj.questions));
+  subjectJson = nextJson || new Map();
+}
+function writeLog(sid, log) {
+  const raw = JSON.stringify(log);
+  try { localStorage.setItem(LOG + sid, raw); } catch (e) {}
+  logCache.set(sid, { raw, log: log.slice() });
+}
+function removeLog(sid) { remove(LOG + sid); remove(LEGACY + sid); logCache.delete(sid); }
 
 const tidy = (sj) => ({
   topics: {},
   ...sj,
-  questions: sj.questions.map((x) => (x.id ? x : { ...x, id: hid((x.t || "") + "|" + x.q) })),
+  questions: sj.questions.every((x) => x.id)
+    ? sj.questions
+    : sj.questions.map((x) => (x.id ? x : { ...x, id: hid((x.t || "") + "|" + x.q) })),
 });
 export function loadSubjects() { return rawSubjects().map(tidy); }
 
@@ -85,7 +112,12 @@ const isSampleId = (id) => rawSubjects().some((sj) => sj.id === id && sj.sample)
 export function saveSubjects(list) {
   const prevRaw = rawSubjects();
   const prevSample = new Set(prevRaw.filter(isSample).map((sj) => sj.id));
-  const before = new Map(prevRaw.map((sj) => [sj.id, JSON.stringify(tidy(sj))]));
+  const before = new Map();
+  prevRaw.forEach((sj) => {
+    const json = subjectJson.has(sj.id) ? subjectJson.get(sj.id) : JSON.stringify(tidy(sj));
+    before.set(sj.id, json);
+  });
+  const nextJson = new Map();
   const meta = loadMeta();
   let any = false;
   list.forEach((sj) => {
@@ -94,15 +126,17 @@ export function saveSubjects(list) {
       before.delete(sj.id);
       return;
     }
-    if (before.get(sj.id) !== JSON.stringify(tidy(sj))) { touch(meta.s, sj.id, { del: false }); any = true; }
+    const serialized = JSON.stringify(tidy(sj));
+    nextJson.set(sj.id, serialized);
+    if (before.get(sj.id) !== serialized) { touch(meta.s, sj.id, { del: false }); any = true; }
     before.delete(sj.id);
   });
   before.forEach((_, id) => {
     if (!prevSample.has(id)) { touch(meta.s, id, { del: true }); any = true; }
     else if (meta.s[id]) { delete meta.s[id]; any = true; }
-    remove(LOG + id); remove(LEGACY + id);
+    removeLog(id);
   });
-  write(STORE, list);
+  writeSubjects(list, nextJson);
   if (any) { saveMeta(meta); changed(); }
 }
 
@@ -125,14 +159,23 @@ function legacyBases(sid, p, at) {
 
 export function readLog(sj) {
   const sid = sidOf(sj);
-  let log = read(LOG + sid, []);
-  if (!Array.isArray(log)) log = [];
-  const legacy = read(LEGACY + sid, null);
-  if (legacy) {
-    const have = new Set(log.map((e) => e.id));
-    log = log.concat(legacyBases(sid, legacy, Date.now()).filter((e) => !have.has(e.id)));
-    write(LOG + sid, log); remove(LEGACY + sid);
+  let raw = null, legacyRaw = null;
+  try { raw = localStorage.getItem(LOG + sid); legacyRaw = localStorage.getItem(LEGACY + sid); } catch (e) {}
+  const hit = logCache.get(sid);
+  if (!legacyRaw && hit && hit.raw === raw) return hit.log.slice();
+  let log = [];
+  try { const v = JSON.parse(raw); if (Array.isArray(v)) log = v; } catch (e) {}
+  if (legacyRaw) {
+    let legacy = null;
+    try { legacy = JSON.parse(legacyRaw); } catch (e) {}
+    if (legacy) {
+      const have = new Set(log.map((e) => e.id));
+      log = log.concat(legacyBases(sid, legacy, Date.now()).filter((e) => !have.has(e.id)));
+      writeLog(sid, log); remove(LEGACY + sid);
+      return log.slice();
+    }
   }
+  logCache.set(sid, { raw, log: log.slice() });
   return log;
 }
 
@@ -157,15 +200,16 @@ function append(sj, entry) {
   const sid = sidOf(sj);
   const localOnly = isSample(sj) || isSampleId(sid);
   const next = localOnly ? { id: newId(), at: Date.now(), ...entry } : { id: newId(), at: Date.now(), u: 1, ...entry };
-  write(LOG + sid, readLog(sid).concat(next));
+  writeLog(sid, readLog(sid).concat(next));
   if (!localOnly) changed();
+  return next;
 }
-export function logAnswer(sj, qid, ok) { append(sj, { k: "a", q: qid, ok: ok ? 1 : 0 }); }
+export function logAnswer(sj, qid, ok) { return append(sj, { k: "a", q: qid, ok: ok ? 1 : 0 }); }
 // Starts the subject's counts again. The entries before it are dropped here to keep the device copy small;
 // the account keeps them, and the reset entry tells every device to skip them.
 export function resetProgress(sj) {
   const sid = sidOf(sj);
-  readLog(sid); write(LOG + sid, []);
+  readLog(sid); writeLog(sid, []);
   append(sj, { k: "r" });
 }
 
@@ -189,7 +233,7 @@ export function subjectFileCounts(files = []) {
 }
 export function markSent(sid, ids) {
   const set = new Set(ids);
-  write(LOG + sid, readLog(sid).map((e) => (set.has(e.id) ? (({ u, ...rest }) => rest)(e) : e)));
+  writeLog(sid, readLog(sid).map((e) => (set.has(e.id) ? (({ u, ...rest }) => rest)(e) : e)));
 }
 
 // One entry as a row of the "reviews" table, and back.
@@ -218,8 +262,8 @@ export function applyRemote({ subjects = [], removed = [], reviews = [] }) {
     const list = rawSubjects().filter((sj) => !gone.has(sj.id)).map((sj) => fresh.get(sj.id) || sj);
     const have = new Set(list.map((sj) => sj.id));
     subjects.forEach((sj) => { if (!have.has(sj.id)) list.push(sj); });
-    write(STORE, list);
-    removed.forEach((id) => { remove(LOG + id); remove(LEGACY + id); });
+    writeSubjects(list);
+    removed.forEach(removeLog);
   }
   const bySubject = new Map();
   reviews.forEach((r) => { if (KIND_BACK[r.kind]) (bySubject.get(r.subject_id) || bySubject.set(r.subject_id, []).get(r.subject_id)).push(r); });
@@ -231,7 +275,7 @@ export function applyRemote({ subjects = [], removed = [], reviews = [] }) {
     const log = readLog(sid), at = new Map(log.map((e, k) => [e.id, k]));
     const before = JSON.stringify(progressFrom(log));
     rows.forEach((r) => { const e = fromRow(r); if (at.has(e.id)) log[at.get(e.id)] = e; else { at.set(e.id, log.length); log.push(e); } });
-    write(LOG + sid, log);
+    writeLog(sid, log);
     if (JSON.stringify(progressFrom(log)) !== before) any = true;
   });
   return any;
@@ -240,7 +284,8 @@ export function applyRemote({ subjects = [], removed = [], reviews = [] }) {
 // Another account signed in on this device: its subjects replace the ones here.
 export function clearLocal() {
   keys(LOG).concat(keys(LEGACY)).forEach(remove);
-  write(STORE, []); saveMeta({ user: null, s: {}, rc: null });
+  logCache.clear();
+  writeSubjects([]); saveMeta({ user: null, s: {}, rc: null });
 }
 
 // Drops local-only preview subjects and their logs without touching sync state or marking deletes.
@@ -251,10 +296,10 @@ export function removeSamples() {
   const meta = loadMeta();
   let metaChanged = false;
   prev.filter(isSample).forEach((sj) => {
-    remove(LOG + sj.id); remove(LEGACY + sj.id);
+    removeLog(sj.id);
     if (meta.s[sj.id]) { delete meta.s[sj.id]; metaChanged = true; }
   });
-  write(STORE, kept);
+  writeSubjects(kept);
   if (metaChanged) saveMeta(meta);
   return true;
 }

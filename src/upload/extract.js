@@ -43,6 +43,7 @@ async function loadPdf() {
   }
   return pdfjs;
 }
+export function preloadPdf() { loadPdf().catch(() => {}); }
 
 // A page as a JPEG, long side about 1400 px: readable for the model, about 1,500 input tokens.
 async function render(page) {

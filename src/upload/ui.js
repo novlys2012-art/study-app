@@ -4,7 +4,7 @@ import { t, getLang } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, createSubject, loadMeta, removeSamples } from "../app/subjects.js";
 import { syncNow } from "../app/autosync.js";
 import * as cloud from "../cloud/supabase.js";
-import { extractFile, extractPhotos, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, MAX_PICTURES, MAX_FREE_PICTURES, ext } from "./extract.js";
+import { extractFile, extractPhotos, preloadPdf, ExtractError, TYPES, PHOTO_TYPES, ACCEPT_FILES, ACCEPT_EXAMS, MAX_PICTURES, MAX_FREE_PICTURES, ext } from "./extract.js";
 import { buildSubject, DEFAULT_MAKE, contextOf } from "./pipeline.js";
 import { readExams, guessYear } from "./exams.js";
 import { readTemplates } from "./templates.js";
@@ -128,6 +128,8 @@ async function refresh() {
   $("upMakeBox").hidden = photoMode();
   renderSubjects(); step(1);
   panel("upForm"); renderMake(); renderPicked();
+  const cached = getCachedUsage();
+  if (cached) showUsage(cached);
   try {
     showUsage((await cloud.call("usage", {}, getLang())).usage);
     if (photoMode() && getCachedUsage() && !isPlusActive()) error(t("upload.err.plus_required"));
@@ -433,6 +435,7 @@ function wire() {
   $("upAgree").onclick = () => { try { localStorage.setItem(CONSENT_KEY, "1"); } catch (e) {} refresh(); };
   $("upFiles").onchange = () => {
     error("");
+    if ([...$("upFiles").files].some((f) => ext(f.name) === ".pdf")) preloadPdf();
     if (photoMode()) {
       // Every file is one exam/workbook; photos picked together are the pages of one item, in name order.
       const files = [...$("upFiles").files];

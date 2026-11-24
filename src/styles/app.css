@@ -59,7 +59,6 @@ body{
   letter-spacing:var(--body-ls);
   caret-color:var(--ledger);
   -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
   -webkit-tap-highlight-color:transparent;
 }
 html.is-native body{overscroll-behavior-y:none}
@@ -433,7 +432,7 @@ select.search{appearance:auto}
 
 /* ===== Reader (Read mode: calm 65ch prose + single-layer Proof Highlight) ===== */
 .readbar{position:absolute;left:0;right:0;bottom:-1px;height:2px}
-.readbar i{display:block;height:100%;width:0;background:var(--ledger)}
+.readbar i{display:block;height:100%;width:100%;background:var(--ledger);transform:scaleX(0);transform-origin:0 50%;will-change:transform}
 .toc{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px;padding:2px 16px 4px;scrollbar-width:none}
 .toc::-webkit-scrollbar{display:none}
 .toc button{flex:0 0 auto;font-size:.875rem}

@@ -37,8 +37,14 @@ test("hasUnsynced detects pending answers and dirty subjects", () => {
   saveMeta({ user: "u1", s: { s1: { at: 1, base: 1, dirty: false, del: false } }, rc: null });
   assert.equal(hasUnsynced(), false);
 
-  logAnswer(sj, "q1", true);
+  const entry = logAnswer(sj, "q1", true);
+  assert.equal(entry.k, "a");
+  assert.equal(entry.q, "q1");
   assert.equal(hasUnsynced(), true);
+
+  // Direct external localStorage writes invalidate the raw-string cache automatically.
+  localStorage.setItem("studyapp-subjects-v1", JSON.stringify([{ ...sj, name: "Bio 2" }]));
+  assert.equal(loadSubjects()[0].name, "Bio 2");
 
   markSent("s1", unsent().map((x) => x.e.id));
   assert.equal(hasUnsynced(), false);

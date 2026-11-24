@@ -1,18 +1,20 @@
 // The app's screens: Today, Subjects, one subject (topics, summaries), the summary reader,
 // the multiple-choice quiz and Profile. The upload screen has its own module (src/upload/ui.js).
 // How screens should look and behave: docs/design.md.
-import { t, getLang, setLang } from "../i18n/index.js";
+import { t, getLang, setLang, ensureLang, applyI18n } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, createSubject, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
 import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
 import { isProblem, correctAnswers, checkNumericAnswer } from "./problems.js";
 import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
-import { daysTo, questionStats, dueRound, dailyPlan } from "./plan.js";
+import { daysTo, memoryStates, questionStats, dueRound, dailyPlan } from "./plan.js";
 import { renderLimit, limitInfo, getCachedUsage, setCachedUsage, isPlusActive } from "./limit.js";
 import { openWelcome, syncAuthCopy } from "./welcome.js";
-import { ensureSampleSubject, SAMPLE_ID } from "./sample.js";
 import { clearPendingAuth } from "./auth-state.js";
+
+const SAMPLE_ID = "sample-mikro";
+const CLOUD_CONFIGURED = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_KEY);
 import {
   initNativeShell, isNative, syncNativeChrome, haptic, minimizeApp,
   onHardwareBack, onOpenSubject, reminderPermission, requestReminderPermission,
@@ -106,7 +108,8 @@ function show(id) {
   const showAdd = SUBJECTS.length > 0;
   $("todayAdd").hidden = !showAdd;
   $("homeAdd").hidden = !showAdd;
-  if (dir !== "none") {
+  const tabSwitch = !!(TAB_OF[screen] && TAB_OF[id] && screen !== id);
+  if (dir !== "none" && !tabSwitch) {
     const s = $(id);
     s.classList.remove("in-fwd", "in-back", "in-fade"); void s.offsetWidth; s.classList.add("in-" + dir);
   }
@@ -294,14 +297,15 @@ function renderToday() {
   let last = ""; try { last = localStorage.getItem(LAST_KEY) || ""; } catch (e) {}
   const rows = SUBJECTS.map((sj) => {
     const log = readLog(sj);
-    return { sj, log, st: stats(sj.questions, log), d: daysTo(sj.exam) };
+    const states = memoryStates(log);
+    return { sj, states, st: stats(sj.questions, states), d: daysTo(sj.exam) };
   });
   const withQ = rows.filter((r) => r.st.total);
   // The big card is the subject with the nearest exam, or else the one opened last.
   const soon = withQ.filter((r) => r.d != null && r.d >= 0).sort((a, b) => a.d - b.d)[0];
   const hero = soon || withQ.find((r) => r.sj.id === last) || withQ[0];
   if (hero) {
-    const plan = dailyPlan(hero.sj.questions, hero.log, hero.sj.exam, { roundSize: roundLimit(hero.sj.questions) });
+    const plan = dailyPlan(hero.sj.questions, hero.states, hero.sj.exam, { roundSize: roundLimit(hero.sj.questions) });
     const c = el("div", "sheet hero");
     const open = button("hero-open", null, () => go(hero.sj.id));
     const names = el("span", "grow");
@@ -445,7 +449,8 @@ function renderSubject() {
   const mixed = hasBothKinds(QUESTIONS);
   if (!mixed) subjectKind = "all";
   const activeQs = filterKind(QUESTIONS, subjectKind);
-  const st = stats(activeQs, LOG), files = summaries().length, fc = subjectFileCounts(CUR.files);
+  const states = memoryStates(LOG);
+  const st = stats(activeQs, states), files = summaries().length, fc = subjectFileCounts(CUR.files);
   $("sName").textContent = CUR.name;
   const templates = CUR.templates || [];
   $("sMeta").textContent = [
@@ -488,7 +493,7 @@ function renderSubject() {
   $("tabFiles").hidden = tab !== "files" || !has.files;
   $("tabExams").hidden = tab !== "exams" || !has.exams;
   $("tabTemplates").hidden = tab !== "templates" || !has.templates;
-  if (!$("tabOverview").hidden) renderOverview();
+  if (!$("tabOverview").hidden) renderOverview(states);
   if (!$("tabFiles").hidden) renderFiles();
   if (!$("tabExams").hidden) renderExams();
   if (!$("tabTemplates").hidden) renderTemplates();
@@ -502,11 +507,11 @@ $("sEmptyExams").onclick = () => openUpload(CUR.id, "exams");
 $("sEmptyTemplates").onclick = () => openUpload(CUR.id, "templates");
 
 // Topics from the weakest. A topic opens to its summary, weak spots and a button that practises it.
-function renderOverview() {
+function renderOverview(states = memoryStates(LOG)) {
   const info = CUR.topicInfo || {};
   const rows = topicKeys().map((k) => {
     const tQs = filterKind(QUESTIONS.filter((x) => x.t === k), subjectKind);
-    return { k, tQs, st: stats(tQs, LOG), it: info[k] || {} };
+    return { k, tQs, st: stats(tQs, states), it: info[k] || {} };
   }).sort((a, b) => (a.st.total ? a.st.pct : 101) - (b.st.total ? b.st.pct : 101));
   $("tbars").replaceChildren(...rows.map(({ k, tQs, st, it }) => {
     const c = el("div", "tcard" + (openTopic === k ? " open" : ""));
@@ -538,21 +543,32 @@ function renderOverview() {
   }));
 }
 
+const fileSearchCache = new WeakMap();
+let fileRowItems = [];
+function fileSearchText(f) {
+  let cached = fileSearchCache.get(f);
+  if (cached == null) {
+    cached = norm([f.title, f.name, f.summary || f.text, ...(f.keyTerms || []).map((k) => k.term + " " + k.meaning)].join(" "));
+    fileSearchCache.set(f, cached);
+  }
+  return cached;
+}
+
 function renderFiles() {
   const files = summaries();
   let rows = files.map((f) => ({ f, name: f.title || f.name, size: +f.pagesBefore || 0 }));
   if (sortBy === "az") rows.sort((x, y) => x.name.localeCompare(y.name, getLang()));
   if (sortBy === "long") rows.sort((x, y) => y.size - x.size);
-  $("files").replaceChildren(...rows.map(({ f, name }) => {
+  fileRowItems = rows.map(({ f, name }) => {
     const b = button("rowcard file", null, () => { readerHint = null; go(CUR.id + "/read/" + CUR.files.indexOf(f)); });
     const g = el("span", "grow"), art = el("span", "file-art");
     art.appendChild(icon("doc"));
     const pageHint = f.context ? t("study.contextPages", { before: f.pagesBefore }) : t("study.pages", { before: f.pagesBefore, after: String(f.pagesAfter).replace(".", ",") });
     g.append(el("span", "rc-title", name), el("span", "hint", pageHint));
     b.append(art, g, icon("chev", "chev"));
-    b.dataset.text = norm([f.title, f.name, f.summary || f.text, ...(f.keyTerms || []).map((k) => k.term + " " + k.meaning)].join(" "));
-    return b;
-  }));
+    return { el: b, f };
+  });
+  $("files").replaceChildren(...fileRowItems.map((r) => r.el));
   $("studyTools").hidden = files.length < 2;
   $("studySearch").hidden = files.length < SEARCH_FROM;
   if (files.length < SEARCH_FROM) query = "";
@@ -566,7 +582,7 @@ function renderFiles() {
 function filterFiles() {
   const q = norm(query.trim());
   let n = 0;
-  [...$("files").children].forEach((b) => { const hit = !q || b.dataset.text.includes(q); b.hidden = !hit; if (hit) n++; });
+  fileRowItems.forEach(({ el: b, f }) => { const hit = !q || fileSearchText(f).includes(q); b.hidden = !hit; if (hit) n++; });
   $("studyNone").hidden = !q || n > 0;
 }
 $("studySearch").oninput = () => { query = $("studySearch").value; filterFiles(); };
@@ -1030,7 +1046,7 @@ function showReader(f, fileIndex = -1) {
   $("rDock").hidden = !qs.length;
   $("rPractise").lastElementChild.textContent = t("reader.practise");
   $("rPractise").onclick = () => { roundOf = null; start(smartRound(qs, LOG, roundLimit(qs))); };
-  $("rProg").style.width = "0";
+  $("rProg").style.transform = "scaleX(0)";
   show("reader");
 }
 // Ephemeral, zero-AI study summary assembled from the current round's wrong answers and matching summary excerpts.
@@ -1104,15 +1120,21 @@ function showWrongReview() {
   $("rDock").hidden = !wrong.length;
   $("rPractise").lastElementChild.textContent = t("review.practise");
   $("rPractise").onclick = () => start(shuffle(wrong));
-  $("rProg").style.width = "0";
+  $("rProg").style.transform = "scaleX(0)";
   show("reader");
 }
 $("rBack").onclick = () => back(CUR.id);
-// The thin bar under the reader's title: how far down the summary you are.
+// The thin bar under the reader's title: how far down the summary you are (rAF + GPU scaleX, zero layout thrash).
+let rProgRaf = 0;
 window.addEventListener("scroll", () => {
-  if ($("reader").hidden) return;
-  const max = document.documentElement.scrollHeight - window.innerHeight;
-  $("rProg").style.width = (max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 100) + "%";
+  if ($("reader").hidden || rProgRaf) return;
+  rProgRaf = requestAnimationFrame(() => {
+    rProgRaf = 0;
+    if ($("reader").hidden) return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = max > 0 ? Math.max(0, Math.min(1, window.scrollY / max)) : 1;
+    $("rProg").style.transform = `scaleX(${ratio})`;
+  });
 }, { passive: true });
 
 // ===== Rounds: "learn" and the custom round sheet
@@ -1401,8 +1423,7 @@ function gradeProblem(ok) {
   const x = list[i];
   if (ok) score++; else wrong.push(x);
   const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
-  logAnswer(CUR, x.id, ok);
-  LOG = readLog(CUR);
+  LOG.push(logAnswer(CUR, x.id, ok));
   haptic(ok ? "success" : "error");
   i++;
   i < list.length ? render() : finish();
@@ -1413,8 +1434,7 @@ function grade(sel) {
   const ok = C.size === sel.size && [...sel].every((n) => C.has(n));
   if (ok) score++; else wrong.push(x);
   const r = P[x.id] || { n: 0, c: 0 }; r.n++; if (ok) r.c++; r.l = ok ? 1 : 0; P[x.id] = r;
-  logAnswer(CUR, x.id, ok);
-  LOG = readLog(CUR);
+  LOG.push(logAnswer(CUR, x.id, ok));
   haptic(ok ? "success" : "error");
   [...$("opts").children].forEach((b, n) => {
     b.setAttribute("aria-disabled", "true"); b.removeAttribute("aria-pressed");
@@ -1529,9 +1549,11 @@ document.addEventListener("keydown", (e) => {
 
 // The browser's own bars and native iOS/Android status & navigation bars take the canvas colour.
 function paintChrome() {
-  const color = getComputedStyle(document.body).getPropertyValue("--paper").trim();
+  const th = document.documentElement.dataset.theme;
+  const dark = th === "dark" || (!th && matchMedia("(prefers-color-scheme:dark)").matches);
+  const color = dark ? "#121312" : "#f7f7f5";
   const m = document.querySelector('meta[name="theme-color"]');
-  if (m && color) m.content = color;
+  if (m) m.content = color;
   syncNativeChrome(color);
 }
 try { matchMedia("(prefers-color-scheme:dark)").addEventListener("change", paintChrome); } catch (e) {}
@@ -1601,8 +1623,7 @@ $("pUpgrade").onclick = () => {
   openPlus(info?.state === "full" ? "limit" : "");
 };
 
-function setLangUI(l) {
-  setLang(l);
+function syncLangUI(l) {
   const all = [...$("langs").children];
   all.forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === l));
   $("langs").style.setProperty("--n", all.length);
@@ -1610,11 +1631,15 @@ function setLangUI(l) {
   syncAuthCopy();
   syncPlusSheet();
 }
+async function setLangUI(l) {
+  await setLang(l);
+  syncLangUI(l);
+}
 $("themes").onclick = (e) => { const b = e.target.closest("button"); if (b && !b.disabled) setTheme(b.dataset.th); };
-$("langs").onclick = (e) => { const b = e.target.closest("button"); if (b) { setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
+$("langs").onclick = async (e) => { const b = e.target.closest("button"); if (b) { await setLangUI(b.dataset.lang); renderAccount(); renderReminders(); resyncReminders(); } };
 let theme0 = ""; try { theme0 = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
 setTheme(theme0 === "light" || theme0 === "dark" ? theme0 : "");
-setLangUI(getLang());
+syncLangUI(getLang());
 
 // ===== Local exam-countdown study reminders (iOS & Android native local notifications)
 
@@ -1762,16 +1787,38 @@ $("delAcctConfirm").onclick = async () => {
   }
 };
 
-// The account lives in Supabase, whose code loads only here and on the upload screen.
+// The account lives in Supabase, whose code loads only when a session exists or on the upload screen.
 async function renderAccount() {
-  $("pSign").hidden = true; $("pLimit").hidden = true; $("pDelete").hidden = true; $("pWho").textContent = ""; $("pEmail").textContent = ""; $("pAvatar").textContent = "";
-  $("pAvatar").classList.add("wait");
+  if (!CLOUD_CONFIGURED) {
+    $("pSign").hidden = true; $("pLimit").hidden = true; $("pDelete").hidden = true;
+    $("pEmail").textContent = ""; $("pAvatar").classList.remove("wait"); $("pAvatar").replaceChildren(icon("user"));
+    $("pWho").textContent = t("upload.off");
+    return;
+  }
+  if (!hasSessionToken()) {
+    $("pLimit").hidden = true; $("pDelete").hidden = true;
+    $("pAvatar").classList.remove("wait"); $("pAvatar").replaceChildren(icon("user"));
+    $("pEmail").textContent = t("profile.guest");
+    $("pWho").textContent = t("profile.signedOut");
+    $("pSign").hidden = false;
+    $("pSign").className = "btn wide";
+    $("pSign").textContent = t("upload.verify"); $("pSign").onclick = () => go("signin");
+    return;
+  }
+  // Show cached quota immediately while refreshing session and usage in the background.
+  const cachedU = getCachedUsage();
+  if (cachedU) renderLimit($("pLimit"), cachedU, t);
+  else $("pLimit").hidden = true;
+  if (!$("pEmail").textContent) {
+    $("pSign").hidden = true; $("pDelete").hidden = true; $("pWho").textContent = ""; $("pAvatar").textContent = "";
+    $("pAvatar").classList.add("wait");
+  }
   const cloud = await import("../cloud/supabase.js");
-  if (!cloud.configured) { $("pAvatar").classList.remove("wait"); $("pAvatar").replaceChildren(icon("user")); $("pWho").textContent = t("upload.off"); return; }
   let s = null; try { s = await cloud.session(); } catch (e) {}
   $("pAvatar").classList.remove("wait");
   $("pSign").hidden = false;
   if (!s) {
+    $("pLimit").hidden = true; $("pDelete").hidden = true;
     $("pAvatar").replaceChildren(icon("user"));
     $("pEmail").textContent = t("profile.guest");
     $("pWho").textContent = t("profile.signedOut");
@@ -1813,8 +1860,9 @@ function showWelcome(openAuth = false, preferredMode = "login") {
   show("welcome");
   openWelcome({
     enterApp: () => { markEntered(); go(""); },
-    trySample: () => {
+    trySample: async () => {
       if (hasSessionToken()) { markEntered(); go(""); return; }
+      const { ensureSampleSubject } = await import("./sample.js");
       const id = ensureSampleSubject(getLang());
       markEntered();
       go(id);
@@ -1859,6 +1907,9 @@ function showUpload(target, signIn, mode) {
 }
 
 route();
+if (getLang() === "cs") {
+  ensureLang("cs").then(() => { applyI18n(document); syncLangUI("cs"); refresh(); });
+}
 resyncReminders();
 
 // Subjects or progress arrived from the account (another device, or this one after its storage was cleared).
