@@ -104,7 +104,8 @@ test("server: template_problem enforces variant 1|2, routes math to strong, and 
 
   // Variant 1 ignores avoid, routes numeric template to strong, and populates ai_cache.
   const r1 = await handle({ task: "template_problem", input: { template: mathTpl, variant: 1, avoid: "should-be-ignored", context: "x".repeat(8000) } }, d1);
-  assert.equal(r1.cached, false);
+  assert.equal("cached" in r1, false);
+  assert.equal(d1.rows[0].cached, false);
   assert.equal(d1.calls[0].tier, "strong");
   assert.equal(d1.calls[0].effort, "medium");
   assert.doesNotMatch(d1.calls[0].prompt, /<avoid>/);
@@ -112,7 +113,8 @@ test("server: template_problem enforces variant 1|2, routes math to strong, and 
 
   // Repeated variant 1 hits ai_cache even over monthly cap.
   const r1Again = await handle({ task: "template_problem", input: { template: mathTpl, variant: 1, context: "x".repeat(8000) } }, { ...d1, spend: async () => ({ month: 5, today: 0, minute: 0 }) });
-  assert.equal(r1Again.cached, true);
+  assert.equal("cached" in r1Again, false);
+  assert.equal(d1.rows[1].cached, true);
   assert.equal(d1.calls.length, 1);
 
   // Variant 2 includes <avoid> and is distinct in cache.

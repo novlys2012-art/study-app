@@ -84,7 +84,7 @@ try { history.scrollRestoration = "manual"; } catch (e) {}
 // After a reload the sheet that was open is closed, so its entry is an ordinary one again.
 if (history.state && history.state.sheet) history.replaceState({ d: history.state.d || 0 }, "");
 
-const here = () => decodeURIComponent(location.hash.slice(1));
+const here = () => { try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return ""; } };
 const depth = () => (history.state && history.state.d) || 0;
 
 function go(h, replace) {

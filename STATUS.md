@@ -1,6 +1,6 @@
 # Lekto — Status & Handoff
 
-Last updated: 2026-11-23
+Last updated: 2026-11-24
 Build / checks: Pending CI/Node run after Clean Proof design system overhaul (Node.js not installed in local Windows workspace; mechanical i18n/JSON/HTML/JS/CSS checks verified).
 
 Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
@@ -156,6 +156,14 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
   - Enabled creating a new subject without picking files on `#upload` Step 1 (`#upFilesLabel` shows `"Súbory (voliteľné)"` and `#upNext` creates the empty subject when 0 files are picked, switching back to `"Ďalej"` once any file is picked).
   - Kept `#sCard` (exam date) visible on empty subjects, aligned `#sEmpty` into desktop column 2 with direct buttons to upload course files, past exams, or worked-example templates later, and showed honest `"Zatiaľ bez materiálov"` subtitles on `#today` and `#home`.
 
+### 1.18 Security Hardening (Atomic Spend Reservation, Row Limits, Input Validation, CSP & CI)
+- **Files**: `supabase/migrations/20261124120000_security_hardening.sql`, `server/generate.js`, `supabase/functions/generate/index.ts`, `src/app/app.js`, `index.html`, `public/{privacy.html,cs/privacy.html}`, `vite.config.js`, `package.json`, `.github/workflows/mobile-release.yml`, `.env.example`, `test/{server.test.mjs,templates.test.mjs,smoke.mjs,db/rls.sql}`, `docs/{security-todo.md,live-setup.md,mobile-release.md}`, `CLAUDE.md`
+- **How it works**:
+  - **Atomic pre-call reservation (`ai_reserve`)**: Added Postgres RPC `public.ai_reserve(...)` taking `pg_advisory_xact_lock(hashtext('lekto:ai_reserve'))` across all Edge Function instances, checking `per_minute`, Free monthly `vision_pages`, monthly user cap, Free daily pool, and global daily ceiling before inserting a worst-case reservation row (`estimateMaxUsd(ai, req)` using `ai/prices.js` + `1600` tokens/image + `maxTokens`), then settling to actual cost on success or deleting on provider error.
+  - **Isolated Free daily pool & Free server-side vision cap**: Split `FREE_DAILY_LIMIT_USD` (default `$3`) from the global emergency ceiling `DAILY_LIMIT_USD` (default `$25`, warning log at 80%) via `ai_usage.plan` so Free bursts cannot lock out Lekto Plus users; tracked `ai_usage.vision_pages` and capped Free accounts at `FREE_VISION_PAGES_MONTHLY` (default `18` → `402 plus_required`).
+  - **Per-user DB row limits & `ai_cache` 90-day TTL**: Added `AFTER INSERT FOR EACH STATEMENT` triggers limiting each user to `200` `subjects`, `200` `progress`, and `200,000` `reviews` rows (allowing upserts on existing rows at cap), pruned `ai_cache` rows older than 90 days on read & insert, updated SK/CS `privacy.html` with the 90-day anonymous cache retention note, and omitted `cached` from HTTP responses.
+  - **Input, hash, CSP, dev-server & CI hardening**: Validated `body`, `input`, and item shapes in `topics`, `group`, `check`, and `check_problems` (`400 bad_input`); wrapped `decodeURIComponent` in `here()` (`src/app/app.js`) in `try/catch`; added a CSP `<meta>` tag to `index.html`; bound Vite dev server to `127.0.0.1` outside container environments; and passed `mobile-release.yml` workflow inputs via `env:` with validation.
+
 ---
 
 ## 2. Load-Bearing Invariants (Do Not Break)
@@ -190,9 +198,8 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
 
 ## 5. Open / Next Tasks
 
-- [ ] Run `npm run fn:prepare` and deploy the updated Supabase `generate` Edge Function so production accepts `context`, smart routing, and `delete_account`.
-- [ ] Run `npm test && npm run lint && npm run build && npm run smoke && npm run e2e` + `./gradlew assembleDebug` in GitHub Actions CI (or a machine with Node 22) and test on physical iPhone, iPad, and Android devices (`docs/mobile-release.md`).
+- [ ] Watch GitHub Actions `Build`, `Deploy server`, and `Deploy web preview` after pushing `main` (runs `npm test`, `npm run build`, `npm run smoke`, `npm run e2e`, `npm run test:db`, Android `assembleDebug`, applies `20261123140000` + `20261124120000` migrations, and redeploys `generate`), and test on physical iPhone, iPad, and Android devices (`docs/mobile-release.md`).
+- [ ] Supabase Auth dashboard checks (`docs/live-setup.md` §3, `docs/security-todo.md`): verify **Confirm email** is ON, min password length `8`, paste updated email templates + custom SMTP (Resend), enable **Leaked password protection** (if available), and turn on **CAPTCHA** (Cloudflare Turnstile) before public sign-ups.
 - [ ] Configure Android upload keystore secrets and Codemagic iOS App Store Connect integration (`docs/mobile-release.md`).
-- [ ] **Security fixes before public launch** (`docs/security-todo.md`, review of 23 Nov): atomic spending reservation in `generate` (caps can be raced today), the global daily cap as a kill switch, a per-user row limit on `subjects`/`reviews`, plus the smaller items listed there.
 - [ ] Remaining roadmap items from `CLAUDE.md`: payments (Stripe / RevenueCat) once paid tier launches.
 - [ ] **Later idea — iPad stylus scratchpad in `Príklady` & `Vzory`**: Add an ephemeral `<canvas>` scratch area (`Náčrt`) inside `#probBox` (`#quiz`) and `#tpProb` (`#template`) using standard Pointer Events (`pointerdown`/`pointermove`/`pointerup`, `e.pointerType === "pen"` palm rejection once a stylus is detected, `e.pressure`, `getCoalescedEvents?.()`, `touch-action: none`) with Pen / Eraser / Undo / Clear controls that reset per problem (zero `localStorage` or Supabase sync bloat).

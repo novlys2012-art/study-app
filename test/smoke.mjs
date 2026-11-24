@@ -139,6 +139,8 @@ check(await page.locator("#today").isVisible(), "leaving a round started on Toda
 await page.click('#tabbar [data-go="profile"]');
 await page.click('#themes [data-th="dark"]');
 check((await page.evaluate(() => document.documentElement.dataset.theme)) === "dark", "profile switches to dark");
+await page.goto(base + "#%E0");
+check(await page.locator("#today").isVisible(), "malformed URL hash falls back cleanly to Today");
 
 await browser.close();
 server.close();

@@ -33,12 +33,40 @@ Deno.serve(async (req) => {
         const { data, error } = await admin.rpc("ai_spend", acctKey ? { uid, acct_key: acctKey } : { uid });
         if (error) throw error;
         const row = (Array.isArray(data) ? data[0] : data) || {};
-        return { month: Number(row.user_month || 0), today: Number(row.all_today || 0), minute: Number(row.user_minute || 0) };
+        return {
+          month: Number(row.user_month || 0),
+          today: Number(row.all_today || 0),
+          freeToday: Number(row.free_today || 0),
+          minute: Number(row.user_minute || 0),
+          vision: Number(row.user_vision || 0),
+        };
       },
-      async reserve(row: Record<string, unknown>) {
-        const { data, error } = await admin.from("ai_usage").insert(row).select("id").single();
+      async reserve(p: Record<string, unknown>) {
+        const { data, error } = await admin.rpc("ai_reserve", {
+          uid: p.user_id,
+          acct_key: p.account_key ?? null,
+          p_plan: p.plan,
+          p_task: p.task,
+          p_model: p.model,
+          p_est_usd: p.est_usd,
+          p_month_limit: p.month_limit,
+          p_daily_limit: p.daily_limit,
+          p_free_daily_limit: p.free_daily_limit,
+          p_per_minute: p.per_minute,
+          p_vision_pages: p.vision_pages ?? 0,
+          p_vision_month_limit: p.vision_month_limit ?? null,
+        });
         if (error) throw error;
-        return data?.id ?? null;
+        const row = (Array.isArray(data) ? data[0] : data) || {};
+        return {
+          ok: Boolean(row.ok),
+          reason: row.reason || null,
+          id: row.row_id ?? null,
+          month: Number(row.user_month || 0),
+          today: Number(row.all_today || 0),
+          freeToday: Number(row.free_today || 0),
+          minute: Number(row.user_minute || 0),
+        };
       },
       async release(id: number | string) {
         const { error } = await admin.from("ai_usage").delete().eq("id", id);
@@ -54,15 +82,16 @@ Deno.serve(async (req) => {
         const { error } = await admin.auth.admin.deleteUser(uid);
         if (error) throw error;
       },
-      // Answers stored by content hash (table ai_cache, service role only), so a repeated request is free.
+      // Answers stored by content hash (table ai_cache, service role only, 90-day TTL), so a repeated request is free.
       cache: {
         async get(key: string) {
-          const { data, error } = await admin.from("ai_cache").select("result").eq("key", key).maybeSingle();
+          const cutoff = new Date(Date.now() - 90 * 864e5).toISOString();
+          const { data, error } = await admin.from("ai_cache").select("result").eq("key", key).gt("created_at", cutoff).maybeSingle();
           if (error) throw error;
           return data ? data.result : null;
         },
         async put(row: Record<string, unknown>) {
-          const { error } = await admin.from("ai_cache").upsert(row, { onConflict: "key", ignoreDuplicates: true });
+          const { error } = await admin.from("ai_cache").upsert({ ...row, created_at: new Date().toISOString() }, { onConflict: "key" });
           if (error) throw error;
         },
       },

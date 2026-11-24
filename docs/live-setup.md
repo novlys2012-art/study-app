@@ -30,8 +30,9 @@ Students register with an email + password (min. 8 characters) and verify their 
 
 **Auth settings.** Authentication → Providers → Email:
 
-- Ensure **Enable Email provider** and **Confirm email** are turned ON.
-- Under Authentication → Settings → Password Settings, set **Minimum password length** to `8`.
+- Ensure **Enable Email provider** and **Confirm email** stay turned ON (`ALLOWED_EMAILS` and `PLUS_EMAILS` trust the verified email address).
+- Under Authentication → Settings → Password Settings, set **Minimum password length** to `8`, and turn on **Leaked password protection** if your Supabase plan supports it.
+- Before opening sign-ups publicly, enable **CAPTCHA protection** (Cloudflare Turnstile) under Authentication → Attack Protection to stop automated free-account bursts.
 
 **URLs.** Authentication → URL Configuration:
 
@@ -68,7 +69,9 @@ Edge Functions → Secrets (https://supabase.com/dashboard/project/_/functions/s
 | `FREE_MONTHLY_LIMIT_USD` | optional, default `0.15` (15 credits per calendar month on the free plan) |
 | `PLUS_MONTHLY_LIMIT_USD` | optional, default `1.5` (150 credits per calendar month on Lekto Plus) |
 | `USER_MONTHLY_LIMIT_USD` | optional legacy override when `FREE_MONTHLY_LIMIT_USD` / `PLUS_MONTHLY_LIMIT_USD` are not set |
-| `DAILY_LIMIT_USD` | optional, default `5` (the whole app's AI spending per day, UTC) |
+| `FREE_DAILY_LIMIT_USD` | optional, default `3` (total Free-tier AI spend per UTC day; isolated so Free bursts cannot block Lekto Plus users) |
+| `DAILY_LIMIT_USD` | optional, default `25` (overall emergency AI spending ceiling per UTC day across all users; logs a warning at 80%) |
+| `FREE_VISION_PAGES_MONTHLY` | optional, default `18` (monthly picture-page OCR cap on Free before requiring Lekto Plus) |
 | `USER_RATE_PER_MINUTE` | optional, default `60` (AI tasks one account may run in a minute; the app waits and tries again when it is reached) |
 
 ## 5. GitHub settings

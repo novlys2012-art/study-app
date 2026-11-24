@@ -1,17 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handle, HttpError, limitsFrom, isPlusUser, PLUS_TASKS, accountKey, MAX_CONCURRENT, cacheKey, needsStrongCheck } from "../server/generate.js";
+import { handle, HttpError, limitsFrom, isPlusUser, PLUS_TASKS, accountKey, MAX_CONCURRENT, cacheKey, needsStrongCheck, estimateMaxUsd } from "../server/generate.js";
 import { buildSubject, stepsFor, retrying, backoff, contextOf, citedForCheck } from "../src/upload/pipeline.js";
 import { createSubject } from "../src/app/subjects.js";
 import { parseQuiz, parseProblems, parseTopics, parseVision, parseChecks, parseProblemChecks } from "../ai/tasks.js";
 import { getProvider } from "../ai/index.js";
 
 const user = { id: "u1", email: "simon@example.com" };
-function deps({ month = 0, today = 0, minute = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null, user: u = user } = {}) {
+function deps({ month = 0, today = 0, freeToday = today, minute = 0, vision = 0, env = {}, text = '{"title":"T","summary":"- a","key_terms":[]}', truncated = false, fail = null, cache = null, user: u = user } = {}) {
   const rows = [], calls = [];
   return {
     rows, calls, user: u, env, cache, log: () => {},
-    spend: async () => ({ month, today, minute }),
+    spend: async () => ({ month, today, freeToday, minute, vision }),
     record: async (r) => rows.push(r),
     ai: {
       name: "fake", models: { fast: "m", strong: "m2" },
@@ -37,10 +37,21 @@ test("server: needs a signed-in user and a known task", async () => {
   await rejects(handle({ task: "summary", input: { text: "x".repeat(70_000) } }, deps()), "too_large");
 });
 
-test("server: stops at the monthly and daily caps before calling the AI", async () => {
+test("server: stops at the monthly, free-daily, global-daily and free-vision caps before calling the AI", async () => {
   const d = deps({ month: 0.15 });
   await rejects(handle({ task: "summary", input: { text: "abc" } }, d), "user_limit");
-  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ today: 5 })), "daily_limit");
+  // Free daily pool (default $3) blocks Free accounts without cutting off Plus users.
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ today: 3 })), "daily_limit");
+  const plusUnderCeiling = deps({ today: 3, user: { ...user, plan: "plus" } });
+  await handle({ task: "summary", input: { text: "abc" } }, plusUnderCeiling);
+  assert.equal(plusUnderCeiling.calls.length, 1);
+  // Global emergency ceiling (default $25) still stops Plus users.
+  await rejects(handle({ task: "summary", input: { text: "abc" } }, deps({ today: 25, user: { ...user, plan: "plus" } })), "daily_limit");
+  // Free monthly vision page cap (default 18) returns plus_required; Plus is unaffected.
+  const img = [{ page: 1, mediaType: "image/jpeg", data: "AAAA" }];
+  await rejects(handle({ task: "vision", input: { images: img } }, deps({ vision: 18, text: '{"pages":[{"page":1,"text":"T"}]}' })), "plus_required");
+  await handle({ task: "vision", input: { images: img } }, deps({ vision: 50, user: { ...user, plan: "plus" }, text: '{"pages":[{"page":1,"text":"T"}]}' }));
+
   const raised = deps({ month: 0.15, env: { USER_MONTHLY_LIMIT_USD: "2" } });
   await handle({ task: "summary", input: { text: "abc" } }, raised);
   assert.equal(d.calls.length, 0);
@@ -96,21 +107,55 @@ test("server: pre-call cost reservation & concurrency cap block parallel TOCTOU 
   assert.equal(batch.filter((x) => x.status === "fulfilled").length, MAX_CONCURRENT.free);
   assert.deepEqual(batch.filter((x) => x.status === "rejected").map((x) => x.reason.code), ["rate_limit", "rate_limit"]);
 
-  // DB reserve/release hooks: reservation is updated on success and deleted when ai.complete fails.
+  // Worst-case cost estimator covers Sonnet 16k-output + images accurately.
+  const sonnetAi = { name: "anthropic", models: { fast: "claude-haiku-5-5", strong: "claude-sonnet-5-5" } };
+  const strongEst = estimateMaxUsd(sonnetAi, { tier: "strong", system: "s".repeat(2000), prompt: "p".repeat(12000), images: [{}, {}, {}, {}, {}, {}], maxTokens: 16000 });
+  assert.ok(strongEst >= 0.18, `expected worst-case Sonnet reserve >= $0.18, got ${strongEst}`);
+
+  // Atomic DB reserve/release hooks: reservation enforces server reasons, updates on success, deletes on failure.
   const dbRows = new Map();
   let seq = 1;
-  const withDbReserve = (fail = null) => ({
+  const warnings = [];
+  const withDbReserve = ({ fail = null, reserveResult = null } = {}) => ({
     ...deps({ fail, user: { id: "u-db", email: "db@example.com" } }),
-    reserve: async (row) => { const id = seq++; dbRows.set(id, row); return id; },
+    log: (msg, meta) => warnings.push([msg, meta]),
+    reserve: async (p) => {
+      if (reserveResult) return reserveResult;
+      const id = seq++;
+      dbRows.set(id, { ...p, cost_usd: p.est_usd });
+      return { ok: true, id, month: 0, today: 21, freeToday: 0, minute: 0 };
+    },
     release: async (id) => { dbRows.delete(id); },
     record: async (row, id) => { dbRows.set(id ?? seq++, row); },
   });
   await handle({ task: "summary", input: { text: "ok" } }, withDbReserve());
   assert.equal(dbRows.size, 1);
   assert.equal([...dbRows.values()][0].cost_usd, 0.01);
+  assert.ok(warnings.some(([m]) => m === "daily_spend_high"), "logs warning above 80% of daily ceiling");
 
-  await rejects(handle({ task: "summary", input: { text: "fail" } }, withDbReserve(Object.assign(new Error("busy"), { status: 503 }))), "ai_busy");
+  for (const reason of ["rate_limit", "plus_required", "user_limit", "daily_limit"]) {
+    const blocked = withDbReserve({ reserveResult: { ok: false, reason } });
+    await rejects(handle({ task: "summary", input: { text: "blocked" } }, blocked), reason);
+    assert.equal(blocked.calls.length, 0);
+  }
+
+  await rejects(handle({ task: "summary", input: { text: "fail" } }, withDbReserve({ fail: Object.assign(new Error("busy"), { status: 503 }) })), "ai_busy");
   assert.equal(dbRows.size, 1, "failed provider call released its reserved row");
+});
+
+test("server: malformed inputs return 400 bad_input instead of throwing 500", async () => {
+  const plusUser = { ...user, plan: "plus" };
+  await rejects(handle({ task: "summary", input: null }, deps()), "bad_input");
+  await rejects(handle({ task: "summary", input: "text" }, deps()), "bad_input");
+  await rejects(handle({ task: "topics", input: { files: [null], questions: [] } }, deps()), "bad_input");
+  await rejects(handle({ task: "topics", input: { files: [], questions: [null] } }, deps()), "bad_input");
+  await rejects(handle({ task: "group", input: { exams: [null] } }, deps({ user: plusUser })), "bad_input");
+  await rejects(handle({ task: "group", input: { exams: [{ name: "E", questions: [null] }] } }, deps({ user: plusUser })), "bad_input");
+  await rejects(handle({ task: "check", input: { text: "src", questions: [null] } }, deps()), "bad_input");
+  await rejects(handle({ task: "check", input: { text: "src", questions: [{ q: "A?", o: ["only-one"], a: 0 }] } }, deps()), "bad_input");
+  await rejects(handle({ task: "check", input: { text: "src", questions: [{ q: "A?", o: ["a", "b"], a: 5 }] } }, deps()), "bad_input");
+  await rejects(handle({ task: "check_problems", input: { text: "src", problems: [null] } }, deps({ user: plusUser })), "bad_input");
+  await rejects(handle({ task: "check_problems", input: { text: "src", problems: [{ q: "A", steps: "not-array", ans: "1" }] } }, deps({ user: plusUser })), "bad_input");
 });
 
 test("server: the test list blocks other accounts", async () => {
@@ -268,10 +313,11 @@ test("server: the same request is answered from the cache, for free and even ove
   const d = deps({ cache });
   const body = { task: "summary", input: { title: "L1", text: "[1]\nText" } };
   const first = await handle(body, d);
-  assert.equal(first.cached, false);
+  assert.equal("cached" in first, false, "HTTP response omits cached flag");
+  assert.equal(d.rows[0].cached, false);
   assert.equal(cache.m.size, 1);
-  const again = await handle(body, { ...d, spend: async () => ({ month: 5, today: 0 }) });
-  assert.equal(again.cached, true);
+  const again = await handle(body, { ...d, spend: async () => ({ month: 5, today: 0, minute: 0 }) });
+  assert.equal("cached" in again, false, "HTTP response omits cached flag on hit too");
   assert.deepEqual(again.result, first.result);
   assert.equal(d.calls.length, 1, "the AI was asked once");
   assert.deepEqual([d.rows[1].cached, d.rows[1].cost_usd], [true, 0]);

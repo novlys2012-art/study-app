@@ -49,10 +49,23 @@ do $$ begin
   exception when insufficient_privilege then null; end;
   begin perform public.ai_spend('aaaaaaaa-0000-0000-0000-000000000001'); raise exception 'a student could call ai_spend';
   exception when insufficient_privilege then null; end;
+  begin perform public.ai_reserve('aaaaaaaa-0000-0000-0000-000000000001', null, 'free', 'summary', 'm', 0.01, 0.15, 25, 3, 60, 0, 18); raise exception 'a student could call ai_reserve';
+  exception when insufficient_privilege then null; end;
   begin insert into public.ai_usage (user_id, task, model, input_tokens, output_tokens, cost_usd)
     values ('aaaaaaaa-0000-0000-0000-000000000001', 'summary', 'm', 0, 0, 0); raise exception 'a student could write ai_usage';
   exception when insufficient_privilege then null; end;
 end $$;
+-- Per-user row limit on subjects (200 max; updating an existing row at the limit still works).
+insert into public.subjects (id, data)
+  select 'lim-' || g, '{}'::jsonb from generate_series(1, 200) g;
+insert into public.subjects (id, data) values ('lim-1', '{"ok":true}'::jsonb)
+  on conflict (user_id, id) do update set data = excluded.data;
+do $$ begin
+  begin insert into public.subjects (id, data) values ('lim-201', '{}'::jsonb);
+    raise exception 'A exceeded the 200-subject per-user row limit';
+  exception when check_violation then null; end;
+end $$;
+delete from public.subjects where id like 'lim-%';
 commit;
 
 -- B sees none of A's rows and cannot delete them.
@@ -101,9 +114,24 @@ do $$ declare r record; begin
   end if;
   select * into r from public.ai_spend('aaaaaaaa-0000-0000-0000-000000000001');
   if r.user_minute <> 2 or r.user_month <> 0.01 then raise exception 'ai_spend gave % / %', r.user_minute, r.user_month; end if;
+  insert into public.ai_cache (key, task, model, result, created_at) values (repeat('b', 64), 'summary', 'm', '{}', now() - interval '91 days');
   insert into public.ai_cache (key, task, model, result) values (repeat('a', 64), 'summary', 'm', '{}');
+  if exists (select from public.ai_cache where key = repeat('b', 64)) then raise exception 'expired ai_cache row was not pruned'; end if;
   begin insert into public.ai_cache (key, task, model, result) values ('short', 'summary', 'm', '{}'); raise exception 'a bad cache key was accepted';
   exception when check_violation then null; end;
+
+  -- Atomic ai_reserve: enforces monthly, free-daily (without blocking Plus), vision page limit, and inserts a reserved row.
+  select * into r from public.ai_reserve('bbbbbbbb-0000-0000-0000-000000000002', repeat('d', 64), 'free', 'vision', 'm', 0.14, 0.15, 25, 0.14, 60, 10, 18);
+  if not r.ok or r.row_id is null then raise exception 'first ai_reserve failed: %', r.reason; end if;
+  -- Vision monthly limit blocks another 10 pages for Free (10 + 10 > 18).
+  select * into r from public.ai_reserve('bbbbbbbb-0000-0000-0000-000000000002', repeat('d', 64), 'free', 'vision', 'm', 0.01, 0.15, 25, 3, 60, 10, 18);
+  if r.ok or r.reason <> 'plus_required' then raise exception 'expected plus_required for vision cap, got % / %', r.ok, r.reason; end if;
+  -- Free daily cap blocks another Free user once Free daily spend reached 0.14, but a Plus user still succeeds.
+  select * into r from public.ai_reserve('cccccccc-0000-0000-0000-000000000003', null, 'free', 'summary', 'm', 0.01, 0.15, 25, 0.14, 60, 0, 18);
+  if r.ok or r.reason <> 'daily_limit' then raise exception 'expected daily_limit for free pool, got % / %', r.ok, r.reason; end if;
+  select * into r from public.ai_reserve('cccccccc-0000-0000-0000-000000000003', null, 'plus', 'summary', 'm', 0.01, 1.5, 25, 0.14, 60, 0, null);
+  if not r.ok or r.row_id is null then raise exception 'plus user was blocked by free daily pool: %', r.reason; end if;
+  delete from public.ai_usage where user_id in ('bbbbbbbb-0000-0000-0000-000000000002', 'cccccccc-0000-0000-0000-000000000003');
 end $$;
 commit;
 

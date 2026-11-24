@@ -2,27 +2,44 @@
 // The Supabase Edge Function (supabase/functions/generate) wires it to Deno, Supabase and Claude;
 // the tests wire it to fakes. Nothing here touches the network itself.
 import * as T from "../ai/tasks.js";
+import { PRICES } from "../ai/prices.js";
 
 // Defaults when the secrets are not set. USD, because that is what Anthropic bills.
 // freeMonthUsd: $0.15 (15 credits); plusMonthUsd: $1.50 (150 credits).
+// freeDailyUsd caps total Free-tier spend per UTC day separately from the global emergency ceiling (dailyUsd)
+// so a Free-account burst cannot cut off paying Lekto Plus students.
 // perMinute: AI tasks one account may run in a minute (answers from the cache count too).
 export const DEFAULT_LIMITS = {
   freeMonthUsd: 0.15,
   plusMonthUsd: 1.5,
   userMonthUsd: 0.15,
-  dailyUsd: 5,
+  freeDailyUsd: 3,
+  dailyUsd: 25,
   perMinute: 60,
+  freeVisionPages: 18,
   plusEmails: ["novlys2012@gmail.com"],
 };
 
 // Tasks that require an active Lekto Plus plan (Past Exams, Worked Practice Problems, Worked-Example Templates).
 export const PLUS_TASKS = new Set(["exam", "group", "problems", "check_problems", "template", "template_problem"]);
 
-// Pre-call cost reservation & concurrency limits to prevent parallel TOCTOU bursts past monthly/daily caps.
-export const RESERVE_USD = { fast: 0.005, strong: 0.04 };
+// Worst-case cost reservation & concurrency limits to prevent parallel TOCTOU bursts past caps.
+export const RESERVE_USD = { fast: 0.005, strong: 0.18 };
 export const MAX_CONCURRENT = { free: 6, plus: 10 };
 const inFlight = new Map();
 let inFlightTodayUsd = 0;
+let inFlightFreeTodayUsd = 0;
+
+// Worst-case USD estimate for one AI call (input chars/4 + 1.6k tokens/image + maxTokens output).
+export function estimateMaxUsd(ai, req) {
+  const model = ai?.models?.[req.tier] ?? "";
+  const p = PRICES[`${ai?.name}:${model}`];
+  if (!p) return RESERVE_USD[req.tier] ?? RESERVE_USD.fast;
+  const inputChars = (req.system?.length || 0) + (req.prompt?.length || 0);
+  const inputTokens = Math.ceil(inputChars / 4) + (req.images?.length || 0) * 1600;
+  const outputTokens = req.maxTokens || 16000;
+  return +(((inputTokens * p.input) + (outputTokens * p.output)) / 1e6).toFixed(6);
+}
 
 // Non-PII SHA-256 identity key so spend persists even if an account is deleted and recreated.
 export async function accountKey(user) {
@@ -63,8 +80,10 @@ export function limitsFrom(env = {}) {
     userMonthUsd: freeMonthUsd,
     freeMonthUsd,
     plusMonthUsd,
+    freeDailyUsd: num(env.FREE_DAILY_LIMIT_USD, DEFAULT_LIMITS.freeDailyUsd),
     dailyUsd: num(env.DAILY_LIMIT_USD, DEFAULT_LIMITS.dailyUsd),
     perMinute: num(env.USER_RATE_PER_MINUTE, DEFAULT_LIMITS.perMinute),
+    freeVisionPages: num(env.FREE_VISION_PAGES_MONTHLY, DEFAULT_LIMITS.freeVisionPages),
     allowed: allowed.length ? allowed : null,
     plus: plus.length ? plus : null,
   };
@@ -129,6 +148,7 @@ const TASKS = {
       if (!Array.isArray(images) || !images.length) throw new HttpError(400, "bad_input", "No images.");
       pictures(images);
       return {
+        maxTokens: Math.min(16000, Math.max(2500, images.length * 2500)),
         system: T.visionSystem(),
         prompt: T.visionPrompt({ pages: images.map((im) => im.page) }),
         images: images.map((im) => ({ mediaType: im.mediaType, data: im.data })),
@@ -174,13 +194,18 @@ const TASKS = {
     build(input, lang) {
       const qs = input.questions;
       if (!Array.isArray(qs) || !qs.length || qs.length > MAX_QUESTIONS) throw new HttpError(400, "bad_input", "Bad questions.");
+      const valid = qs.filter((x) =>
+        x && typeof x === "object" && typeof x.q === "string" && x.q.trim() &&
+        Array.isArray(x.o) && x.o.length >= 2 && x.o.every((o) => typeof o === "string") &&
+        Number.isInteger(x.a) && x.a >= 0 && x.a < x.o.length);
+      if (valid.length !== qs.length) throw new HttpError(400, "bad_input", "Bad questions.");
       const src = text(input.text);
-      const strong = needsStrongCheck({ text: src, questions: qs, fromVision: input.fromVision === true });
+      const strong = needsStrongCheck({ text: src, questions: valid, fromVision: input.fromVision === true });
       return {
         tier: strong ? "strong" : "fast",
         ...(strong ? { effort: "medium" } : {}),
         system: T.checkSystem(lang),
-        prompt: text(T.checkPrompt({ text: src, questions: qs, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000),
+        prompt: text(T.checkPrompt({ text: src, questions: valid, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 20_000),
       };
     },
   },
@@ -189,10 +214,15 @@ const TASKS = {
     build(input, lang) {
       const ps = input.problems;
       if (!Array.isArray(ps) || !ps.length || ps.length > MAX_PROBLEMS) throw new HttpError(400, "bad_input", "Bad problems.");
+      const valid = ps.filter((p) =>
+        p && typeof p === "object" && typeof p.q === "string" && p.q.trim() &&
+        Array.isArray(p.steps) && p.steps.every((s) => typeof s === "string") &&
+        typeof p.ans === "string");
+      if (valid.length !== ps.length) throw new HttpError(400, "bad_input", "Bad problems.");
       const src = text(input.text);
       return {
         system: T.checkProblemSystem(lang),
-        prompt: text(T.checkProblemPrompt({ text: src, problems: ps, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 25_000),
+        prompt: text(T.checkProblemPrompt({ text: src, problems: valid, context: ctxText(input.context) }), MAX_TEXT + MAX_CONTEXT + 25_000),
       };
     },
   },
@@ -246,8 +276,11 @@ const TASKS = {
     tier: "fast", maxTokens: 8000, parse: T.parseTopics,
     build(input, lang) {
       if (!Array.isArray(input.files) || !Array.isArray(input.questions)) throw new HttpError(400, "bad_input", "Bad topics input.");
+      if (input.files.some((f) => !f || typeof f !== "object") || input.questions.some((x) => !x || typeof x !== "object")) {
+        throw new HttpError(400, "bad_input", "Bad topics input.");
+      }
       const files = input.files.map((f) => ({ name: title(f.name), summary: String(f.summary || "") }));
-      const questions = input.questions.map((x) => ({ id: String(x.id), q: String(x.q) }));
+      const questions = input.questions.map((x) => ({ id: String(x.id ?? ""), q: String(x.q ?? "") }));
       return { system: T.topicSystem(lang), prompt: text(T.topicPrompt({ files, questions }), MAX_TEXT * 2) };
     },
   },
@@ -261,12 +294,17 @@ TASKS.group = {
   build(input, lang) {
     const exams = input.exams;
     if (!Array.isArray(exams) || !exams.length) throw new HttpError(400, "bad_input", "No exams.");
-    const list = exams.map((e) => ({
-      name: title(e && e.name), year: Number.isInteger(e && e.year) ? e.year : null,
-      questions: (Array.isArray(e && e.questions) ? e.questions : []).map((q) => ({
-        ref: String(q.ref).slice(0, 20), topic: String(q.topic || "").slice(0, 80), text: String(q.text || "").replace(/\s+/g, " ").slice(0, GROUP_TEXT),
-      })),
-    }));
+    if (exams.some((e) => !e || typeof e !== "object")) throw new HttpError(400, "bad_input", "Bad exams.");
+    const list = exams.map((e) => {
+      const qs = Array.isArray(e.questions) ? e.questions : [];
+      if (qs.some((q) => !q || typeof q !== "object")) throw new HttpError(400, "bad_input", "Bad exam questions.");
+      return {
+        name: title(e.name), year: Number.isInteger(e.year) ? e.year : null,
+        questions: qs.map((q) => ({
+          ref: String(q.ref ?? "").slice(0, 20), topic: String(q.topic || "").slice(0, 80), text: String(q.text || "").replace(/\s+/g, " ").slice(0, GROUP_TEXT),
+        })),
+      };
+    });
     const n = list.reduce((s, e) => s + e.questions.length, 0);
     if (!n) throw new HttpError(400, "bad_input", "No questions.");
     if (n > MAX_EXAM_QUESTIONS) throw new HttpError(413, "too_large", `At most ${MAX_EXAM_QUESTIONS} questions.`);
@@ -295,15 +333,28 @@ function aiFailure(e) {
   return e;
 }
 
-// body: { task, input, lang }. deps: { user: {id, email} | null, ai, spend(userId, accountKey) -> {month, today, minute},
-// record(row, reservedId?), reserve?(row) -> id, release?(id), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, deleteUser?(userId), log? }.
+function reserveError(reason) {
+  if (reason === "rate_limit") return new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+  if (reason === "plus_required") return new HttpError(402, "plus_required", "This feature requires Lekto Plus.");
+  if (reason === "daily_limit") return new HttpError(429, "daily_limit", "The app's daily limit is reached.");
+  return new HttpError(429, "user_limit", "Monthly limit reached.");
+}
+
+// body: { task, input, lang }. deps: { user: {id, email} | null, ai,
+// spend(userId, accountKey) -> {month, today, minute, freeToday?, vision?},
+// record(row, reservedId?),
+// reserve?(params) -> { ok, reason?, id?, month?, today?, freeToday?, minute? },
+// release?(id), env, cache?: { get(key) -> text | null, put({ key, task, model, result }) }, deleteUser?(userId), log? }.
 // task "usage" returns the caller's spending without an AI call.
 // task "delete_account" deletes the caller's own account and cascades all user data (runs even over caps / off allowlist).
 export async function handle(body, { user, ai, spend, record, reserve = null, release = null, env, cache = null, deleteUser = null, log = console.error }) {
   if (!user) throw new HttpError(401, "auth", "Sign in first.");
-  const { task, input = {}, lang: l } = body || {};
+  if (body != null && (typeof body !== "object" || Array.isArray(body))) throw new HttpError(400, "bad_input", "Bad body.");
+  const { task, input: rawInput, lang: l } = body || {};
+  if (rawInput != null && (typeof rawInput !== "object" || Array.isArray(rawInput))) throw new HttpError(400, "bad_input", "Bad input.");
+  const input = rawInput || {};
   if (task === "delete_account") {
-    if (!input || input.confirm !== true) throw new HttpError(400, "bad_input", "Missing delete confirmation.");
+    if (input.confirm !== true) throw new HttpError(400, "bad_input", "Missing delete confirmation.");
     if (typeof deleteUser !== "function") throw new HttpError(503, "server_error", "Account deletion unavailable.");
     await deleteUser(user.id);
     return { deleted: true };
@@ -317,27 +368,28 @@ export async function handle(body, { user, ai, spend, record, reserve = null, re
   const lang = l === "cs" ? "cs" : "sk";
   const acctKey = await accountKey(user);
   const flightKey = acctKey || String(user.id);
-  const s = await spend(user.id, acctKey);
-  const usage = (extra = 0) => ({ plan, monthUsd: +(s.month + extra).toFixed(4), limitUsd });
-  if (task === "usage") return { usage: usage() };
+  const usage = (month, extra = 0) => ({ plan, monthUsd: +(month + extra).toFixed(4), limitUsd });
+  if (task === "usage") {
+    const s = await spend(user.id, acctKey);
+    return { usage: usage(s.month) };
+  }
   const def = TASKS[task];
   if (!def) throw new HttpError(400, "bad_task", `Unknown task "${task}".`);
   if (!plus && PLUS_TASKS.has(task)) throw new HttpError(402, "plus_required", "This feature requires Lekto Plus.");
-  const curFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
-  if ((s.minute || 0) + curFlight.count >= lim.perMinute || curFlight.count >= maxConcurrent) {
-    throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
-  }
 
   const req = { tier: def.tier, effort: def.effort, maxTokens: def.maxTokens, ...def.build(input, lang) };
   const model = ai.models?.[req.tier] ?? "";
+  const visionPages = task === "vision" ? (req.images?.length || 0) : 0;
   const row = (extra) => ({
     user_id: user.id,
     ...(acctKey ? { account_key: acctKey } : {}),
-    task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false,
+    plan,
+    task, model, input_tokens: 0, output_tokens: 0, cost_usd: 0, cached: false, vision_pages: 0,
     ...extra,
   });
 
   // A stored answer costs nothing, so it is served even when a spending cap is reached.
+  // The response omits `cached` so callers cannot probe whether another user uploaded identical text.
   const key = cache ? await cacheKey(task, ai, req) : null;
   if (key) {
     let hit = null;
@@ -346,27 +398,78 @@ export async function handle(body, { user, ai, spend, record, reserve = null, re
       let result = null;
       try { result = def.parse(hit); } catch (e) { /* stored before a parser change: ask the AI again */ }
       if (result != null) {
+        const s = await spend(user.id, acctKey);
+        const curFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
+        if ((s.minute || 0) + curFlight.count >= lim.perMinute) {
+          throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
+        }
         await record(row({ cached: true }));
-        return { result, truncated: false, cached: true, costUsd: 0, usage: usage() };
+        return { result, truncated: false, usage: usage(s.month) };
       }
     }
   }
 
-  const latestFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
-  if ((s.minute || 0) + latestFlight.count >= lim.perMinute || latestFlight.count >= maxConcurrent) {
-    throw new HttpError(429, "rate_limit", "Too many requests in a minute. Wait a moment.");
-  }
-  if (s.month + latestFlight.usd >= limitUsd) throw new HttpError(429, "user_limit", "Monthly limit reached.");
-  if (s.today + inFlightTodayUsd >= lim.dailyUsd) throw new HttpError(429, "daily_limit", "The app's daily limit is reached.");
-
-  const estUsd = RESERVE_USD[req.tier] ?? RESERVE_USD.fast;
-  inFlight.set(flightKey, { count: latestFlight.count + 1, usd: +(latestFlight.usd + estUsd).toFixed(6) });
-  inFlightTodayUsd = +(inFlightTodayUsd + estUsd).toFixed(6);
-
+  const estUsd = estimateMaxUsd(ai, req);
+  let baseMonth = 0;
   let reservedId = null;
+
+  if (typeof reserve === "function") {
+    const curFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
+    if (curFlight.count >= maxConcurrent) throw reserveError("rate_limit");
+    inFlight.set(flightKey, { count: curFlight.count + 1, usd: +(curFlight.usd + estUsd).toFixed(6) });
+    try {
+      const r = await reserve({
+        user_id: user.id,
+        account_key: acctKey,
+        plan,
+        task,
+        model,
+        est_usd: estUsd,
+        month_limit: limitUsd,
+        daily_limit: lim.dailyUsd,
+        free_daily_limit: lim.freeDailyUsd,
+        per_minute: lim.perMinute,
+        vision_pages: visionPages,
+        vision_month_limit: plus ? null : lim.freeVisionPages,
+      });
+      if (!r || !r.ok) throw reserveError(r?.reason);
+      reservedId = r.id ?? null;
+      baseMonth = Number(r.month || 0);
+      if (Number(r.today || 0) + estUsd >= lim.dailyUsd * 0.8) {
+        log("daily_spend_high", { today: Number(r.today || 0), dailyUsd: lim.dailyUsd });
+      }
+    } catch (e) {
+      const after = inFlight.get(flightKey);
+      if (after) {
+        const nextCount = after.count - 1;
+        const nextUsd = Math.max(0, +(after.usd - estUsd).toFixed(6));
+        if (nextCount <= 0) inFlight.delete(flightKey);
+        else inFlight.set(flightKey, { count: nextCount, usd: nextUsd });
+      }
+      throw e;
+    }
+  } else {
+    const s = await spend(user.id, acctKey);
+    const latestFlight = inFlight.get(flightKey) || { count: 0, usd: 0 };
+    if ((s.minute || 0) + latestFlight.count >= lim.perMinute || latestFlight.count >= maxConcurrent) {
+      throw reserveError("rate_limit");
+    }
+    if (!plus && visionPages > 0 && (s.vision || 0) + visionPages > lim.freeVisionPages) {
+      throw reserveError("plus_required");
+    }
+    if (s.month + latestFlight.usd >= limitUsd) throw reserveError("user_limit");
+    const freeToday = s.freeToday ?? s.today;
+    if (s.today + inFlightTodayUsd >= lim.dailyUsd || (!plus && freeToday + inFlightFreeTodayUsd >= lim.freeDailyUsd)) {
+      throw reserveError("daily_limit");
+    }
+    baseMonth = s.month;
+    inFlight.set(flightKey, { count: latestFlight.count + 1, usd: +(latestFlight.usd + estUsd).toFixed(6) });
+    inFlightTodayUsd = +(inFlightTodayUsd + estUsd).toFixed(6);
+    if (!plus) inFlightFreeTodayUsd = +(inFlightFreeTodayUsd + estUsd).toFixed(6);
+  }
+
   let res;
   try {
-    if (typeof reserve === "function") reservedId = await reserve(row({ cost_usd: estUsd }));
     res = await ai.complete(req);
   } catch (e) {
     if (reservedId != null && typeof release === "function") {
@@ -381,16 +484,19 @@ export async function handle(body, { user, ai, spend, record, reserve = null, re
       if (nextCount <= 0) inFlight.delete(flightKey);
       else inFlight.set(flightKey, { count: nextCount, usd: nextUsd });
     }
-    inFlightTodayUsd = Math.max(0, +(inFlightTodayUsd - estUsd).toFixed(6));
+    if (typeof reserve !== "function") {
+      inFlightTodayUsd = Math.max(0, +(inFlightTodayUsd - estUsd).toFixed(6));
+      if (!plus) inFlightFreeTodayUsd = Math.max(0, +(inFlightFreeTodayUsd - estUsd).toFixed(6));
+    }
   }
 
   const cost = res.costUsd ?? 0;
-  await record(row({ model: res.model || model, input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost }), reservedId);
+  await record(row({ model: res.model || model, input_tokens: res.usage.inputTokens, output_tokens: res.usage.outputTokens, cost_usd: cost, vision_pages: visionPages }), reservedId);
   let result;
   try { result = def.parse(res.text); } catch (e) { throw new HttpError(502, "bad_reply", "The AI reply could not be read. Try again."); }
   // Only complete answers are kept: a cut-off one should be asked for again next time.
   if (key && !res.truncated) {
     try { await cache.put({ key, task, model: res.model || model, result: res.text }); } catch (e) { log("ai_cache write failed", e); }
   }
-  return { result, truncated: !!res.truncated, cached: false, costUsd: cost, usage: usage(cost) };
+  return { result, truncated: !!res.truncated, usage: usage(baseMonth, cost) };
 }

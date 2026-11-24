@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3000",
+    "dev": "vite --port 3000",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "preview": "vite preview --port 3000",
     "lint": "for f in src/main.js src/app/*.js src/upload/*.js src/cloud/*.js ai/*.js ai/providers/*.js server/*.js test/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "node --test test/*.test.mjs",
     "test:db": "node test/db.mjs",

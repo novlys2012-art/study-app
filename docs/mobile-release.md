@@ -66,7 +66,7 @@ Base64-encode the keystore (`base64 -w 0 lekto-upload.jks`) and add these GitHub
 
 Test on at least one physical iPhone, one Android phone, and one tablet (iPad or Android tablet) in both portrait and landscape, light and dark mode:
 - [ ] Launch splash screen matches light/dark mode with zero white flash.
-- [ ] Status bar icons stay legible across `Účtovná kniha`, `Kocky`, `Riso`, `Zošit`, `Tabuľa`, and `Čistý` in light and dark modes.
+- [ ] Status bar icons stay legible in Clean Proof light and dark modes.
 - [ ] Android hardware Back button / predictive back closes bottom sheets first, quits quiz safely, navigates back, and backgrounds on `Dnes`.
 - [ ] Bottom sheets dismiss smoothly on downward swipe without blocking internal scrolling.
 - [ ] Soft keyboard never covers inputs in Sign-In, Custom Round, Exam Date, or Upload.
