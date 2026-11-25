@@ -23,7 +23,7 @@ export function initNativeShell() {
 // Compute perceived luminance of a hex/rgb CSS colour so native status/navigation bar icons always stay legible.
 export function isDarkColor(cssColor) {
   const s = String(cssColor || "").trim();
-  let r = 247, g = 247, b = 245;
+  let r = 238, g = 243, b = 248;
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s);
   if (hex) {
     const h = hex[1].length === 3 ? hex[1].split("").map((c) => c + c).join("") : hex[1];

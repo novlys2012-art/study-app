@@ -4,7 +4,7 @@
 import { t, getLang, setLang, ensureLang, applyI18n } from "../i18n/index.js";
 import { loadSubjects, saveSubjects, createSubject, readProgress, readLog, logAnswer, resetProgress, clearLocal, removeSamples, loadMeta, hasUnsynced, subjectFileCounts } from "./subjects.js";
 import { startSync, syncNow, cancelSync, hasSessionToken } from "./autosync.js";
-import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta } from "./md.js";
+import { renderMarkdown, matchSummaryBlock, highlightMatch, buildWrongStudyPack, sourceFileIndex, stripSourceMeta, sourceLocus } from "./md.js";
 import { isProblem, correctAnswers, checkNumericAnswer } from "./problems.js";
 import { icon } from "./icons.js";
 import { rankExams, rankedRound, yearSpan, retagTopic, retagQuestion, matchTopic, FEW_EXAMS } from "./exams.js";
@@ -115,6 +115,7 @@ function show(id) {
   }
   if (screen !== id) document.querySelectorAll("dialog[open]").forEach((d) => { d.dataset.noPop = "1"; d.close(); });
   screen = id;
+  paintChrome();
 }
 
 function route() {
@@ -1065,7 +1066,7 @@ function showReader(f, fileIndex = -1) {
   if (readerHint && readerHint.fi === fileIndex) {
     const blocks = [...body.querySelectorAll("p, li")];
     const match = matchSummaryBlock(blocks.map((n) => n.textContent), readerHint);
-    if (match) readerFocus = highlightMatch(blocks[match.index], match.phrase);
+    if (match) readerFocus = highlightMatch(blocks[match.index], match.phrase, readerHint.locus);
   }
   // A row of the summary's headings, to jump around a long one.
   $("rToc").replaceChildren(...heads.map((h) => button(null, h.textContent, () => h.scrollIntoView({ behavior: "smooth", block: "start" }))));
@@ -1128,15 +1129,19 @@ function showWrongReview() {
       }
       if (it.excerpt) {
         const box = el("div", "rev-excerpt");
-        box.appendChild(el("span", "rev-cap", t("review.fromSummary")));
+        const reg = el("div", "rev-reg");
+        reg.appendChild(el("span", "rev-cap", t("review.fromSummary")));
+        if (it.locus) reg.appendChild(el("span", "rev-loc", it.locus));
+        box.appendChild(reg);
         const p = el("p", null, it.excerpt);
         if (it.phrase) highlightMatch(p, it.phrase);
         box.appendChild(p);
         card.appendChild(box);
       }
       if (it.fi >= 0) {
-        card.appendChild(button("link rev-jump", t("quiz.openSource"), () => {
-          readerHint = { fi: it.fi, quote: it.quote, extras: it.extras };
+        const jumpLabel = it.locus ? t("quiz.openSource") + " · " + it.locus : t("quiz.openSource");
+        card.appendChild(button("link rev-jump", jumpLabel, () => {
+          readerHint = { fi: it.fi, quote: it.quote, extras: it.extras, locus: it.locus };
           go(CUR.id + "/read/" + it.fi);
         }));
       }
@@ -1407,8 +1412,16 @@ const sourceFile = (x) => sourceFileIndex(x, CUR ? CUR.files : []);
 function openQuestionSource(x) {
   const fi = sourceFile(x);
   if (fi < 0) return;
-  readerHint = { fi, quote: stripSourceMeta(x.s), extras: [x.e, x.q, ...correctAnswers(x)].filter(Boolean) };
+  readerHint = { fi, quote: stripSourceMeta(x.s), extras: [x.e, x.q, ...correctAnswers(x)].filter(Boolean), locus: sourceLocus(x.s, { pageOnly: true }) };
   go(CUR.id + "/read/" + fi);
+}
+function bindOpenSrc(x, showBtn) {
+  const btn = $("openSrc");
+  btn.hidden = !showBtn;
+  if (!showBtn) { btn.onclick = null; return; }
+  const loc = sourceLocus(x.s, { pageOnly: true });
+  btn.textContent = loc ? t("quiz.openSource") + " · " + loc : t("quiz.openSource");
+  btn.onclick = () => openQuestionSource(x);
 }
 function checkProblemInput() {
   const x = list[i];
@@ -1451,13 +1464,12 @@ function revealProblem() {
   $("verdict").textContent = t(probNumOk === true ? "quiz.probNumOk" : probNumOk === false ? "quiz.probNumBad" : "quiz.probRate");
   $("more").innerHTML = ""; $("more").hidden = true;
   const fi = sourceFile(x);
-  $("openSrc").hidden = fi < 0;
-  $("openSrc").onclick = fi >= 0 ? () => openQuestionSource(x) : null;
+  bindOpenSrc(x, fi >= 0);
   $("next").hidden = true;
   $("pMissed").hidden = false;
   $("pGotIt").hidden = false;
   fb.hidden = false;
-  $("quiz").style.paddingBottom = fb.offsetHeight + 16 + "px";
+  $("quiz").style.paddingBottom = fb.offsetHeight + 24 + "px";
   (probNumOk === false ? $("pMissed") : $("pGotIt")).focus({ preventScroll: true });
 }
 function gradeProblem(ok) {
@@ -1496,13 +1508,12 @@ function grade(sel) {
   if (x.s) m.appendChild(el("div", "src", t("quiz.source") + x.s));
   m.hidden = !m.childNodes.length;
   const fi = ok ? -1 : sourceFile(x);
-  $("openSrc").hidden = fi < 0;
-  $("openSrc").onclick = fi >= 0 ? () => openQuestionSource(x) : null;
+  bindOpenSrc(x, fi >= 0);
   $("pg").style.width = ((i + 1) / list.length) * 100 + "%";
   $("next").textContent = t(i === list.length - 1 ? "quiz.toResult" : "quiz.next");
   fb.hidden = false;
   // Room under the options, so the panel never covers them.
-  $("quiz").style.paddingBottom = fb.offsetHeight + 16 + "px";
+  $("quiz").style.paddingBottom = fb.offsetHeight + 24 + "px";
   $("next").focus({ preventScroll: true });
 }
 $("check").onclick = () => { if (!answered && picked.size) grade(new Set(picked)); };
@@ -1595,7 +1606,7 @@ document.addEventListener("keydown", (e) => {
 function paintChrome() {
   const th = document.documentElement.dataset.theme;
   const dark = th === "dark" || (!th && matchMedia("(prefers-color-scheme:dark)").matches);
-  const color = dark ? "#121312" : "#f7f7f5";
+  const color = screen === "welcome" ? (dark ? "#090e16" : "#10233d") : (dark ? "#0d131d" : "#eef3f8");
   const m = document.querySelector('meta[name="theme-color"]');
   if (m) m.content = color;
   syncNativeChrome(color);

@@ -352,6 +352,7 @@
   "welcome.formats": "PDF · PPTX · DOCX · TXT",
   "welcome.guest": "Vyzkoušej na ukázkovém předmětu",
   "welcome.proofCaption": "Chyba v kvízu → přesný zdroj ve shrnutí",
+  "welcome.demoLocus": "bunecna-biochemie.pdf · str. 4",
   "welcome.demoQ": "Který enzym je hlavním regulačním bodem glykolýzy?",
   "welcome.demoA": "Správně: Fosfofruktokináza-1 (PFK-1)",
   "welcome.demoExcerptBefore": "Glykolýza probíhá v cytozolu. ",

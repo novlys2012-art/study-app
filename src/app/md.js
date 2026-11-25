@@ -56,6 +56,17 @@ export function matchSummaryBlock(blocks, { quote = "", extras = [] } = {}) {
 
 export const stripSourceMeta = (s) => String(s || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
 
+export function sourceLocus(s, { pageOnly = false } = {}) {
+  const m = /\(([^()]+)\)\s*$/.exec(String(s || ""));
+  if (!m) return "";
+  const inner = m[1].trim();
+  if (pageOnly) {
+    const p = /(?:str?\.|s\.|p\.)\s*\d+(?:[–-]\d+)?/i.exec(inner);
+    return p ? p[0].replace(/\s+/g, "\u00a0") : "";
+  }
+  return inner.replace(/\s*,\s*/g, " · ");
+}
+
 export function sourceFileIndex(x, files = []) {
   if (!x || !x.s) return -1;
   return files.findIndex((f) => f && f.summary && (x.s.includes("(" + f.name) || x.s === f.name));
@@ -107,6 +118,7 @@ export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
       explanation: x.e || "",
       example: x.x || "",
       topicName: topics[x.t] || "",
+      locus: sourceLocus(x.s, { pageOnly: true }),
       fi, quote, extras, excerpt, phrase,
     });
   }
@@ -129,8 +141,9 @@ export function buildWrongStudyPack(wrong = [], files = [], topics = {}) {
   return { sections, keyTerms, fileCount: matchedFiles.size };
 }
 
-export function highlightMatch(el, phrase) {
+export function highlightMatch(el, phrase, locus = "") {
   el.classList.add("hl-block");
+  if (locus) el.dataset.locus = locus; else delete el.dataset.locus;
   const target = norm(phrase).replace(/\s+/g, " ").trim();
   if (!target) return el;
   const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);

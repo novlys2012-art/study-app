@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T16:10:00+01:00",
+  "title": "Design System: Lekto",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": {
+        "role": "primary",
+        "displayName": "Cobalt Press",
+        "canonical": "oklch(0.415 0.145 254)",
+        "tonalRamp": ["#091526", "#0e2954", "#0e3b82", "#154da3", "#3b76d4", "#73b2ff", "#b8d8ff", "#dfeafa"]
+      },
+      "shell": {
+        "role": "secondary",
+        "displayName": "Prussian Cloth",
+        "canonical": "oklch(0.255 0.065 252)",
+        "tonalRamp": ["#090e16", "#10233d", "#193256", "#27446e", "#466591", "#7b96bd", "#b8c8de", "#f4f8fc"]
+      },
+      "mark": {
+        "role": "tertiary",
+        "displayName": "Sulfur Highlighter",
+        "canonical": "oklch(0.915 0.155 102)",
+        "tonalRamp": ["#2d2912", "#3b3512", "#665b14", "#998916", "#ccb822", "#e8d638", "#f4e547", "#fbf5be"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Calendered Paper",
+        "canonical": "oklch(0.962 0.010 245)",
+        "tonalRamp": ["#0d131d", "#141d2b", "#233044", "#445166", "#68778d", "#cbd5e3", "#e2eaf3", "#eef3f8"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Cobalt-Carbon Ink",
+        "canonical": "oklch(0.195 0.028 252)",
+        "tonalRamp": ["#0f1726", "#1d293b", "#313f54", "#445166", "#58667c", "#8191a6", "#9aa8bc", "#e6ecf3"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Persuade hero headline (#welcome) and Today exam countdown figure." },
+      "headline": { "displayName": "Headline", "purpose": "Fixed-rem Operate screen headers (Dnes, Predmety, Profil)." },
+      "title": { "displayName": "Title", "purpose": "Subscreen topbar titles, Today priority subject header, sheet headers, and reader section headings." },
+      "reading": { "displayName": "Reading Prose", "purpose": "Strictly fenced 65ch Literata prose inside summary reader and wrong-answer study excerpts." },
+      "body": { "displayName": "UI Body", "purpose": "Buttons, quiz options, form inputs, and list row titles." },
+      "label": { "displayName": "Metadata & Locus", "purpose": "Sentence-case labels, exam frequencies (v 4 z 5 skúšok), and § str. N locus badges." },
+      "code": { "displayName": "Utility Mono", "purpose": "OTP verification inputs, <kbd> shortcuts, numeric problem inputs, and inline formulas." }
+    },
+    "shadows": [
+      { "name": "shadow-stage", "value": "0 18px 38px -14px rgba(5, 11, 22, 0.42)", "purpose": "Lifts the Tear-Proof Compendium Sheet off the Prussian #welcome stage." },
+      { "name": "shadow-overlay", "value": "0 18px 42px -12px rgba(9, 18, 34, 0.24)", "purpose": "Centered desktop modal dialogs (dialog.bsheet) at >= 900px." },
+      { "name": "shadow-toast", "value": "0 8px 22px -6px rgba(9, 18, 34, 0.26)", "purpose": "Floating Prussian-Cloth toast notifications and context help popovers." }
+    ],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Single exponential ease-out across all state, sheet, and screen transitions." },
+      { "name": "t-fast", "value": "0.12s", "purpose": "Button/row hover, border, color, and active press detent." },
+      { "name": "t", "value": "0.18s", "purpose": "Screen transitions, bottom sheets, accordions, and quiz feedback bar." }
+    ],
+    "breakpoints": [
+      { "name": "tablet-portrait", "value": "640px" },
+      { "name": "profile-split", "value": "760px" },
+      { "name": "desktop-rail", "value": "900px" },
+      { "name": "welcome-split", "value": "980px" },
+      { "name": "desktop-wide", "value": "1100px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Cobalt Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Single primary CTA per Operate/Read screen in Cobalt Press with 4px binding corners.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 8 5.2z\"/></svg><span>Začať dnešné kolo</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 20px; font: 600 1rem/1.2 var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); letter-spacing: -0.01em; background: var(--ledger, #154da3); color: var(--on-ledger, #ffffff); border: 1px solid transparent; border-radius: var(--r-ctl, 4px); cursor: pointer; transition: background-color 0.12s cubic-bezier(0.22, 1, 0.36, 1), transform 0.12s cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-primary svg { width: 18px; height: 18px; } .ds-btn-primary:hover { background: var(--ledger-hover, #0e3b82); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ledger, #154da3); outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.988); }"
+    },
+    {
+      "name": "Ghost Compendium Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action on sheets and headers with 1px structural rule border.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Vlastné kolo</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 20px; font: 600 1rem/1.2 var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); background: var(--sheet, #fbfdff); color: var(--ink, #0f1726); border: 1px solid var(--rule, #cbd5e3); border-radius: var(--r-ctl, 4px); cursor: pointer; transition: background-color 0.12s, border-color 0.12s, transform 0.12s; } .ds-btn-ghost:hover { background: var(--subtle, #e2eaf3); border-color: var(--input-border, #68778d); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--ledger, #154da3); outline-offset: 2px; } .ds-btn-ghost:active { transform: scale(0.988); }"
+    },
+    {
+      "name": "Compendium Search & Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "48px text/search field with >= 3.4:1 border contrast and Cobalt focus ring.",
+      "html": "<input class=\"ds-input\" type=\"search\" placeholder=\"Hľadať v zhrnutiach a témach\" />",
+      "css": ".ds-input { width: 100%; max-width: 340px; min-height: 48px; padding: 10px 14px; font: 400 1rem/1.4 var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); color: var(--ink, #0f1726); background: var(--sheet, #fbfdff); border: 1px solid var(--input-border, #68778d); border-radius: var(--r-ctl, 4px); caret-color: var(--ledger, #154da3); } .ds-input::placeholder { color: var(--ink-subtle, #58667c); } .ds-input:focus-visible { outline: 2px solid var(--ledger, #154da3); outline-offset: 2px; }"
+    },
+    {
+      "name": "Prussian Cloth Navigation Rail",
+      "kind": "nav",
+      "refersTo": "button-rail",
+      "description": "Committed Prussian Cloth desktop navigation shell with recessed ghost upload button and Sulfur-accented active tab.",
+      "html": "<nav class=\"ds-rail\" aria-label=\"Hlavné menu\"><button class=\"ds-rail-add\" type=\"button\">+ Nahrať materiály</button><button class=\"ds-rail-tab is-active\" type=\"button\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2.5\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/></svg><span>Dnes</span></button><button class=\"ds-rail-tab\" type=\"button\"><span>Predmety</span></button></nav>",
+      "css": ".ds-rail { width: 236px; padding: 16px 14px; background: var(--shell, #10233d); color: var(--on-shell, #f4f8fc); border-radius: var(--r-card, 6px); display: grid; gap: 6px; font-family: var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); } .ds-rail-add { min-height: 44px; padding: 8px 12px; margin-bottom: 8px; font: 600 0.9375rem/1.2 inherit; background: var(--shell-elev, #193256); color: var(--on-shell, #f4f8fc); border: 1px solid var(--shell-rule, #27446e); border-radius: var(--r-ctl, 4px); text-align: left; cursor: pointer; } .ds-rail-add:hover { background: var(--shell-rule, #27446e); } .ds-rail-tab { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; font: 600 0.9375rem/1.2 inherit; color: var(--shell-muted, #b8c8de); background: transparent; border: 0; border-radius: var(--r-ctl, 4px); cursor: pointer; } .ds-rail-tab svg { width: 19px; height: 19px; } .ds-rail-tab:hover { color: var(--on-shell, #f4f8fc); background: var(--shell-elev, #193256); } .ds-rail-tab.is-active { background: var(--shell-elev, #193256); color: var(--on-shell, #f4f8fc); box-shadow: inset 0 0 0 1px var(--shell-rule, #27446e); } .ds-rail-tab.is-active svg { color: var(--focus-shell, #f4e547); } .ds-rail button:focus-visible { outline: 2px solid var(--focus-shell, #f4e547); outline-offset: 2px; }"
+    },
+    {
+      "name": "Today Priority Exam Sheet",
+      "kind": "card",
+      "refersTo": "sheet",
+      "description": "Prussian-banded priority subject card pairing today's study slice with tabular exam countdown.",
+      "html": "<div class=\"ds-hero-sheet\"><button class=\"ds-hero-head\" type=\"button\"><span>Bunková biochémia</span><span>›</span></button><div class=\"ds-hero-body\"><div class=\"ds-cd\"><b>5</b><span>dní do skúšky · 30. 11.</span></div><p class=\"ds-plan\">Na dnes: 6 zopakovať, 12 nové (spolu 18).</p></div></div>",
+      "css": ".ds-hero-sheet { background: var(--sheet, #fbfdff); border: 1px solid var(--rule, #cbd5e3); border-radius: var(--r-card, 6px); overflow: hidden; font-family: var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); } .ds-hero-head { width: 100%; min-height: 52px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; background: var(--shell, #10233d); color: var(--on-shell, #f4f8fc); border: 0; font: 700 1.1875rem/1.2 inherit; cursor: pointer; } .ds-hero-head:hover { background: var(--shell-elev, #193256); } .ds-hero-head:focus-visible { outline: 2px solid var(--focus-shell, #f4e547); outline-offset: -3px; } .ds-hero-body { padding: 18px 20px; display: grid; gap: 10px; } .ds-cd { display: flex; align-items: baseline; gap: 10px; } .ds-cd b { font: 800 2.5rem/1 inherit; font-variant-numeric: tabular-nums; color: var(--warn, #8c5100); letter-spacing: -0.035em; } .ds-cd span, .ds-plan { margin: 0; font-size: 0.875rem; color: var(--muted, #445166); }"
+    },
+    {
+      "name": "Tear-Proof & Margin Locus Excerpt",
+      "kind": "custom",
+      "refersTo": "sheet",
+      "description": "Signature Alfa Skriptum proof pattern pairing a dashed tear-register locus strip with Literata prose and Sulfur highlight.",
+      "html": "<div class=\"ds-proof\"><div class=\"ds-proof-reg\"><span class=\"ds-proof-cap\">Zo zhrnutia</span><span class=\"ds-proof-loc\">bunkova-biochemia.pdf · str. 4</span></div><p class=\"ds-proof-p\"><span class=\"ds-locus\">§ str. 4</span>Glykolýza prebieha v cytozole. <mark class=\"ds-hl\">Hlavným regulačným enzýmom glykolýzy je fosfofruktokináza-1 (PFK-1).</mark></p></div>",
+      "css": ".ds-proof { padding: 14px 18px; background: var(--paper, #eef3f8); border: 1px solid var(--rule, #cbd5e3); border-radius: var(--r-ctl, 4px); display: grid; gap: 8px; } .ds-proof-reg { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--rule, #cbd5e3); font-family: var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); font-size: 0.75rem; } .ds-proof-cap { font-weight: 700; color: var(--muted, #445166); } .ds-proof-loc { font-weight: 600; color: var(--ledger, #154da3); } .ds-proof-p { margin: 0; font: 400 1rem/1.62 var(--f-read, 'Literata', Georgia, serif); color: var(--ink, #0f1726); } .ds-locus { display: inline-block; margin-right: 8px; padding: 1px 6px; font: 700 0.75rem/1.35 var(--f-sans, 'Schibsted Grotesk', system-ui, sans-serif); background: var(--ledger-soft, #dfeafa); color: var(--ledger, #154da3); border: 1px solid var(--rule, #cbd5e3); border-radius: 3px; } .ds-hl { background: var(--mark, #f4e547); color: var(--mark-ink, #0f1726); font-weight: 500; border-radius: 2px; padding: 1px 2px; margin: 0 -1px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Alfa Skriptum",
+    "overview": "Lekto is built for Slovak and Czech university students studying under exam pressure—phone in one hand on a tram at 23:30 or laptop open at a faculty reading desk (študovňa) in daylight. Alfa Skriptum anchors the product in the tradition of Central European clothbound technical compendia (Alfa Bratislava and SNTL Praha): composed senior-classmate authority that cuts straight to what to study next without sterile all-white SaaS timidity, Duolingo gamification, or warm-cream literary AI clichés.\n\nThe system scales ambition strictly by surface mode across Light, Dark, and Auto (prefers-color-scheme). On #welcome (Persuade), a full-bleed Prussian Cloth stage dramatizes Lekto's core truth—turning a missed quiz question into the exact cited sentence in the student's own uploaded notes. On daily study screens (Operate), standard controls and predictable spatial hierarchy let the task lead while Prussian cloth rails/headers, crisp 4px/6px bookbinding geometry, and Cobalt Press actions carry the world. On #reader and #<subject>/review (Read), Schibsted Grotesk owns the frame so a calm 65ch Literata column can be read effortlessly for hours.",
+    "keyCharacteristics": [
+      "Committed Prussian-Cloth shell over calendered blueprint paper: Whole structural zones (#welcome hero stage, desktop navigation rail, #today priority subject band, legal mastheads, and toast notifications) commit to deep Prussian Cloth rather than floating white nav over grey backgrounds.",
+      "One signature move (\"The Margin Locus & Tear-Proof\"): Cited evidence pairs an unboxed Sulfur Highlighter <mark class=\"hl\"> sentence with a compact § str. N locus badge and dashed tear-register rule—zero nested colored boxes, zero one-sided card stripes.",
+      "Role-separated Central European typography: Self-hosted variable Schibsted Grotesk (400–800) drives 100% of Persuade and Operate UI, headings, and pure numeric figures, while Prague-born Literata (opsz 7–72, 400–600) appears exclusively inside summary prose (#reader, #review, and the #welcome proof excerpt).",
+      "Bookbinding geometry & hairline ledgers: Tight 4px control corners and 6px sheet corners with 1px structural rules replace pillowy SaaS card stacks, SVG progress rings, blur/glassmorphism, and decorative motion."
+    ],
+    "rules": [
+      { "name": "The One-Cobalt Rule", "body": "Each screen exposes at most one solid Cobalt Press CTA button (on #welcome's Prussian stage, one crisp #fbfdff primary sheet button); secondary actions use ghost, plain, or recessed Prussian rail styling.", "section": "colors" },
+      { "name": "The Tinted-Surface Rule", "body": "Never place neutral grey text or low-contrast Cobalt focus rings on Prussian Cloth or semantic washes; use --shell-muted / --on-shell and --focus-shell on Prussian Cloth, and matching semantic hue tokens on status surfaces.", "section": "colors" },
+      { "name": "The Unboxed-Proof Rule", "body": "Cited proof uses inline Sulfur <mark class=\"hl\"> and a § locus badge or dashed tear-register divider—never a nested colored box or a one-sided colored border on a rounded card.", "section": "colors" },
+      { "name": "The Prose-Fence Rule", "body": "Literata is strictly fenced inside summary reading paragraphs (.md p, .md li, #rBody > p:not(.hint), .rev-excerpt p); it never appears in headings, buttons, navigation, or cards.", "section": "typography" },
+      { "name": "The Proportional-Punctuation Rule", "body": "Apply font-variant-numeric: tabular-nums only to pure numeric/count/percentage/price columns (.countdown b, .sum-pct, .rc-pct, .tbar-top .pct, .count, .score, .result-pct, .up-pct, .limit-pct, .w-plan-price, .plus-price), never to prose sentences or .pdf / str. locus strings where Schibsted Grotesk's tabular period widens punctuation.", "section": "typography" },
+      { "name": "The Three-Axis Halation Rule", "body": "Dark mode compensates light-on-dark reading on all three perceptual axes simultaneously: line-height (1.65 → 1.70), body letter-spacing (0 → +0.005em), and Literata variable weight (400 → 430).", "section": "typography" },
+      { "name": "The No-Eyebrow Rule", "body": "Never place uppercase tracked kickers or eyebrows above headings; metadata uses plain sentence case.", "section": "typography" },
+      { "name": "The Flat-Workspace Rule", "body": "Cards, sheets, rows, and buttons inside Operate and Read never carry drop shadows, neon glows, or hard offset shadows (4px 4px 0).", "section": "elevation" },
+      { "name": "The Purposeful-Motion Rule", "body": "Transitions use a single exponential ease-out (--ease: cubic-bezier(0.22, 1, 0.36, 1), 120ms control state, 180ms screen/sheet/verdict). Under prefers-reduced-motion: reduce, spatial slides and press scales turn off while preserving non-animated state feedback (.toast.on stays opacity: 1, .hl-block retains --mark-wash).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do commit whole shell zones (#welcome .w-stage, desktop #tabbar, #today .hero-open, legal .band, .toast) to Prussian Cloth (--shell) and keep working sheets crisp (--sheet on --paper).",
+      "Do fence Literata strictly inside summary reading paragraphs and keep 100% of UI controls, headings, and metadata in Schibsted Grotesk.",
+      "Do pair every source-proof jump with sourceLocus() (§ str. N badge + unboxed Sulfur <mark class=\"hl\">).",
+      "Do verify every interactive target at >= 44×44px and keep <meta name=\"theme-color\">, PWA manifest, legal pages, and native Android/iOS chrome synced with the active screen's top surface."
+    ],
+    "donts": [
+      "Don't put one-sided colored stripes (border-left: 3px solid ...) on rounded boxes or wrap <mark class=\"hl\"> inside nested colored border cards.",
+      "Don't apply font-variant-numeric: tabular-nums to prose sentences, dates with dots (30. 11.), or .pdf / str. locus strings in Schibsted Grotesk.",
+      "Don't use neutral grey text or dark Cobalt focus outlines inside Prussian Cloth regions—always use --shell-muted / --on-shell and --focus-shell (#f4e547).",
+      "Don't introduce uppercase kickers/eyebrows, SVG progress rings, backdrop-filter: blur(), hard offset shadows, decorative monospace labels, or gamification (streaks, XP, badges)."
+    ]
+  }
+}

@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { matchSummaryBlock, buildWrongStudyPack } from "../src/app/md.js";
+import { matchSummaryBlock, buildWrongStudyPack, sourceLocus } from "../src/app/md.js";
+
+test("sourceLocus extracts full citation or compact non-breaking page locus", () => {
+  const s = "Hlavným regulačným enzýmom je PFK-1 (bunkova-biochemia.pdf, str. 4)";
+  assert.equal(sourceLocus(s), "bunkova-biochemia.pdf · str. 4");
+  assert.equal(sourceLocus(s, { pageOnly: true }), "str.\u00a04");
+  assert.equal(sourceLocus("Citát (Bio_01.pdf, s. 12–14)", { pageOnly: true }), "s.\u00a012–14");
+  assert.equal(sourceLocus("Citát (Bio_01.pdf)", { pageOnly: true }), "");
+  assert.equal(sourceLocus("Bez zátvorky"), "");
+});
 
 test("matchSummaryBlock prefers exact quote match ignoring case and diacritics", () => {
   const blocks = [

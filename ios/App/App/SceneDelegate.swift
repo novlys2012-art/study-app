@@ -66,9 +66,9 @@ public class LektoNativePlugin: CAPPlugin, CAPBridgedPlugin {
     private let reminderPrefix = "lekto-rem-"
 
     @objc func setChrome(_ call: CAPPluginCall) {
-        let hex = call.getString("color") ?? "#f7f7f5"
+        let hex = call.getString("color") ?? "#eef3f8"
         let dark = call.getBool("dark") ?? false
-        let color = Self.parseColor(hex) ?? (dark ? UIColor(red: 0.071, green: 0.075, blue: 0.071, alpha: 1) : UIColor(red: 0.969, green: 0.969, blue: 0.961, alpha: 1))
+        let color = Self.parseColor(hex) ?? (dark ? UIColor(red: 0.051, green: 0.075, blue: 0.114, alpha: 1) : UIColor(red: 0.933, green: 0.953, blue: 0.973, alpha: 1))
         DispatchQueue.main.async {
             (self.bridge?.viewController as? LektoViewController)?.applyChrome(color: color, dark: dark)
             call.resolve()

@@ -1,84 +1,96 @@
 ---
 name: Lekto
-description: Minimalistic, no-fuss study app design language ("Clean Proof") — flat mineral paper, 1px hairline structure, one spruce action ink, and one marker highlight for cited source proof.
+description: Authoritative Central European technical-compendium design language ("Alfa Skriptum") — Prussian-cobalt cloth shell, calendered blueprint daylight sheets, Cobalt Press actions, and unboxed Sulfur + Margin Locus source proof.
 colors:
-  paper: "#f7f7f5"
-  sheet: "#ffffff"
-  subtle: "#efefea"
-  ink: "#161716"
-  muted: "#595b57"
-  ink-subtle: "#6e706b"
-  rule: "#e2e2dc"
-  input-border: "#878983"
-  spruce: "#14524c"
-  spruce-hover: "#0e3e39"
-  spruce-soft: "#e5f0ee"
-  on-spruce: "#ffffff"
-  mark: "#f5e28a"
-  mark-ink: "#161716"
-  ok: "#1d6e3d"
-  ok-soft: "#e5f3ea"
-  no: "#b43425"
-  no-soft: "#faeae7"
-  warn: "#8a5200"
-  warn-soft: "#fbf1db"
-  dark-paper: "#121312"
-  dark-sheet: "#191b19"
-  dark-subtle: "#222522"
-  dark-ink: "#ecece8"
-  dark-muted: "#9e9f9a"
-  dark-ink-subtle: "#858781"
-  dark-rule: "#2a2d2a"
-  dark-input-border: "#686b66"
-  dark-spruce: "#68cbbf"
-  dark-spruce-hover: "#80d6cc"
-  dark-spruce-soft: "#1a2c2a"
-  dark-on-spruce: "#0d1918"
-  dark-mark: "rgba(245, 226, 138, 0.22)"
-  dark-mark-ink: "#faf2c8"
+  paper: "#eef3f8"
+  sheet: "#fbfdff"
+  subtle: "#e2eaf3"
+  shell: "#10233d"
+  shell-elev: "#193256"
+  shell-rule: "#27446e"
+  on-shell: "#f4f8fc"
+  shell-muted: "#b8c8de"
+  ink: "#0f1726"
+  muted: "#445166"
+  ink-subtle: "#58667c"
+  rule: "#cbd5e3"
+  input-border: "#68778d"
+  cobalt: "#154da3"
+  cobalt-hover: "#0e3b82"
+  cobalt-soft: "#dfeafa"
+  on-cobalt: "#ffffff"
+  mark: "#f4e547"
+  mark-wash: "#fbf5be"
+  mark-ink: "#0f1726"
+  ok: "#156d3b"
+  ok-soft: "#e2f4e9"
+  no: "#b8292f"
+  no-soft: "#fce8e8"
+  warn: "#8c5100"
+  warn-soft: "#fdf0d5"
+  dark-paper: "#0d131d"
+  dark-sheet: "#141d2b"
+  dark-subtle: "#1d293b"
+  dark-shell: "#090e16"
+  dark-shell-elev: "#152033"
+  dark-shell-rule: "#23324a"
+  dark-on-shell: "#e6ecf3"
+  dark-shell-muted: "#9eadc2"
+  dark-ink: "#e6ecf3"
+  dark-muted: "#9aa8bc"
+  dark-ink-subtle: "#8191a6"
+  dark-rule: "#233044"
+  dark-input-border: "#5e6e84"
+  dark-cobalt: "#73b2ff"
+  dark-cobalt-hover: "#8ec2ff"
+  dark-cobalt-soft: "#172b46"
+  dark-on-cobalt: "#091526"
+  dark-mark: "#3b3512"
+  dark-mark-wash: "#2d2912"
+  dark-mark-ink: "#faf0b8"
   dark-ok: "#6dd092"
-  dark-ok-soft: "#182c20"
+  dark-ok-soft: "#142c1e"
   dark-no: "#f28b7a"
-  dark-no-soft: "#341e1b"
+  dark-no-soft: "#351c19"
   dark-warn: "#e7b75d"
-  dark-warn-soft: "#342914"
+  dark-warn-soft: "#342812"
 typography:
   display:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "clamp(2.25rem, 5vw, 3.25rem)"
-    fontWeight: 700
-    lineHeight: 1.06
-    letterSpacing: "-0.03em"
-  page-title:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+    fontFamily: "\"Schibsted Grotesk\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+    fontSize: "clamp(2.25rem, 4.8vw, 3.375rem)"
+    fontWeight: 800
+    lineHeight: 1.05
+    letterSpacing: "-0.032em"
+  headline:
+    fontFamily: "\"Schibsted Grotesk\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
     fontSize: "1.75rem"
     fontWeight: 700
-    lineHeight: 1.15
-    letterSpacing: "-0.025em"
-  section:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "1.25rem"
-    fontWeight: 600
-    lineHeight: 1.3
-    letterSpacing: "-0.015em"
+    lineHeight: 1.14
+    letterSpacing: "-0.026em"
+  title:
+    fontFamily: "\"Schibsted Grotesk\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+    fontSize: "1.3125rem"
+    fontWeight: 700
+    lineHeight: 1.18
+    letterSpacing: "-0.02em"
   body:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+    fontFamily: "\"Schibsted Grotesk\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
     fontSize: "1rem"
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: 1.52
     letterSpacing: "0em"
   reading:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+    fontFamily: "\"Literata\", Georgia, \"Times New Roman\", serif"
     fontSize: "1.0625rem"
     fontWeight: 400
     lineHeight: 1.65
     letterSpacing: "0em"
-  meta:
-    fontFamily: "\"Source Sans 3\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+  label:
+    fontFamily: "\"Schibsted Grotesk\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
     fontSize: "0.875rem"
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: "0em"
+    fontWeight: 700
+    lineHeight: 1.35
+    letterSpacing: "-0.005em"
   code:
     fontFamily: "\"JetBrains Mono\", ui-monospace, Consolas, monospace"
     fontSize: "0.875rem"
@@ -86,8 +98,9 @@ typography:
     lineHeight: 1.45
     letterSpacing: "0em"
 rounded:
-  ctl: "6px"
-  card: "10px"
+  ctl: "4px"
+  card: "6px"
+  sheet-mobile: "10px"
   track: "999px"
 spacing:
   xs: "4px"
@@ -96,16 +109,17 @@ spacing:
   lg: "24px"
   xl: "32px"
   2xl: "48px"
+  3xl: "64px"
 components:
   button-primary:
-    backgroundColor: "{colors.spruce}"
-    textColor: "{colors.on-spruce}"
+    backgroundColor: "{colors.cobalt}"
+    textColor: "{colors.on-cobalt}"
     typography: "{typography.body}"
     rounded: "{rounded.ctl}"
     padding: "10px 20px"
     height: "48px"
   button-primary-hover:
-    backgroundColor: "{colors.spruce-hover}"
+    backgroundColor: "{colors.cobalt-hover}"
   button-ghost:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink}"
@@ -113,6 +127,13 @@ components:
     rounded: "{rounded.ctl}"
     padding: "10px 20px"
     height: "48px"
+  button-rail:
+    backgroundColor: "{colors.shell-elev}"
+    textColor: "{colors.on-shell}"
+    typography: "{typography.body}"
+    rounded: "{rounded.ctl}"
+    padding: "8px 12px"
+    height: "44px"
   sheet:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink}"
@@ -131,122 +152,139 @@ components:
 
 ## Overview
 
-**Creative North Star: "Clean Proof"**
+**Creative North Star: "Alfa Skriptum"**
 
-Lekto is built for Slovak and Czech university students studying under exam pressure—phone in one hand on a tram at 23:30 or laptop open at a library desk in overcast daylight. **Clean Proof** strips the interface to the utilitarian clarity of Central European coursebooks (*vysokoškolské skriptá*): flat mineral paper, 1 px hairline dividers, decisive typographic weight jumps, and zero gamification or theme clutter.
+Lekto is built for Slovak and Czech university students studying under exam pressure—phone in one hand on a tram at 23:30 or laptop open at a faculty reading desk (*študovňa*) in daylight. **Alfa Skriptum** anchors the product in the tradition of Central European clothbound technical compendia (*Alfa Bratislava* and *SNTL Praha*): composed senior-classmate authority that cuts straight to what to study next without sterile all-white SaaS timidity, Duolingo gamification, or warm-cream literary AI clichés.
 
-The entire site—landing (`#welcome`), daily workspace (`#today`, `#home`, `#subject`), summary reader (`#reader`), quiz (`#quiz`, `#end`), upload (`#upload`), and settings (`#profile`)—shares one cohesive visual language in **Light**, **Dark**, and **Auto** (`prefers-color-scheme`).
+The system scales ambition strictly by surface mode across **Light**, **Dark**, and **Auto** (`prefers-color-scheme`). On `#welcome` (Persuade), a full-bleed **Prussian Cloth** stage dramatizes Lekto's core truth—turning a missed quiz question into the exact cited sentence in the student's own uploaded notes. On daily study screens (Operate), standard controls and predictable spatial hierarchy let the task lead while Prussian cloth rails/headers, crisp `4px`/`6px` bookbinding geometry, and Cobalt Press actions carry the world. On `#reader` and `#<subject>/review` (Read), `Schibsted Grotesk` owns the frame so a calm `65ch` `Literata` column can be read effortlessly for hours.
 
 **Key Characteristics:**
-- **One signature move ("The Source Mark"):** Monochrome stone chrome lets only two chromatic signals command attention—the single primary action (**Spruce Ink**) and the highlighted proof sentence in a summary (**Marker Citron**).
-- **Hairline lists over floating cards:** Repeated rows (subjects, topics, summaries, past exams, files, missed questions, FAQs) sit inside flat hairline-divided lists instead of stacked boxed cards.
-- **Tabular numbers & 3 px tracks over ornaments:** No SVG progress rings, no glowing floating action buttons, no frosted glass blur, no spring bounce or typewriter rewrite scripts.
-- **One workhorse typeface:** Self-hosted variable `Source Sans 3` (weights `400–700`, full Slovak/Czech `latin-ext`) carries display, UI, reading prose, and tabular numbers; `JetBrains Mono` is strictly limited to OTP inputs, `<kbd>` chips, and inline formulas/code.
+- **Committed Prussian-Cloth shell over calendered blueprint paper:** Whole structural zones (`#welcome` hero stage, desktop navigation rail, `#today` priority subject band, legal mastheads, and toast notifications) commit to deep Prussian Cloth rather than floating white nav over grey backgrounds.
+- **One signature move ("The Margin Locus & Tear-Proof"):** Cited evidence pairs an unboxed **Sulfur Highlighter** `<mark class="hl">` sentence with a compact **`§ str. N` locus badge** and dashed tear-register rule—zero nested colored boxes, zero one-sided card stripes.
+- **Role-separated Central European typography:** Self-hosted variable `Schibsted Grotesk` (`400–800`) drives 100% of Persuade and Operate UI, headings, and pure numeric figures, while Prague-born `Literata` (`opsz 7–72`, `400–600`) appears exclusively inside summary prose (`#reader`, `#review`, and the `#welcome` proof excerpt).
+- **Bookbinding geometry & hairline ledgers:** Tight `4px` control corners and `6px` sheet corners with `1px` structural rules replace pillowy SaaS card stacks, SVG progress rings, blur/glassmorphism, and decorative motion.
 
 ## Colors
 
-Stone-tinted neutrals carry ~90% of every viewport. Every foreground/background text pair meets WCAG AA (`>= 4.5:1`), primary ink and accent pairs meet AAA (`>= 7:1`), and input/control borders meet WCAG 1.4.11 (`>= 3:1`).
+Both Light and Dark palettes are intentionally composed in perceptual OKLCH (`hue 245°–254°` cobalt-mineral cool ground contrasted against `102°` Sulfur proof), meeting WCAG AA (`>= 4.5:1` text, `>= 3:1` controls/borders) and AAA (`>= 7:1` primary ink, shell, and CTA pairs) across every surface.
 
 ### Primary
-- **Spruce Ink** (`--ledger`: `#14524c` light / `#68cbbf` dark): The screen's single filled primary button, active navigation indicator, keyboard focus outline, 3 px progress fill, and inline jump links (`Pozrieť v zhrnutí`). Shifted cooler than emerald so primary actions never collide with quiz grading green.
-- **Spruce Hover** (`--ledger-hover`: `#0e3e39` light / `#80d6cc` dark): Hover fill for primary buttons.
-- **Spruce Wash** (`--ledger-soft`: `#e5f0ee` light / `#1a2c2a` dark): Active desktop rail wash, selected context chip, and notice blocks.
+- **Cobalt Press** (`--ledger` / `colors.cobalt` in Light, `colors.dark-cobalt` in Dark): The screen's single filled primary CTA button, active mobile tab indicator, `3px` progress fill, `2px` reader scroll rule, keyboard focus ring on light surfaces, and source-jump links (`Pozrieť v zhrnutí · str. 4`).
+- **Cobalt Deep & Cobalt Wash** (`--ledger-hover`, `--ledger-soft`): Primary CTA hover state and tinted selection/notice wash (`#roundSheet` checked topic row, `Kontext` active pill, `.tipbox`).
 
-### Signature Accent & Semantic States
-- **Marker Citron** (`--mark`: `#f5e28a` light / `rgba(245, 226, 138, 0.22)` dark with `--mark-ink`): Exclusively for `<mark class="hl">` highlighting cited passages in `#reader`, `#review`, and `#welcome`.
-- **Verified Green** (`--ok` / `--ok-soft`): Correct quiz feedback, mastery pass tone, completed upload rows.
-- **Error Vermilion** (`--no` / `--no-soft`): Wrong quiz feedback, validation errors, destructive actions, 100% credit limit.
-- **Deadline Amber** (`--warn` / `--warn-soft`): Exams within 7 days and `>= 80%` monthly credit warning.
+### Secondary
+- **Prussian Cloth** (`--shell` / `colors.shell` in Light, `colors.dark-shell` in Dark): Committed structural shell color owning the `#welcome` masthead and hero stage, the `>= 900px` desktop navigation rail, the `#today` priority exam header band, static legal mastheads, and floating toasts/tooltips.
+- **Prussian Elevated & Prussian Rule** (`--shell-elev`, `--shell-rule`): Recessed interactive fills, active rail tabs, and hairline borders inside Prussian Cloth regions, paired with **Prussian Chalk** (`--on-shell`) and hue-tinted **Prussian Mist** (`--shell-muted`) text.
+
+### Tertiary
+- **Sulfur Highlighter** (`--mark` / `colors.mark` in Light, `colors.dark-mark` with `colors.dark-mark-ink` in Dark): Reserved for inline `<mark class="hl">` cited source passages, `::selection` highlight, the brand-mark proof bar, and high-contrast (`11.8:1`) `:focus-visible` outlines inside dark Prussian Cloth regions (`--focus-shell`).
+- **Semantic Status Triads** (`--ok`, `--no`, `--warn` and `-soft` washes): Verified Green for correct answers and completed uploads; Vermilion for wrong answers, `aria-invalid` fields, destructive confirmations, and `100%` quota; Deadline Amber for exams within 7 days and `>= 80%` monthly credit warnings.
 
 ### Neutral
-- **Mineral Paper** (`--paper`: `#f7f7f5` light / `#121312` dark): Page canvas and native status/navigation bar color.
-- **Clean Sheet** (`--sheet`: `#ffffff` light / `#191b19` dark): Elevated work sheets, hairline lists, side rail, tab bar, modals, and form fields.
-- **Inset Stone** (`--subtle`: `#efefea` light / `#222522` dark): Row hover state, inactive progress tracks, segmented control tracks, neutral icon tiles.
-- **Carbon Ink / Graphite Muted / Slate Subtle** (`--ink`, `--muted`, `--ink-subtle`): Three-step readable text scale (`16.8:1` / `6.4:1` / `4.7:1+`).
-- **Hairline Rule / Control Outline** (`--rule`, `--input-border`): `1px` structural dividers and `>= 3:1` interactive field borders.
+- **Calendered Paper** (`--paper` / `colors.paper` in Light, `colors.dark-paper` in Dark): Glare-free `245°` blueprint-tinted canvas and native status/navigation bar color on Operate and Read screens.
+- **Compendium Sheet & Inset Slate** (`--sheet`, `--subtle`): Crisp reading/working containers, hairline index lists, modal dialogs, form inputs, and hover/track states.
+- **Cobalt-Carbon Ink Scale & Structural Rules** (`--ink`, `--muted`, `--ink-subtle`, `--rule`, `--input-border`): Three-step cobalt-tinted text hierarchy (`17.2:1`, `7.8:1`, `5.2:1` in Light; `13.9:1`, `6.8:1`, `5.1:1` in Dark) plus `1px` dividers (`--rule`) and `>= 3.4:1` field borders (`--input-border`).
 
 ### Named Rules
-- **The One-Spruce Rule.** Never place more than one filled Spruce Ink button on a screen; secondary actions stay monochrome (`ghost` or `plain`).
-- **The Tinted-Surface Rule.** Never place neutral muted gray text on a tinted semantic or accent surface; use primary ink or the matching hue token.
+- **The One-Cobalt Rule.** Each screen exposes at most one solid Cobalt Press CTA button (on `#welcome`'s Prussian stage, one crisp `#fbfdff` primary sheet button); secondary actions use ghost, plain, or recessed Prussian rail styling.
+- **The Tinted-Surface Rule.** Never place neutral grey text or low-contrast Cobalt focus rings on Prussian Cloth or semantic washes; use `--shell-muted` / `--on-shell` and `--focus-shell` on Prussian Cloth, and matching semantic hue tokens on status surfaces.
+- **The Unboxed-Proof Rule.** Cited proof uses inline Sulfur `<mark class="hl">` and a `§` locus badge or dashed tear-register divider—never a nested colored box or a one-sided colored border on a rounded card.
 
 ## Typography
 
-**Primary Font:** `Source Sans 3` (self-hosted variable WOFF2 `400 700` in `public/fonts/fonts.css`, fallback `system-ui, -apple-system, "Segoe UI", sans-serif`)
-**Utility Mono Font:** `JetBrains Mono` (`500`, fallback `ui-monospace, Consolas, monospace`)
+**Display & UI Font:** `Schibsted Grotesk` (self-hosted variable WOFF2 `400–800` in `public/fonts/fonts.css`, fallback `system-ui, -apple-system, "Segoe UI", sans-serif`)
+**Reading Font:** `Literata` (self-hosted variable WOFF2 `opsz 7–72`, `400–600`, fallback `Georgia, "Times New Roman", serif`)
+**Label/Mono Font:** `JetBrains Mono` (`500`, fallback `ui-monospace, Consolas, monospace`)
 
-**Character:** Open humanist proportions with clean Central European diacritics (`á ä č ď é í ĺ ľ ň ó ô ŕ š ť ú ý ž ě ř ů`) and crisp built-in tabular numerals (`font-variant-numeric: tabular-nums`) so counts, percentages, and exam frequencies align without monospace decoration.
+**Character:** `Schibsted Grotesk` brings crisp neo-grotesque authority and clean Slovak/Czech caron spacing (`ľ`, `ť`, `ď`, `ĺ`, `ŕ`, `ô`, `ä`, `ě`, `ř`, `ů`) across navigation, headings, and controls, while Prague-designed `Literata` gives multi-hour study summaries effortless coursebook legibility. `JetBrains Mono` is strictly restricted to OTP verification codes, `<kbd>` shortcut chips, numeric problem inputs, and inline formulas.
 
 ### Hierarchy
-- **Display** (`700`, `clamp(2.25rem, 5vw, 3.25rem)`, `1.06`, `-0.03em`): Landing hero headline (`#welcome`) and Today exam countdown figure (`2.75rem`).
-- **Page Title** (`700`, `1.75rem` mobile / `2rem` desktop, `1.15`, `-0.025em`): Screen headers (`Dnes`, `Predmety`, `Profil`).
-- **Section & Question** (`600`, `1.25rem`–`1.375rem`, `1.3`, `-0.015em`): Quiz prompts, summary headings, sheet titles.
-- **Reading Prose** (`400`, `1.0625rem` / `17px`, `1.65` light / `1.70` dark, max `65ch`): Summary body in `#reader` and `#review`.
-- **UI Body** (`400` / `600`, `1rem` / `16px`, `1.55`): Options, buttons, inputs, list titles.
-- **Metadata & Labels** (`500`–`600`, `0.8125rem`–`0.875rem`, `1.4`): Plain sentence-case labels, counts, dates, exam frequencies (`v 4 z 5 skúšok`).
+- **Display** (`800`, `clamp(2.25rem, 4.8vw, 3.375rem)`, `1.05`, `-0.032em`): Persuade hero headline on `#welcome` and tabular exam countdown figure (`2.75rem`, `800`).
+- **Headline** (`700`, `1.75rem` mobile / `2rem` at `>= 1100px`, `1.14`, `-0.026em`): Fixed-rem Operate screen titles (`Dnes`, `Predmety`, `Profil`).
+- **Title** (`700`, `1.25rem`–`1.3125rem`, `1.18`–`1.28`, `-0.02em`): Subscreen topbar titles, `#today` priority subject name, `dialog.bsheet` headers, quiz questions (`600`, `1.3125rem`, `1.34`), and `Schibsted Grotesk` summary section headings (`.md h3`, `28px` top margin vs `2px` bottom margin).
+- **Reading** (`400` Light / `430` Dark, `1.0625rem` / `17px`, `1.65` Light / `1.70` Dark, max `65ch`): `Literata` summary prose inside `.md p`, `.md li`, and `.rev-excerpt p`.
+- **Body** (`400` / `600`, `1rem` / `16px`, `1.52`): Buttons, quiz options, form fields, and list row titles.
+- **Label** (`600`–`700`, `0.8125rem`–`0.875rem`, `1.35`, `-0.005em`): Plain sentence-case section labels, topic metadata, exam frequency ratios (`v 4 z 5 skúšok`), and `§ str. N` locus badges.
 
 ### Named Rules
-- **The No-Eyebrow Rule.** Never place uppercase kickers above headings.
-- **The Dark-Mode Air Rule.** Dark mode increases reading line-height (`1.65 → 1.70`) and adds `+0.005em` body tracking to eliminate halation.
+- **The Prose-Fence Rule.** `Literata` is strictly fenced inside summary reading paragraphs (`.md p`, `.md li`, `#rBody > p:not(.hint)`, `.rev-excerpt p`); it never appears in headings, buttons, navigation, or cards.
+- **The Proportional-Punctuation Rule.** Apply `font-variant-numeric: tabular-nums` only to pure numeric/count/percentage/price columns (`.countdown b`, `.sum-pct`, `.rc-pct`, `.tbar-top .pct`, `.count`, `.score`, `.result-pct`, `.up-pct`, `.limit-pct`, `.w-plan-price`, `.plus-price`), never to prose sentences or `.pdf` / `str.` locus strings where `Schibsted Grotesk`'s tabular period widens punctuation.
+- **The Three-Axis Halation Rule.** Dark mode compensates light-on-dark reading on all three perceptual axes simultaneously: line-height (`1.65 → 1.70`), body letter-spacing (`0 → +0.005em`), and `Literata` variable weight (`400 → 430`).
+- **The No-Eyebrow Rule.** Never place uppercase tracked kickers or eyebrows above headings; metadata uses plain sentence case.
 
 ## Layout
 
-Spacing runs on a 4 px base rhythm (`4 / 8 / 12 / 16 / 24 / 32 / 48 px`).
+Spacing runs on a 4 px base scale (`4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 / 64 px`), with tight internal grouping (`8–12px`) and clear structural separation (`16–24px` in Operate, `48–64px` in Persuade).
 
-- **Phone (`< 640px`):** Single-column flow (`16px` inline padding), solid bottom tab bar (`56px` + safe area), and compact inline `+ Nahrať` header buttons on `#today` and `#home` (no floating FAB).
-- **Tablet Portrait (`640–899px`):** `800px` centered canvas; `#today` hero splits horizontally (plan + CTA left, countdown + progress right); quiz options form a 2×2 grid.
-- **Tablet Landscape & Desktop (`>= 900px`):** `232px` left rail (`248px` at `>= 1100px`) replaces the bottom tab bar and hides mobile header add buttons in favor of the rail action. Bottom sheets become centered modal dialogs (`max-width: 500px`). `#subject` splits into a sticky summary column + tab content; `#reader` pairs the `65ch` reading column with a hairline-separated sticky `Kľúčové pojmy` side column.
+- **Phone (`< 640px`, tested down to `360px`):** Single-column flow (`16px` safe-area-aware inline padding), solid `56px` bottom tab bar on top-level screens, inline `+ Nahrať` header action on `#today` and `#home`, and full-bleed Prussian `.w-stage` above `.w-body` on `#welcome`.
+- **Tablet Portrait (`640–899px`):** `800px` max container (`24px` inline padding); `#today` `.sheet.hero` spans its Prussian `.hero-open` band across both columns while splitting plan + CTA (left) from tabular countdown + progress (right, `244px`); quiz options form a `2×2` grid; `#profile` splits into 2 columns at `>= 760px`.
+- **Tablet Landscape & Desktop (`>= 900px` / `1280px`):** Committed **Prussian Cloth** left rail (`236px` at `900px`, `248px` at `>= 1100px`) replaces the bottom tab bar and hides mobile header add buttons. `dialog.bsheet` sheets become centered modals (`max-width: 500px`). `#subject` splits into a sticky `296px–320px` summary column + tab workspace; `#reader` pairs the `65ch` `Literata` column with a hairline-separated sticky `260px–280px` `Kľúčové pojmy` glossary rail.
 
 ## Elevation & Depth
 
-Surfaces are flat by default; depth comes from `Mineral Paper` vs. `Clean Sheet` contrast and `1px` hairlines. No `backdrop-filter: blur()` and no shadows on cards, buttons, or headers.
+Working surfaces are flat at rest, relying on the contrast between **Calendered Paper** (`--paper`), **Compendium Sheet** (`--sheet`), **Prussian Cloth** (`--shell`), and crisp `1px` rules (`--rule`) rather than card drop shadows or `backdrop-filter: blur()`.
 
 ### Shadow Vocabulary
-- **Overlay** (`--shadow-overlay: 0 16px 40px -12px rgba(0, 0, 0, 0.18)`): Centered desktop modal dialogs (`dialog.bsheet`) only.
-- **Toast / Tooltip** (`--shadow-toast: 0 6px 20px -6px rgba(0, 0, 0, 0.20)`): Floating toast and context tooltip popover only.
+- **Stage Specimen** (`--shadow-stage: 0 18px 38px -14px rgba(5, 11, 22, 0.42)`): Lifts the `#wProof` Tear-Proof Compendium Sheet off the dark Prussian `#welcome` stage.
+- **Modal Overlay** (`--shadow-overlay: 0 18px 42px -12px rgba(9, 18, 34, 0.24)`): Centered desktop `dialog.bsheet` modals (`>= 900px`) over `rgba(8, 14, 24, 0.52)` backdrop.
+- **Toast & Tooltip** (`--shadow-toast: 0 8px 22px -6px rgba(9, 18, 34, 0.26)`): Prussian-Cloth toast notifications and context help popovers only.
 
-### Motion
-- Single curve `--ease: cubic-bezier(0.22, 1, 0.36, 1)` (zero spring bounce). `120ms` for interactive press/hover/color states; `180ms` for screens, sheets, accordions, and quiz feedback bar. Fully disabled under `prefers-reduced-motion: reduce`.
+### Named Rules
+- **The Flat-Workspace Rule.** Cards, sheets, rows, and buttons inside Operate and Read never carry drop shadows, neon glows, or hard offset shadows (`4px 4px 0`).
+- **The Purposeful-Motion Rule.** Transitions use a single exponential ease-out (`--ease: cubic-bezier(0.22, 1, 0.36, 1)`, `120ms` control state, `180ms` screen/sheet/verdict). Under `prefers-reduced-motion: reduce`, spatial slides and press scales turn off while preserving non-animated state feedback (`.toast.on` stays `opacity: 1`, `.hl-block` retains `--mark-wash`).
 
 ## Shapes
 
-Two functional radii across the entire system (plus `999px` strictly for 3–6 px progress tracks and status dots):
+Alfa Skriptum uses tight, architectural bookbinding radii so every control and sheet reads as cut paper and cloth rather than soft SaaS plastic:
 
-- **Controls (`--r-ctl: 6px`):** Buttons, inputs, quiz options, segmented thumbs, checkboxes (`4px`), tooltips, brand mark.
-- **Containers (`--r-card: 10px`):** Sheets, hairline lists, desktop dialogs (`14px` top corners on mobile bottom sheets).
-- **Icons:** Single inline SVG set on `24×24`, uniform `1.8px` stroke, round caps/joins.
+- **Controls (`--r-ctl: 4px`):** Buttons, inputs, selects, quiz options, segmented thumbs, locus badges (`3px`), checkboxes (`3px`), and brand mark tiles.
+- **Sheets & Ledgers (`--r-card: 6px`):** `.sheet`, `.list`, `#wProof`, `.w-plans`, `.w-rank-ledger`, and desktop modal dialogs (`10px` top corners on mobile bottom sheets).
+- **Tracks (`999px`):** Strictly for `3px–6px` progress tracks, upload step bars, and mobile sheet grab handles.
+- **Icons:** Inline `24×24` SVG set (`1.8px` uniform stroke, round caps/joins); the Lekto brand mark pairs a vertical compendium spine with three horizontal rules whose middle proof bar is filled in Sulfur (`#f4e547`).
 
 ## Components
 
-Every interactive component maintains `>= 44px` tap targets and complete `default`, `hover`, `focus-visible` (`2px solid var(--ledger)`), `active` (`scale(0.985)`), `disabled`, and `aria-invalid` states.
+Every interactive control maintains `>= 44×44px` tap targets at both `360px` and `1280px` and implements complete `default`, `hover`, `focus-visible`, `active`, `disabled`, and `aria-invalid` states.
 
 ### Buttons
-- **Primary (`.btn`):** Solid Spruce Ink, `6px` radius, `48px` min-height (`50px` `.wide`). One per screen.
-- **Ghost (`.btn.ghost`):** Clean Sheet fill, `1px` Hairline Rule border, shifts to Inset Stone + Control Outline on hover.
-- **Plain (`.btn.plain`):** Transparent fill, Muted text, Vermilion for `.danger`.
+- **Shape:** Crisp `4px` corners (`--r-ctl`), `600 1rem/1.2` `Schibsted Grotesk`, `48px` min-height (`50px` `.btn.wide`).
+- **Primary (`.btn`):** Solid Cobalt Press (`--ledger`) with `--on-ledger` text; on `#welcome`'s Prussian stage, `#wGuest` uses crisp `#fbfdff` sheet fill with `#0f1726` ink (`15.8:1`) in Light and Cobalt in Dark.
+- **Hover / Focus:** Shifts to `--ledger-hover` in `120ms`; `2px solid var(--ledger)` focus ring (`2px solid var(--focus-shell)` inside Prussian Cloth regions); `scale(0.988)` press detent.
+- **Ghost / Plain / Rail (`.btn.ghost`, `.btn.plain`, `.rail-add.btn.ghost`):** Clean `--sheet` fill with `1px` `--rule` border on paper; recessed `--shell-elev` fill with `--shell-rule` border inside the Prussian desktop rail.
 
-### Hairline Index Lists (`.list`, `#subjects`, `#tbars`, `#files`, `.ranks`, `.up-list`)
-- Single Clean Sheet container (`1px` border, `10px` radius) with `1px` internal row dividers (`:not([hidden]) ~ :not([hidden])` so filtered rows never show a stray top rule). Rows show tabular percentage + a `3px` `.bar` instead of progress rings.
+### Chips
+- **Style:** `44px` min-height (`4px` radius), `1px solid var(--rule)` on `--sheet` (`.seg button`, `.chips button`, `.up-ctx`).
+- **State:** Multi-choice / filter active states (`aria-pressed="true"`) invert to `--ink` fill + `--sheet` text (or `--ledger-soft` + `--ledger` border on `Kontext`), reserving Cobalt solid fills for the primary CTA. Compact 2–3-way settings toggles use `.seg.fill` on `--subtle` track.
 
-### Underline Tabs (`.utabs`) & Segmented Controls (`.seg.fill`)
-- **`.utabs` (`#sTabs`):** Flat horizontal tabs over a `1px` hairline with a `2px` Spruce Ink active underline.
-- **`.seg.fill` (`#themes`, `#langs`, `#remToggle`):** Reserved for compact 2–3-option settings toggles on Inset Stone track with a flat Clean Sheet thumb (zero shadow).
+### Cards / Containers
+- **Corner Style:** `6px` compendium radius (`--r-card`), `overflow: hidden` when topped by a Prussian header band.
+- **Background & Border:** `--sheet` fill with `1px solid var(--rule)`. On `#today`, `.sheet.hero` leads with a full-width Prussian `.hero-open` band (`--shell` Light / `--shell-elev` Dark) over the daylight plan body.
+- **Hairline Lists (`.list`, `#subjects`, `#tbars`, `#files`, `.ranks`, `.up-list`):** Unified `1px`-bordered containers dividing visible rows with `1px` internal hairlines (`:not([hidden]) ~ :not([hidden])`), pairing tabular `%` with `3px` `.bar` tracks.
 
-### Quiz Options & Feedback Bar (`.opt`, `.fb`)
-- Flat `56px` option rows with `26×26` letter badges. Multi-select active state uses neutral Carbon Ink (`aria-pressed="true"`) so it never collides with semantic grading (`ok` / `no`). Feedback bar sits flush at the bottom with a `1px` colored top rule and soft semantic tint.
+### Inputs / Fields
+- **Style:** `48px` min-height, `--sheet` background, `1px solid var(--input-border)` (`>= 3.4:1` contrast), `4px` radius.
+- **Focus:** `2px solid var(--ledger)` outline at `2px` offset; `caret-color: var(--ledger)`.
+- **Error / Disabled:** `aria-invalid="true"` shifts border to `--no` paired with an inline `.err` banner (`1px solid var(--no)` on `--no-soft`); `:disabled` drops opacity to `0.45`.
 
-### Signature Component: Proof Highlight (`mark.hl`, `.hl-block`)
-- Inline **Marker Citron** highlight directly inside calm prose (`border-radius: 3px`, `box-decoration-break: clone`). When jumped to from a quiz, `.hl-block` gently settles from a warm wash to transparent over `1.8s` without an outer border box.
+### Navigation
+- **Mobile (`< 900px`):** Solid `--sheet` bottom bar (`56px` + safe area) with 3 labeled icon tabs (`Dnes`, `Predmety`, `Profil`) and a `2px` top Cobalt active indicator.
+- **Desktop (`>= 900px`):** Committed Prussian Cloth (`--shell`) left rail (`236px` / `248px`) housing the `44px` `.brand` button, `.rail-add.btn.ghost`, and full-width `.tab` items whose active state (`aria-current="page"`) uses `--shell-elev` fill, `1px` `--shell-rule` inset frame, and a Sulfur-accented icon.
+- **Subject Tabs (`.utabs`):** Flat horizontal tabs (`>= 44×44px`) over a `1px` hairline with a `2px` Cobalt active underline.
+
+### Tear-Proof & Margin Locus (`#wProof`, `.rev-excerpt`, `.hl-block`, `mark.hl`)
+- **Tear-Proof Excerpt (`.w-proof`, `.rev-excerpt`):** Pairs a `Schibsted Grotesk` question/answer header with a `Literata` source excerpt across a `1px dashed` tear-register rule (`.rev-reg`) showing `Zo zhrnutia` on the left and the source file/page locus (`bunkova-biochemia.pdf · str. 4`) on the right.
+- **Reader Margin Locus (`.hl-block[data-locus]`, `mark.hl`):** Jumping from `#openSrc` (`Pozrieť v zhrnutí · str. 4`) scrolls `#reader` to the matched `<p>` or `<li>`, gently settles `--mark-wash` to transparent (`li.hl-block` keeps zero negative margin so list bullets stay aligned), prepends an inline `§ str. 4` badge, and wraps the exact phrase in Sulfur `<mark class="hl">` (`padding: 1px 2px; margin: 0 -1px` so trailing periods stay flush).
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep one filled Spruce Ink CTA per screen and group repeated rows into unified hairline lists.
-- **Do** use `Source Sans 3` with `tabular-nums` for percentages, countdowns, and exam counts (`v 4 z 5 skúšok`).
-- **Do** keep every browser surface themed (`::selection`, `caret-color`, scrollbars, `theme-color`, and native status bar sync).
-- **Do** check new screens at `360px` and `1280px` in both Light and Dark mode.
+- **Do** commit whole shell zones (`#welcome` `.w-stage`, desktop `#tabbar`, `#today` `.hero-open`, legal `.band`, `.toast`) to Prussian Cloth (`--shell`) and keep working sheets crisp (`--sheet` on `--paper`).
+- **Do** fence `Literata` strictly inside summary reading paragraphs and keep 100% of UI controls, headings, and metadata in `Schibsted Grotesk`.
+- **Do** pair every source-proof jump with `sourceLocus()` (`§ str. N` badge + unboxed Sulfur `<mark class="hl">`).
+- **Do** verify every interactive target at `>= 44×44px` and keep `<meta name="theme-color">`, PWA manifest, legal pages, and native Android/iOS chrome synced with the active screen's top surface.
 
 ### Don't:
-- **Don't** nest bordered cards inside bordered cards or add an outer colored box around `<mark class="hl">`.
-- **Don't** reintroduce SVG progress rings, floating glow FABs, `backdrop-filter: blur()`, hard offset shadows, or spring-bounce easings.
-- **Don't** use `JetBrains Mono` for UI labels, counts, or dates—keep it strictly for OTP codes, `<kbd>`, and inline code/formulas.
-- **Don't** add uppercase kickers above headings or per-look theme overrides.
+- **Don't** put one-sided colored stripes (`border-left: 3px solid ...`) on rounded boxes or wrap `<mark class="hl">` inside nested colored border cards.
+- **Don't** apply `font-variant-numeric: tabular-nums` to prose sentences, dates with dots (`30. 11.`), or `.pdf` / `str.` locus strings in `Schibsted Grotesk`.
+- **Don't** use neutral grey text or dark Cobalt focus outlines inside Prussian Cloth regions—always use `--shell-muted` / `--on-shell` and `--focus-shell` (`#f4e547`).
+- **Don't** introduce uppercase kickers/eyebrows, SVG progress rings, `backdrop-filter: blur()`, hard offset shadows, decorative monospace labels, or gamification (streaks, XP, badges).

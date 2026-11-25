@@ -1,11 +1,13 @@
 // Lightweight offline app-shell Service Worker for the installable Lekto PWA (web only).
 // Caches same-origin static assets & fonts; never caches Supabase API or cross-origin requests.
-const CACHE = "lekto-shell-v3";
+const CACHE = "lekto-shell-v4";
 const PRECACHE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png",
-  "./fonts/source-sans-3-400-latin-ext-9.woff2",
-  "./fonts/source-sans-3-400-latin-10.woff2",
+  "./fonts/schibsted-grotesk-var-latin-ext.woff2",
+  "./fonts/schibsted-grotesk-var-latin.woff2",
+  "./fonts/literata-var-latin-ext.woff2",
+  "./fonts/literata-var-latin.woff2",
 ];
 
 self.addEventListener("install", (event) => {

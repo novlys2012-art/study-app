@@ -1,7 +1,7 @@
 # Lekto — Status & Handoff
 
-Last updated: 2026-11-24
-Build / checks: Pending CI/Node run after Clean Proof design system overhaul (Node.js not installed in local Windows workspace; mechanical i18n/JSON/HTML/JS/CSS checks verified).
+Last updated: 2026-11-25
+Build / checks: Live Chromium visual QA verified at `360x800` and `1280x820` in Light & Dark plus mechanical i18n/JSON/HTML/CSS/asset checks after ground-up "Alfa Skriptum" visual-world replacement (Node.js not installed in local Windows workspace; run `npm test`, `npm run lint`, `npm run build`, `npm run smoke`, and `npm run e2e` in CI).
 
 Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for product scope, stack rules, and UI conventions.
 
@@ -179,6 +179,14 @@ Read `CLAUDE.md`, `DESIGN.md`, and `docs/design.md` alongside this file for prod
   - **Sheet navigation, `Esc`, & auth mount races (`app.js`, `welcome.js`)**: Tagged sheet history entries with `sheet: d.id`, suppressed stray `history.back()` when dialogs close for route changes or `popstate` (`dataset.noPop`), prevented stale `closeSheet` timeouts after reopen, added a document `Escape` fallback for `dialog.bsheet[open]`, added an `authSeq` guard in `welcome.js` so in-flight `refreshAuthState()` never races `#upload` mounts, and disabled `#wForgot`/`#wBackLogin`/`#wChangeEmail` while auth requests are busy.
   - **Czech i18n, sample sync & `SAMPLE_ID` (`i18n/index.js`, `app.js`)**: Fixed `SAMPLE_ID` (`"sample-biochem"`), updated `document.title` in `applyI18n()`, re-rendered `#profile` account block after lazy `cs.json` cold boot, and synced existing built-in sample subjects across `sk <-> cs` switches.
   - **Layout, validation & deep-link cleanup (`app.css`, `app.js`, `index.html`)**: Bounded `.topics` inside `#roundSheet` so the sticky dock never covers `Ktoré otázky` pills, centered `.empty > .btn`, rejected invalid exam years and `#customN` counts (`aria-invalid` + disabling `#go`) instead of silently overwriting/accepting them, and normalised invalid subject/root deep-link hashes via `replaceState`.
+
+### 1.21 Ground-Up "Alfa Skriptum" Visual-World Replacement
+- **Files**: `DESIGN.md`, `.impeccable/design.json`, `.impeccable/surfaces/app.md`, `src/styles/app.css`, `index.html`, `src/app/{app.js,md.js,native.js}`, `src/i18n/{sk,cs}.json`, `public/fonts/*`, `public/{manifest.webmanifest,sw.js,og.png,icons/*,terms.html,privacy.html,cs/terms.html,cs/privacy.html}`, `capacitor.config.json`, `android/app/src/main/{java/sk/lekto/app/LektoNativePlugin.java,res/values/colors.xml,res/values-night/colors.xml,res/values/ic_launcher_background.xml,res/drawable/ic_launcher_background.xml,res/drawable-v24/ic_launcher_foreground.xml,res/mipmap-*/*,res/drawable*/splash.png}`, `ios/App/App/{SceneDelegate.swift,Assets.xcassets/**}`, `supabase/templates/{sign-in.html,reset-password.html}`, `test/{md.test.mjs,welcome.test.mjs}`, `docs/design.md`, `CLAUDE.md`
+- **How it works**:
+  - **Committed Central European compendium world ("Alfa Skriptum")**: Replaced Clean Proof (`#f7f7f5` / `#14524c` / `Source Sans 3`) with an OKLCH Light/Dark/Auto system anchored in *Alfa Bratislava / SNTL Praha* clothbound technical handbooks: **Prussian Cloth** (`#10233d` / `#090e16`) owns the full-bleed `#welcome` stage, `>= 900px` desktop rail, `#today` `.hero-open` band, legal mastheads, and toasts; working sheets sit on glare-free **Calendered Paper** (`#eef3f8` / `#0d131d`) with `4px`/`6px` binding corners and **Cobalt Press** (`#154da3` / `#73b2ff`) primary actions.
+  - **Typography & halation tuning**: Replaced `Source Sans 3` with self-hosted variable **`Schibsted Grotesk`** (`400–800`, `latin` + `latin-ext`) for all Persuade/Operate UI, headings, and pure numeric columns, paired with Prague-designed **`Literata`** (`opsz 7–72`, `400–600`) fenced strictly inside summary prose (`.md p`, `.md li`, `.rev-excerpt p`), compensated on all three dark-mode halation axes (`1.70` LH, `+0.005em` tracking, `430` weight).
+  - **Signature Move — Margin Locus & Tear-Proof (`sourceLocus`)**: Added pure `sourceLocus(s, { pageOnly })` in `src/app/md.js` (with unit tests in `test/md.test.mjs`), surfacing compact page loci (`Pozrieť v zhrnutí · str. 4`, inline `§ str. 4` badges on `.hl-block[data-locus]`, and dashed `.rev-reg` tear-register bars on `#welcome` and `#<subject>/review`) paired with unboxed **Sulfur Highlighter** (`#f4e547` / `#3b3512`) `<mark class="hl">`.
+  - **Assets, PWA, native chrome & live QA**: Bumped `public/sw.js` (`lekto-shell-v4`), synced `paintChrome()` in `app.js` across `#welcome` vs Operate/Read screens, rebuilt all 37 Web/PWA/Android/iOS PNG icons, splashes, and `og.png` with embedded PNG `tEXt` provenance, and verified `360x800` + `1280x820` Light/Dark views in live Chromium (`>= 44x44px` touch targets, `0px` horizontal overflow, accessible `prefers-reduced-motion` toast/proof states).
 
 ---
 

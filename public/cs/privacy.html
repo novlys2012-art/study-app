@@ -3,37 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10233d">
 <title>Ochrana soukromí – Lekto</title>
 <meta name="description" content="Pro fungování účtu ukládáme tvou e-mailovou adresu, tvoje předměty a historii odpovědí v zabezpečené databázi přístupné jen tvému účtu.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2314524c'/%3E%3Crect x='6.5' y='6.5' width='3' height='19' rx='1.5' fill='white' fill-opacity='.55'/%3E%3Crect x='12.5' y='8.5' width='10.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3Crect x='12' y='13.8' width='13.5' height='4.6' rx='1.8' fill='%23f5e28a'/%3E%3Crect x='12.5' y='21' width='8.5' height='2.8' rx='1.4' fill='white' fill-opacity='.62'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2310233d'/%3E%3Crect x='6.5' y='6' width='2.6' height='20' rx='1' fill='%23f4f8fc' fill-opacity='.65'/%3E%3Crect x='12' y='8.2' width='11' height='2.6' rx='1' fill='%23b8c8de'/%3E%3Crect x='11.6' y='13.6' width='14' height='4.8' rx='1.2' fill='%23f4e547'/%3E%3Crect x='12' y='21.2' width='8.8' height='2.6' rx='1' fill='%23b8c8de'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="../fonts/fonts.css">
 <style>
-:root{--paper:#f7f7f5;--sheet:#ffffff;--ink:#161716;--muted:#595b57;--rule:#e2e2dc;--accent:#14524c;--on-accent:#ffffff}
-@media (prefers-color-scheme:dark){:root{--paper:#121312;--sheet:#191b19;--ink:#ecece8;--muted:#9e9f9a;--rule:#2a2d2a;--accent:#68cbbf;--on-accent:#0d1918;color-scheme:dark}}
+:root{--paper:#eef3f8;--sheet:#fbfdff;--shell:#10233d;--shell-elev:#193256;--shell-rule:#27446e;--on-shell:#f4f8fc;--shell-muted:#b8c8de;--ink:#0f1726;--muted:#445166;--rule:#cbd5e3;--accent:#154da3;--mark:#f4e547}
+@media (prefers-color-scheme:dark){:root{--paper:#0d131d;--sheet:#141d2b;--shell:#090e16;--shell-elev:#152033;--shell-rule:#23324a;--on-shell:#e6ecf3;--shell-muted:#9eadc2;--ink:#e6ecf3;--muted:#9aa8bc;--rule:#233044;--accent:#73b2ff;color-scheme:dark}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.65 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-main{max-width:680px;margin:0 auto;padding:32px 20px 64px;display:grid;gap:20px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
-.brand{display:inline-flex;align-items:center;gap:9px;font:700 19px "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-.mark{width:28px;height:28px;border-radius:6px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.55 "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.band{background:var(--shell);color:var(--on-shell);border-bottom:1px solid var(--shell-rule)}
+header{max-width:680px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+main{max-width:680px;margin:0 auto;padding:28px 20px 64px;display:grid;gap:20px}
+.brand{display:inline-flex;align-items:center;gap:9px;font:700 19px "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.022em;color:var(--on-shell);text-decoration:none}
+.mark{width:28px;height:28px;border-radius:4px;background:var(--shell-elev);border:1px solid var(--shell-rule);color:var(--on-shell);display:grid;place-items:center}
 .mark svg{width:17px;height:17px}
-article{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:26px;display:grid;gap:14px}
-h1{font:700 clamp(26px,5vw,32px)/1.15 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em;margin:0}
+.mark .bm-proof{fill:var(--mark)}
+article{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:26px;display:grid;gap:14px}
+article p{font:400 17px/1.65 "Literata",Georgia,serif;margin:0;max-width:65ch}
+h1{font:700 clamp(26px,5vw,32px)/1.14 "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.026em;margin:0 0 4px}
 p{margin:0}
 .muted{color:var(--muted)}
-nav{display:flex;flex-wrap:wrap;gap:14px;font-size:15px}
-a{color:var(--accent);text-underline-offset:3px}
+nav{display:flex;flex-wrap:wrap;gap:16px;font-size:15px}
+nav a{color:var(--shell-muted);text-decoration:none}
+nav a:hover{color:var(--on-shell);text-decoration:underline;text-underline-offset:4px}
+main a{color:var(--accent);font-weight:600;text-underline-offset:3px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.band a:focus-visible{outline-color:var(--mark)}
 </style>
 </head>
 <body>
-<main>
+<div class="band">
   <header>
-    <a class="brand" href="../"><span class="mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="2.4" height="16" rx="1.2" fill="currentColor" opacity=".55"/><rect x="9" y="5.5" width="8.5" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/><rect x="8.5" y="10.2" width="11.5" height="4" rx="1.6" fill="currentColor"/><rect x="9" y="16.5" width="7" height="2.4" rx="1.2" fill="currentColor" opacity=".6"/></svg></span>Lekto</a>
+    <a class="brand" href="../"><span class="mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3.8" width="2.2" height="16.4" rx=".9" fill="currentColor" opacity=".68"/><rect x="8.8" y="5.5" width="8.6" height="2.2" rx=".9" fill="currentColor" opacity=".72"/><rect class="bm-proof" x="8.4" y="10.1" width="11.6" height="3.8" rx="1" fill="currentColor"/><rect x="8.8" y="16.5" width="6.8" height="2.2" rx=".9" fill="currentColor" opacity=".72"/></svg></span>Lekto</a>
     <nav>
       <a href="./terms.html">Podmínky používání</a>
       <a href="../privacy.html">Slovenčina</a>
     </nav>
   </header>
+</div>
+<main>
   <article>
     <h1>Ochrana soukromí</h1>
     <p>Pro fungování účtu ukládáme tvou e-mailovou adresu, tvoje předměty a historii odpovědí v zabezpečené databázi přístupné jen tvému účtu.</p>

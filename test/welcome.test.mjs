@@ -156,11 +156,12 @@ test("pending auth stores email, kind and timestamp only (never password), expir
   assert.equal(readPendingAuth(t0 + 1000, store).kind, "signup");
 });
 
-test("extractOtpDigits handles pasted spaced codes and fonts.css ships Source Sans 3 + JetBrains Mono", async () => {
+test("extractOtpDigits handles pasted spaced codes and fonts.css ships Schibsted Grotesk + Literata + JetBrains Mono", async () => {
   assert.equal(extractOtpDigits("1234 5678"), "12345678");
   assert.equal(extractOtpDigits(" 12-34-56-78\n"), "12345678");
   const css = await readFile(new URL("../public/fonts/fonts.css", import.meta.url), "utf8");
-  assert.ok(css.includes("Source Sans 3") && css.includes("400 700"), "fonts.css declares variable Source Sans 3");
+  assert.ok(css.includes("Schibsted Grotesk") && css.includes("400 800"), "fonts.css declares variable Schibsted Grotesk");
+  assert.ok(css.includes("Literata") && css.includes("400 600"), "fonts.css declares variable Literata");
   assert.ok(css.includes("JetBrains Mono"), "fonts.css declares JetBrains Mono");
 });
 

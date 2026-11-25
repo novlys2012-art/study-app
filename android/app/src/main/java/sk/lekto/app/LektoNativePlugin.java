@@ -37,7 +37,7 @@ public class LektoNativePlugin extends Plugin {
 
     @PluginMethod
     public void setChrome(PluginCall call) {
-        String hex = call.getString("color", "#f5f2eb");
+        String hex = call.getString("color", "#eef3f8");
         boolean dark = Boolean.TRUE.equals(call.getBoolean("dark", false));
         Activity activity = getActivity();
         if (activity == null) {
