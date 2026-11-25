@@ -174,7 +174,7 @@ Both Light and Dark palettes are intentionally composed in perceptual OKLCH (`hu
 
 ### Secondary
 - **Prussian Cloth** (`--shell` / `colors.shell` in Light, `colors.dark-shell` in Dark): Committed structural shell color owning the `#welcome` masthead and hero stage, the `>= 900px` desktop navigation rail, the `#today` priority exam header band, static legal mastheads, and floating toasts/tooltips.
-- **Prussian Elevated & Prussian Rule** (`--shell-elev`, `--shell-rule`): Recessed interactive fills, active rail tabs, and hairline borders inside Prussian Cloth regions, paired with **Prussian Chalk** (`--on-shell`) and hue-tinted **Prussian Mist** (`--shell-muted`) text.
+- **Prussian Elevated, Prussian Rule & Študovňa Lamp** (`--shell-elev`, `--shell-rule`, `--shell-lamp`, `--shell-lamp-soft`, `--shell-grid`, `--shell-grid-major`, `--shell-rim`): Recessed interactive fills, active rail tabs, hairline borders, and directional library-lamp illumination inside Prussian Cloth regions, paired with **Prussian Chalk** (`--on-shell`) and hue-tinted **Prussian Mist** (`--shell-muted`) text.
 
 ### Tertiary
 - **Sulfur Highlighter** (`--mark` / `colors.mark` in Light, `colors.dark-mark` with `colors.dark-mark-ink` in Dark): Reserved for inline `<mark class="hl">` cited source passages, `::selection` highlight, the brand-mark proof bar, and high-contrast (`11.8:1`) `:focus-visible` outlines inside dark Prussian Cloth regions (`--focus-shell`).
@@ -225,12 +225,13 @@ Spacing runs on a 4 px base scale (`4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 / 64 px`
 Working surfaces are flat at rest, relying on the contrast between **Calendered Paper** (`--paper`), **Compendium Sheet** (`--sheet`), **Prussian Cloth** (`--shell`), and crisp `1px` rules (`--rule`) rather than card drop shadows or `backdrop-filter: blur()`.
 
 ### Shadow Vocabulary
-- **Stage Specimen** (`--shadow-stage: 0 18px 38px -14px rgba(5, 11, 22, 0.42)`): Lifts the `#wProof` Tear-Proof Compendium Sheet off the dark Prussian `#welcome` stage.
+- **Stage Specimen & Študovňa Lamp** (`--shadow-stage: 0 18px 38px -14px rgba(5, 11, 22, 0.42)` + `--shell-lamp` + masked `24px`/`120px` drafting grid): Lifts `#wProof` off `#welcome`'s Prussian `.w-stage` inside an asymmetric reading-lamp light cone that reveals a millimeter grid (`--shell-grid`, `--shell-grid-major`) strictly around the proof card via `mask-image`. Operate Prussian shells (`#today` `.hero-open`, desktop `#tabbar`, static legal `.band`) echo only a quiet `--shell-lamp-soft` catchlight and `1px` `--shell-rim` top highlight with zero grid lines behind labels.
 - **Modal Overlay** (`--shadow-overlay: 0 18px 42px -12px rgba(9, 18, 34, 0.24)`): Centered desktop `dialog.bsheet` modals (`>= 900px`) over `rgba(8, 14, 24, 0.52)` backdrop.
 - **Toast & Tooltip** (`--shadow-toast: 0 8px 22px -6px rgba(9, 18, 34, 0.26)`): Prussian-Cloth toast notifications and context help popovers only.
 
 ### Named Rules
 - **The Flat-Workspace Rule.** Cards, sheets, rows, and buttons inside Operate and Read never carry drop shadows, neon glows, or hard offset shadows (`4px 4px 0`).
+- **The Masked-Lamp Rule.** Technical drafting grids (`24px`/`120px`) appear exclusively on `#welcome`'s `.w-stage` masked inside the `--shell-lamp` pool behind `#wProof`—never behind `.w-copy` headlines/ledes and never inside Operate navigation or headers.
 - **The Purposeful-Motion Rule.** Transitions use a single exponential ease-out (`--ease: cubic-bezier(0.22, 1, 0.36, 1)`, `120ms` control state, `180ms` screen/sheet/verdict). Under `prefers-reduced-motion: reduce`, spatial slides and press scales turn off while preserving non-animated state feedback (`.toast.on` stays `opacity: 1`, `.hl-block` retains `--mark-wash`).
 
 ## Shapes

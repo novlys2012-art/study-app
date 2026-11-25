@@ -19,7 +19,7 @@ A student with a phone in one hand on a tram at 23:30, a week before an exam, wh
 
 ## Structure
 
-- **Úvod (`#welcome` — Persuade)**: full-bleed Prussian Cloth hero stage demonstrating a real missed question linked across a tear-register rule to its Sulfur-highlighted `Literata` source passage and page locus (`str. 4`), followed by how-it-works, past-exam frequency ledger, pricing, and FAQ.
+- **Úvod (`#welcome` — Persuade)**: full-bleed Prussian Cloth hero stage with a directional **Študovňa Lamp** spotlight and masked `24px`/`120px` drafting grid behind the Tear-Proof specimen card, demonstrating a real missed question linked across a tear-register rule to its Sulfur-highlighted `Literata` source passage and page locus (`str. 4`), followed by how-it-works, past-exam frequency ledger, pricing, and FAQ.
 - **Dnes (`#today` — Operate)**: what to do now. The subject with the nearest exam (or the one opened last) leads as a Prussian-banded priority compendium sheet with tabular countdown, `3 px` mastery bar, and today's round. Other subjects sit below inside a single hairline-ruled list, each with a play button.
 - **Predmety (`#home`)**: the library as one unified hairline-ruled list (or empty state).
 - **A subject (`#subject`)**: tabular mastery percentage + `3 px` bar, exam date, "Učiť sa" and "Vlastné kolo", then flat underline tabs: Témy (weakest first, hairline-ruled), Zhrnutia, Skúšky (old exams ranked by frequency, opening old questions in a sheet), and Vzory.

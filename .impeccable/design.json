@@ -130,6 +130,7 @@
       { "name": "The Three-Axis Halation Rule", "body": "Dark mode compensates light-on-dark reading on all three perceptual axes simultaneously: line-height (1.65 → 1.70), body letter-spacing (0 → +0.005em), and Literata variable weight (400 → 430).", "section": "typography" },
       { "name": "The No-Eyebrow Rule", "body": "Never place uppercase tracked kickers or eyebrows above headings; metadata uses plain sentence case.", "section": "typography" },
       { "name": "The Flat-Workspace Rule", "body": "Cards, sheets, rows, and buttons inside Operate and Read never carry drop shadows, neon glows, or hard offset shadows (4px 4px 0).", "section": "elevation" },
+      { "name": "The Masked-Lamp Rule", "body": "Technical drafting grids (24px/120px) appear exclusively on #welcome's .w-stage masked inside the --shell-lamp pool behind #wProof—never behind .w-copy headlines/ledes and never inside Operate navigation or headers.", "section": "elevation" },
       { "name": "The Purposeful-Motion Rule", "body": "Transitions use a single exponential ease-out (--ease: cubic-bezier(0.22, 1, 0.36, 1), 120ms control state, 180ms screen/sheet/verdict). Under prefers-reduced-motion: reduce, spatial slides and press scales turn off while preserving non-animated state feedback (.toast.on stays opacity: 1, .hl-block retains --mark-wash).", "section": "elevation" }
     ],
     "dos": [
